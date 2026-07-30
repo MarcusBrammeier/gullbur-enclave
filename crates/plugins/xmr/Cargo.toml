@@ -1,0 +1,32 @@
+[package]
+name = "plugin-xmr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wallet-plugin = { path = "../../wallet-plugin" }
+crypto-core = { path = "../../crypto-core" }
+
+# monero-serai — Serai DEX team's Monero implementation (CLSAG, RingCT, key derivation).
+monero-serai-mirror = "0.1.5-alpha"
+monero-clsag-mirror = "0.1.0"
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+curve25519-dalek.workspace = true
+zeroize.workspace = true
+rand_core = "0.6"
+
+[dev-dependencies]
+futures = "0.3"
+tokio = { workspace = true }

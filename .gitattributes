@@ -1,0 +1,5 @@
+# Rust project - line endings and binary markers
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+Cargo.lock binary

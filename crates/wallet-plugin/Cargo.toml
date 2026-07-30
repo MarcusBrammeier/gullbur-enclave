@@ -1,0 +1,17 @@
+[package]
+name = "wallet-plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = ">=0.1,<1"
+crypto-core = { path = "../crypto-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

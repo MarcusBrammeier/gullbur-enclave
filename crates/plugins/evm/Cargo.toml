@@ -1,0 +1,25 @@
+[package]
+name = "plugin-evm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wallet-plugin = { path = "../../wallet-plugin" }
+crypto-core = { path = "../../crypto-core" }
+
+# alloy — pending version compatibility with serde >=1.0.228.
+# EVM plugin currently uses k256 + sha3 directly for address/key derivation.
+k256 = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]

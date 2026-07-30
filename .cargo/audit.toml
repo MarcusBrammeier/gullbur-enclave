@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2025-0055",  # tracing-subscriber — transitive via ark-relations/revm, no upgrade
+    "RUSTSEC-2024-0429",  # glib — unsound Iterator, Tauri transitive, no upgrade
+]

@@ -1,0 +1,518 @@
+use async_trait::async_trait;
+use std::sync::LazyLock;
+use wallet_plugin::{
+    Account, Balance, Capability, FeeEstimate, KeyHandle, NetworkSpec, PluginError, PluginMetadata,
+    TxRecord, TxStatus, WalletPlugin,
+};
+
+use reqwest;
+
+pub struct BtcPlugin {
+    socks5_proxy: Option<String>,
+}
+
+impl BtcPlugin {
+    pub fn new(socks5_proxy: Option<String>) -> Self {
+        Self { socks5_proxy }
+    }
+
+    pub fn with_tor(socks_port: u16) -> Self {
+        Self::new(Some(format!("socks5://127.0.0.1:{socks_port}")))
+    }
+
+    fn build_client(&self) -> Result<reqwest::Client, reqwest::Error> {
+        let mut builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30));
+        if let Some(ref proxy_url) = self.socks5_proxy {
+            builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
+        }
+        builder.build()
+    }
+}
+
+static BTC_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| [
+    NetworkSpec { id: String::from("bitcoin"), name: String::from("Bitcoin"), symbol: String::from("BTC"), decimals: 8, is_testnet: false },
+    NetworkSpec { id: String::from("bitcoin-testnet"), name: String::from("Bitcoin Testnet"), symbol: String::from("tBTC"), decimals: 8, is_testnet: true },
+    NetworkSpec { id: String::from("bitcoin-signet"), name: String::from("Bitcoin Signet"), symbol: String::from("sBTC"), decimals: 8, is_testnet: true },
+]);
+
+fn esplora_base(network: &str) -> &str {
+    match network {
+        "bitcoin" => "https://blockstream.info/api",
+        "bitcoin-testnet" => "https://blockstream.info/testnet/api",
+        "bitcoin-signet" => "https://blockstream.info/signet/api",
+        _ => "https://blockstream.info/api",
+    }
+}
+
+#[async_trait]
+impl WalletPlugin for BtcPlugin {
+    fn id(&self) -> &'static str { "btc" }
+    fn name(&self) -> &'static str { "Bitcoin" }
+    fn supported_networks(&self) -> &[NetworkSpec] { &*BTC_NETWORKS }
+
+    fn plugin_metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            description: "Bitcoin — P2WPKH (SegWit v0) via BIP-84, PSBT signing, Esplora-backed balance & history",
+            author: "Gullbúr Enclave",
+            homepage: "https://github.com/gullbur/gullburcore",
+            repository: "https://github.com/gullbur/gullburcore",
+            min_wallet_version: "0.1.0",
+            tags: &["bitcoin", "btc", "segwit", "bip84", "psbt"],
+        }
+    }
+
+    fn capabilities(&self) -> Vec<Capability> {
+        vec![
+            Capability::AccountCreation,
+            Capability::Signing,
+            Capability::Broadcast,
+            Capability::Balance,
+            Capability::History,
+            Capability::FeeEstimation,
+            Capability::AddressValidation,
+            Capability::PsbtParsing,
+        ]
+    }
+
+    async fn create_account(&self, seed: &[u8], index: u32, network: &str) -> Result<Account, PluginError> {
+        let btc_network = match network {
+            "bitcoin" => bitcoin::Network::Bitcoin,
+            "bitcoin-testnet" => bitcoin::Network::Testnet,
+            "bitcoin-signet" => bitcoin::Network::Signet,
+            _ => return Err(PluginError::UnsupportedNetwork(network.into())),
+        };
+        // BIP-84: m/84'/0'/0'/0/index (mainnet) or m/84'/1'/0'/0/index (testnet)
+        let purpose: u32 = 84;
+        let coin_type: u32 = match btc_network {
+            bitcoin::Network::Bitcoin => 0,
+            _ => 1,
+        };
+        let path = format!("m/{purpose}'/{coin_type}'/0'/0/{index}");
+
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let master = bitcoin::bip32::Xpriv::new_master(btc_network, seed)
+            .map_err(|e| PluginError::Internal(format!("BIP-32 master key error: {e}")))?;
+        let derivation_path: bitcoin::bip32::DerivationPath = path.parse()
+            .map_err(|e: bitcoin::bip32::Error| PluginError::Internal(format!("BIP-32 path error: {e}")))?;
+        let child = master.derive_priv(&secp, &derivation_path)
+            .map_err(|e| PluginError::Internal(format!("BIP-32 derivation error: {e}")))?;
+
+        let compressed = bitcoin::CompressedPublicKey(
+            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key));
+        let address = bitcoin::Address::p2wpkh(&compressed, btc_network);
+
+        Ok(Account {
+            id: format!("btc-{network}-{index}"),
+            network: network.into(),
+            address: address.to_string(),
+            path: Some(path),
+            label: None,
+        })
+    }
+
+    async fn sign_transaction(&self, tx: &[u8], key: &KeyHandle, network: &str) -> Result<Vec<u8>, PluginError> {
+        use bitcoin::psbt::Psbt;
+        use bitcoin::sighash::SighashCache;
+
+        // Parse the PSBT
+        let mut psbt = Psbt::deserialize(tx)
+            .map_err(|e| PluginError::Internal(format!("PSBT parse error: {e}")))?;
+
+        // Extract the first input and its witness UTXO
+        if psbt.inputs.is_empty() {
+            return Err(PluginError::Internal("PSBT has no inputs".into()));
+        }
+        let utxo = psbt.inputs[0].witness_utxo.as_ref()
+            .ok_or_else(|| PluginError::Internal("PSBT input missing witness UTXO".into()))?;
+
+        // Decode the seed from key_id (format: "hex_seed@index" or "0xhex_seed@index")
+        let (seed_hex, acct_index) = {
+            let raw = key.key_id.strip_prefix("0x").unwrap_or(&key.key_id);
+            if let Some(at_pos) = raw.find('@') {
+                let seed_part = &raw[..at_pos];
+                let index_part = &raw[at_pos + 1..];
+                let idx: u32 = index_part.parse()
+                    .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
+                (seed_part.to_string(), idx)
+            } else {
+                // Backward compat: key_id is just the seed hex, use index 0
+                (raw.to_string(), 0u32)
+            }
+        };
+        let seed = hex::decode(&seed_hex)
+            .map_err(|e| PluginError::Internal(format!("invalid seed hex in key_id: {e}")))?;
+
+        // Determine BIP-84 network
+        let btc_network = match network {
+            "bitcoin" => bitcoin::Network::Bitcoin,
+            "bitcoin-testnet" => bitcoin::Network::Testnet,
+            "bitcoin-signet" => bitcoin::Network::Signet,
+            _ => return Err(PluginError::UnsupportedNetwork(network.into())),
+        };
+        let coin_type: u32 = match btc_network {
+            bitcoin::Network::Bitcoin => 0,
+            _ => 1,
+        };
+        let path = format!("m/84'/{coin_type}'/0'/0/{acct_index}");
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let master = bitcoin::bip32::Xpriv::new_master(btc_network, &seed)
+            .map_err(|e| PluginError::Internal(format!("BIP-32 master key error: {e}")))?;
+        let derivation_path: bitcoin::bip32::DerivationPath = path.parse()
+            .map_err(|e: bitcoin::bip32::Error| PluginError::Internal(format!("BIP-32 path error: {e}")))?;
+        let child = master.derive_priv(&secp, &derivation_path)
+            .map_err(|e| PluginError::Internal(format!("BIP-32 derivation error: {e}")))?;
+
+        // Get compressed public key matching create_account derivation
+        let compressed_pubkey = bitcoin::CompressedPublicKey(
+            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key));
+        let bitcoin_pubkey: bitcoin::PublicKey = compressed_pubkey.into();
+
+        // Extract secret key bytes for signing
+        let secret_bytes = child.private_key.secret_bytes();
+
+        // Compute BIP-143 sighash for P2WPKH (SegWit v0)
+        let sighash_type = bitcoin::sighash::EcdsaSighashType::All;
+        let mut sighasher = SighashCache::new(&psbt.unsigned_tx);
+        let sighash = sighasher
+            .p2wpkh_signature_hash(0, &utxo.script_pubkey, utxo.value, sighash_type)
+            .map_err(|e| PluginError::Internal(format!("sighash compute error: {e}")))?;
+
+        // Sign with bitcoin's secp256k1 (handles low-S normalization for P2WPKH)
+        let bitcoin_secp = bitcoin::secp256k1::Secp256k1::signing_only();
+        let secret_key = bitcoin::secp256k1::SecretKey::from_slice(&secret_bytes)
+            .map_err(|e| PluginError::Internal(format!("invalid secret key: {e}")))?;
+        let msg = bitcoin::secp256k1::Message::from_digest(*sighash.as_ref());
+        let secp_sig = bitcoin_secp.sign_ecdsa(&msg, &secret_key);
+        let der_sig = secp_sig.serialize_der().to_vec();
+
+        // Encode signature as DER + sighash type byte
+        let mut sig_bytes = der_sig;
+        sig_bytes.push(sighash_type.to_u32() as u8);
+
+        // Insert the signature + pubkey into the PSBT's partial_sigs map
+        // bitcoin_pubkey is the compressed public key matching create_account (line ~137)
+        let bitcoin_sig = bitcoin::ecdsa::Signature::from_slice(&sig_bytes)
+            .map_err(|e| PluginError::Internal(format!("signature conversion error: {e}")))?;
+        psbt.inputs[0].partial_sigs.insert(bitcoin_pubkey, bitcoin_sig);
+
+        // Return the serialized signed PSBT bytes
+        Ok(psbt.serialize())
+    }
+
+    async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
+        let base = esplora_base(network);
+        let url = format!("{}/tx", base);
+        let client = self.build_client()
+            .map_err(|e| PluginError::BroadcastFailed(format!("Failed to build HTTP client: {e}")))?;
+        let body = hex::encode(tx);
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/plain")
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| PluginError::BroadcastFailed(format!("HTTP request failed: {e}")))?;
+        let txid = resp
+            .text()
+            .await
+            .map_err(|e| PluginError::BroadcastFailed(format!("Failed to read response: {e}")))?;
+        Ok(txid.trim().to_string())
+    }
+
+    async fn get_balance(&self, account: &Account, network: &str) -> Result<Balance, PluginError> {
+        let base = esplora_base(network);
+        let url = format!("{}/address/{}", base, account.address);
+        let client = self.build_client()
+            .map_err(|e| PluginError::NetworkError(format!("Failed to build HTTP client: {e}")))?;
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("HTTP request failed: {e}")))?;
+        let json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("Failed to parse address info: {e}")))?;
+
+        let chain_funded = json["chain_stats"]["funded_txo_sum"].as_u64().unwrap_or(0);
+        let chain_spent = json["chain_stats"]["spent_txo_sum"].as_u64().unwrap_or(0);
+        let mempool_funded = json["mempool_stats"]["funded_txo_sum"].as_u64().unwrap_or(0);
+        let mempool_spent = json["mempool_stats"]["spent_txo_sum"].as_u64().unwrap_or(0);
+
+        let confirmed_sats = chain_funded.saturating_sub(chain_spent);
+        let unconfirmed_sats = mempool_funded.saturating_sub(mempool_spent);
+
+        let fmt_btc = |sats: u64| -> String {
+            if sats == 0 {
+                return "0".into();
+            }
+            let btc = sats as f64 / 100_000_000.0;
+            let s = format!("{:.8}", btc);
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        };
+
+        Ok(Balance {
+            confirmed: fmt_btc(confirmed_sats),
+            unconfirmed: fmt_btc(unconfirmed_sats),
+            unit: "BTC".into(),
+        })
+    }
+
+    async fn get_transaction_history(&self, account: &Account, network: &str, limit: u32) -> Result<Vec<TxRecord>, PluginError> {
+        let base = esplora_base(network);
+        let url = format!("{}/address/{}/txs", base, account.address);
+        let client = self.build_client()
+            .map_err(|e| PluginError::NetworkError(format!("Failed to build HTTP client: {e}")))?;
+
+        let resp = match client.get(&url).send().await {
+            Ok(r) => r,
+            Err(_) => return Ok(vec![]),
+        };
+
+        let txs: Vec<serde_json::Value> = match resp.json().await {
+            Ok(j) => j,
+            Err(_) => return Ok(vec![]),
+        };
+
+        Ok(txs
+            .into_iter()
+            .take(limit as usize)
+            .map(|tx| {
+                let txid = tx["txid"].as_str().unwrap_or("").to_string();
+                let from_address = tx["vin"][0]["prevout"]["scriptpubkey_address"]
+                    .as_str()
+                    .map(|s| s.to_string());
+                let to_address = tx["vout"][0]["scriptpubkey_address"]
+                    .as_str()
+                    .map(|s| s.to_string());
+                let amount_sats: u64 = tx["vout"]
+                    .as_array()
+                    .map(|vouts| vouts.iter().filter_map(|v| v["value"].as_u64()).sum())
+                    .unwrap_or(0);
+                let fee = tx["fee"].as_u64().map(|f| f.to_string());
+                let block_height = tx["status"]["block_height"].as_u64();
+                let timestamp = tx["status"]["block_time"].as_u64();
+                let confirmed = tx["status"]["confirmed"].as_bool().unwrap_or(false);
+                let status = if confirmed {
+                    TxStatus::Confirmed {
+                        confirmations: block_height.map(|_| 1u64).unwrap_or(1),
+                    }
+                } else {
+                    TxStatus::Pending
+                };
+
+                TxRecord {
+                    txid,
+                    from_address,
+                    to_address,
+                    amount: amount_sats.to_string(),
+                    fee,
+                    block_height,
+                    timestamp,
+                    status,
+                }
+            })
+            .collect())
+    }
+
+    async fn estimate_fee(&self, _t: &[u8], network: &str) -> Result<FeeEstimate, PluginError> {
+        let base = esplora_base(network);
+        let url = format!("{}/fee-estimates", base);
+        let client = self.build_client()
+            .map_err(|e| PluginError::NetworkError(format!("Failed to build HTTP client: {e}")))?;
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("HTTP request failed: {e}")))?;
+        let json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("Failed to parse fee estimates: {e}")))?;
+
+        let fast = json["1"].as_f64().map_or("0".to_string(), |v| format!("{:.1}", v));
+        let medium = json["3"].as_f64().map_or("0".to_string(), |v| format!("{:.1}", v));
+        let slow = json["6"].as_f64().map_or("0".to_string(), |v| format!("{:.1}", v));
+
+        Ok(FeeEstimate { fast, medium, slow, unit: "sat/vB".into() })
+    }
+
+    async fn validate_address(&self, addr: &str, network: &str) -> Result<bool, PluginError> {
+        // Try full address validation via bitcoin crate (validates bech32 checksum,
+        // Base58Check for legacy, and matches the address to its network)
+        use bitcoin::address::NetworkUnchecked;
+        if let Ok(unchecked) = addr.parse::<bitcoin::Address<NetworkUnchecked>>() {
+            let expected = match network {
+                "bitcoin" => bitcoin::Network::Bitcoin,
+                "bitcoin-testnet" => bitcoin::Network::Testnet,
+                "bitcoin-signet" => bitcoin::Network::Signet,
+                _ => return Ok(false),
+            };
+            return Ok(unchecked.require_network(expected).is_ok());
+        }
+
+        // Fall back to prefix-only check for backward compatibility
+        match network {
+            "bitcoin" => Ok(addr.starts_with("bc1") || addr.starts_with("1") || addr.starts_with("3")),
+            "bitcoin-testnet" | "bitcoin-signet" => Ok(addr.starts_with("tb1") || addr.starts_with("m") || addr.starts_with("n") || addr.starts_with("2")),
+            _ => Ok(false),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wallet_plugin::WalletPlugin;
+
+    #[test]
+    fn test_plugin_id_and_name() {
+        let plugin = BtcPlugin::new(None);
+        assert_eq!(plugin.id(), "btc");
+        assert_eq!(plugin.name(), "Bitcoin");
+    }
+
+    #[test]
+    fn test_supported_networks_count() {
+        let plugin = BtcPlugin::new(None);
+        assert_eq!(plugin.supported_networks().len(), 3);
+    }
+
+    #[test]
+    fn test_supported_networks_data() {
+        let plugin = BtcPlugin::new(None);
+        let networks = plugin.supported_networks();
+        let first = &networks[0];
+        assert_eq!(first.id, "bitcoin");
+        assert_eq!(first.symbol, "BTC");
+        assert_eq!(first.decimals, 8);
+        assert!(!first.is_testnet);
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_valid() {
+        let plugin = BtcPlugin::new(None);
+        let result = plugin
+            .validate_address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bitcoin")
+            .await;
+        assert!(result.expect("test invariant"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_invalid() {
+        let plugin = BtcPlugin::new(None);
+        let result = plugin.validate_address("not-an-address", "bitcoin").await;
+        assert!(!result.expect("test invariant"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_testnet() {
+        let plugin = BtcPlugin::new(None);
+        let result = plugin
+            .validate_address("tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk", "bitcoin-testnet")
+            .await;
+        assert!(result.expect("test invariant"), "testnet bech32 address should be valid");
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_mainnet_rejects_testnet() {
+        let plugin = BtcPlugin::new(None);
+        let result = plugin
+            .validate_address("tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk", "bitcoin")
+            .await;
+        assert!(!result.expect("test invariant"), "testnet address should be rejected on mainnet");
+    }
+
+    #[tokio::test]
+    async fn test_create_account_returns_account() {
+        let plugin = BtcPlugin::new(None);
+        let account = plugin
+            .create_account(&[0xaa; 32], 0, "bitcoin-testnet")
+            .await
+            .expect("test invariant");
+        eprintln!("BTC_TESTNET_ADDR:{}", account.address);
+        assert_eq!(account.network, "bitcoin-testnet");
+        assert!(account.id.starts_with("btc-bitcoin-testnet-"));
+        assert!(account.address.starts_with("tb1q") || account.address.starts_with("bc1q"));
+    }
+
+    #[tokio::test]
+    async fn test_sign_transaction_with_test_key() {
+        use bitcoin::absolute::LockTime;
+        use bitcoin::psbt::Psbt;
+        use bitcoin::transaction::Version;
+        use bitcoin::{Amount, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Witness};
+
+        let plugin = BtcPlugin::new(None);
+
+        // Create a minimal transaction
+        let unsigned_tx = bitcoin::Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint::default(),
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::new(),
+            }],
+            output: vec![TxOut {
+                value: Amount::from_sat(10000),
+                script_pubkey: ScriptBuf::from_bytes(vec![0u8; 22]),
+            }],
+        };
+
+        // Build a PSBT with a witness UTXO (P2WPKH: 0x00 0x14 + 20 zero bytes)
+        let mut p2wpkh_bytes = vec![0x00, 0x14];
+        p2wpkh_bytes.extend_from_slice(&[0u8; 20]);
+        let psbt = Psbt {
+            unsigned_tx,
+            version: 0,
+            xpub: Default::default(),
+            proprietary: Default::default(),
+            unknown: Default::default(),
+            inputs: vec![bitcoin::psbt::Input {
+                witness_utxo: Some(TxOut {
+                    value: Amount::from_sat(50000),
+                    script_pubkey: ScriptBuf::from_bytes(p2wpkh_bytes),
+                }),
+                ..Default::default()
+            }],
+            outputs: vec![Default::default()],
+        };
+
+        let psbt_bytes = psbt.serialize();
+        let key = KeyHandle {
+            key_id: "deadbeef".into(),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+
+        let signed = plugin
+            .sign_transaction(&psbt_bytes, &key, "bitcoin")
+            .await
+            .expect("sign_transaction should succeed");
+
+        // Deserialize the signed PSBT and verify it has a partial signature
+        let signed_psbt =
+            Psbt::deserialize(&signed).expect("signed PSBT should deserialize");
+        assert!(
+            !signed_psbt.inputs[0].partial_sigs.is_empty(),
+            "partial_sigs should contain at least one signature"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sign_transaction_invalid_psbt() {
+        let plugin = BtcPlugin::new(None);
+        let key = KeyHandle {
+            key_id: "deadbeef".into(),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+        let result = plugin
+            .sign_transaction(b"not a valid PSBT", &key, "bitcoin")
+            .await;
+        assert!(result.is_err(), "passing garbage bytes should return Err");
+    }
+}

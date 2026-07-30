@@ -1,0 +1,18 @@
+[package]
+name = "auth-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = ">=0.1,<1"
+crypto-core = { path = "../crypto-core" }
+hex = ">=0.4,<1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

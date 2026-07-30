@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- Allow cleartext WebSocket (ws://) to localhost only.
+       The vault IPC server runs on 127.0.0.1, and Android's
+       CLEARTEXT traffic restriction blocks ws:// from WebView.
+       This is the secure middle ground: no MITM risk because
+       the traffic never leaves the device. -->
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="false">127.0.0.1</domain>
+    <domain includeSubdomains="false">localhost</domain>
+  </domain-config>
+</network-security-config>

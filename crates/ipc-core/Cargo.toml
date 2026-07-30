@@ -1,0 +1,20 @@
+[package]
+name = "ipc-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+axum = "0.8"
+crypto-core = { path = "../crypto-core" }
+futures-util = ">=0.3,<1"
+ipc-protocol = { path = "../ipc-protocol" }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tracing = { workspace = true }

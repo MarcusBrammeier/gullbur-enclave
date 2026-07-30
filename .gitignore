@@ -1,0 +1,47 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Tauri
+apps/desktop/src-tauri/target/
+apps/desktop/node_modules/
+apps/desktop/dist/
+
+# Node
+node_modules/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+dist/
+*.log
+crates/crypto-wasm/target/
+crates/crypto-wasm/pkg/
+
+# Android APK/AAB output
+apk-output/
+apps/desktop/src-tauri/gen/android/app/build/
+apps/desktop/src-tauri/gen/android/build/
+apps/desktop/src-tauri/gen/android/.gradle/
+apps/desktop/src-tauri/gen/android/local.properties
+
+# Keystore (regenerated per-dev)
+apps/desktop/src-tauri/android-keystore.jks
+android-keystore.jks
+.hermes.md

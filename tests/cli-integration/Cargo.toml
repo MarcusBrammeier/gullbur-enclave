@@ -1,0 +1,26 @@
+[package]
+name = "cli-integration"
+version = "0.0.1"
+edition = "2021"
+publish = false
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+tokio-tungstenite = { workspace = true }
+serde_json = { workspace = true }
+futures-util = ">=0.3,<1"
+rand = { workspace = true }
+hex = { workspace = true }
+zeroize = { workspace = true }
+
+vault-core = { path = "../../crates/vault-core", features = ["plugins"] }
+ipc-core = { path = "../../crates/ipc-core" }
+ipc-protocol = { path = "../../crates/ipc-protocol" }
+auth-core = { path = "../../crates/auth-core" }
+crypto-core = { path = "../../crates/crypto-core" }
+wallet-plugin = { path = "../../crates/wallet-plugin" }
+plugin-btc = { path = "../../crates/plugins/btc" }
+plugin-evm = { path = "../../crates/plugins/evm" }
+plugin-xmr = { path = "../../crates/plugins/xmr" }
+plugin-ltc = { path = "../../crates/plugins/ltc" }

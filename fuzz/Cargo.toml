@@ -1,0 +1,61 @@
+[package]
+name = "crypto-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license.workspace = true
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+futures = "0.3"
+libfuzzer-sys = "0.4"
+serde_json = "1"
+aes-gcm = "0.11"
+bip39 = "2.1"
+bitcoin = "0.32"
+
+[dependencies.ipc-protocol]
+path = "../crates/ipc-protocol"
+
+[dependencies.plugin-xmr]
+path = "../crates/plugins/xmr"
+
+[dependencies.wallet-plugin]
+path = "../crates/wallet-plugin"
+
+[[bin]]
+name = "fuzz_json_rpc"
+path = "fuzz_targets/fuzz_json_rpc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_validate_address"
+path = "fuzz_targets/fuzz_validate_address.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_aes_gcm"
+path = "fuzz_targets/fuzz_aes_gcm.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_bip39"
+path = "fuzz_targets/fuzz_bip39.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_psbt"
+path = "fuzz_targets/fuzz_psbt.rs"
+test = false
+doc = false
+bench = false

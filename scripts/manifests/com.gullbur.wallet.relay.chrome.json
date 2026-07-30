@@ -1,0 +1,9 @@
+{
+  "name": "com.gullbur.wallet.relay",
+  "description": "FOSS Crypto Wallet — Native Messaging Relay (Chrome/Brave/Chromium)",
+  "path": "<BINARY_PATH>",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__CHROME_EXTENSION_ID__/"
+  ]
+}

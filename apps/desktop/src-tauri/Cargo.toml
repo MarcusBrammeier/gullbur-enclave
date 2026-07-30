@@ -1,0 +1,47 @@
+[package]
+name = "gullbur-desktop"
+version = "0.0.1"
+edition = "2024"
+license.workspace = true
+description = "Gullbúr Enclave — Internal Beta v0.0.1"
+
+[lib]
+name = "gullbur_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = ">=2,<3", features = ["isolation"] }
+
+[dependencies]
+tauri = { version = ">=2.5,<3", features = ["isolation"] }
+tauri-plugin-biometric = { version = ">=2,<3" }
+tauri-plugin-shell = { version = ">=2,<3" }
+tauri-plugin-dialog = { version = ">=2,<3" }
+serde = { version = ">=1,<2", features = ["derive"] }
+serde_json = ">=1,<2"
+tokio = { version = ">=1,<2", features = ["full"] }
+
+# Path deps on workspace crates
+vault-core = { path = "../../../crates/vault-core", features = ["plugins"] }
+ipc-core = { path = "../../../crates/ipc-core" }
+ipc-protocol = { path = "../../../crates/ipc-protocol" }
+crypto-core = { path = "../../../crates/crypto-core" }
+wallet-plugin = { path = "../../../crates/wallet-plugin" }
+hex = { workspace = true }
+reqwest = { version = ">=0.12,<1", default-features = false, features = ["json", "rustls-tls"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = ">=0.3,<1", features = ["env-filter"] }
+tauri-mcp = { path = "../../../crates/tauri-mcp" }
+aes-gcm = { workspace = true }
+rand = { workspace = true }
+auth-core = { path = "../../../crates/auth-core" }
+dirs-next = "2"
+plugin-btc = { path = "../../../crates/plugins/btc" }
+plugin-evm = { path = "../../../crates/plugins/evm" }
+plugin-xmr = { path = "../../../crates/plugins/xmr" }
+plugin-ltc = { path = "../../../crates/plugins/ltc" }
+update-checker = { path = "../../../crates/update-checker" }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

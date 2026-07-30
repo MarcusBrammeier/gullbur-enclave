@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicholasio/vsce-format/main/schemas/tauri-v2.json",
+  "productName": "Gullbúr Enclave",
+  "version": "0.0.1",
+  "identifier": "com.gullbur.enclave",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Gullbúr Enclave",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' ws://127.0.0.1:* content:; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "pattern": {
+        "use": "isolation",
+        "options": {
+          "dir": "hooks"
+        }
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+      },
+      "appimage": {}
+    }
+  },
+  "plugins": {
+    "biometric": {
+      "reason": "Authenticate to access your crypto vault"
+    }
+  }
+}

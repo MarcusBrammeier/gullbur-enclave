@@ -1,0 +1,94 @@
+name: HITL Approval Gate
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  on_approval:
+    name: Approval Gate
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check
+        run: cargo check --workspace
+
+      - name: cargo test (lib)
+        run: cargo test --workspace --lib
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+        continue-on-error: false
+
+      - name: Post approval gate result
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **HITL Approval Gate Passed**\n\n' +
+                    'All checks passed on commit `${{ github.event.pull_request.head.sha }}`:\n' +
+                    '- `cargo check` — ✅\n' +
+                    '- `cargo test` — ✅\n' +
+                    '- `cargo fmt` — ✅\n' +
+                    '- `cargo clippy` — ✅\n\n' +
+                    'This PR is ready to merge.'
+            });
+
+      - name: Post approval gate failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **HITL Approval Gate Failed**\n\n' +
+                    'One or more checks failed on commit `${{ github.event.pull_request.head.sha }}`.\n' +
+                    'Please review the workflow run for details and push fixes.'
+            });
+
+  on_changes_requested:
+    name: Changes Requested
+    if: github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✏️ **Changes Requested**\n\n' +
+                    'Reviewer **${{ github.event.review.user.login }}** has requested changes.\n\n' +
+                    '**Next steps:**\n' +
+                    '1. Address the reviewer\'s feedback in the review comments above.\n' +
+                    '2. Push new commits to the branch.\n' +
+                    '3. Request re-review when ready.\n\n' +
+                    'For questions, use the discussion thread in the review.'
+            });

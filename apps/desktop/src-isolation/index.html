@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isolation Iframe</title>
+  <!--
+    Tauri v2 Isolation Pattern — Secure sandbox iframe.
+    All IPC between the Svelte frontend and the Rust backend
+    is routed through this iframe and encrypted with SubtleCrypto AES-GCM.
+
+    This iframe is considered TRUSTED — the main window's Svelte code
+    is treated as a hostile environment (XSS, supply-chain UI spoofing).
+  -->
+</head>
+<body>
+  <script src="index.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[package]
+name = "update-checker"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+rust-version = "1.85"
+description = "GitHub release update checker — compares local version against latest GitHub release"
+
+[dependencies]
+reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
