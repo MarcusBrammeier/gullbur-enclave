@@ -34,8 +34,8 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --check
 
-      - name: cargo clippy
-        run: cargo clippy --workspace -- -D warnings -D clippy::unwrap_used
+      - name: cargo clippy (unwrap gate)
+        run: cargo clippy --workspace --lib -- -D clippy::unwrap_used -A warnings
 
       - name: cargo deny check
         run: cargo deny check

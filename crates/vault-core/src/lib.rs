@@ -136,7 +136,7 @@ impl Vault {
 
         // 3. Encrypt seed and persist via keystore-core — stores {seed, mnemonic}
         let keystore_payload = serde_json::json!({
-            "seed": hex::encode(&seed_512),
+            "seed": hex::encode(seed_512),
             "mnemonic": mnemonic_str,
         });
         let keystore_bytes = serde_json::to_vec(&keystore_payload)
@@ -265,7 +265,7 @@ impl Vault {
         if let Some(home) = dirs_next::home_dir() {
             let data_dir = home.join(".gullbur");
             let _ = std::fs::create_dir_all(&data_dir);
-            let _ = std::fs::write(data_dir.join(KEY_FILE), &key);
+            let _ = std::fs::write(data_dir.join(KEY_FILE), key);
             // Restrict permissions on Unix
             #[cfg(unix)]
             {

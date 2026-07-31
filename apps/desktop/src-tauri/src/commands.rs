@@ -99,7 +99,7 @@ pub async fn biometric_unlock_vault(
 
     if vault_guard.is_some() {
         // Vault already loaded — just verify biometric
-        let vault = vault_guard.as_ref().unwrap();
+        let vault = vault_guard.as_ref().expect("vault_guard.is_some() just checked");
         if vault.initialized.load(std::sync::atomic::Ordering::SeqCst) {
             // Prompt biometric auth
             match vs.biometric_engine.verify(auth_core::AuthStatus::BiometricUnlocked) {

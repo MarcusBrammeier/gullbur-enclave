@@ -138,11 +138,12 @@ impl PluginHost {
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
-        let accts = self.accounts
-            .lock()
-            .expect("PluginHost accounts mutex poisoned");
-        let network_accounts: Vec<Account> = accts.iter().filter(|a| a.network == network).cloned().collect();
-        drop(accts); // release lock before async I/O
+        let network_accounts = {
+            let accts = self.accounts
+                .lock()
+                .expect("PluginHost accounts mutex poisoned");
+            accts.iter().filter(|a| a.network == network).cloned().collect::<Vec<Account>>()
+        };
 
         let mut results = Vec::new();
         for acct_ref in &network_accounts {

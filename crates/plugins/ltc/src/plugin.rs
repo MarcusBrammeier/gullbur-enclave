@@ -261,6 +261,7 @@ impl WalletPlugin for LtcPlugin {
         match network {
             "litecoin" => {
                 // Try bech32 checksum validation via segwit decode
+                #[allow(clippy::collapsible_if)]
                 if let Ok((hrp, _, _)) = bech32::segwit::decode(addr) {
                     if hrp.as_str() == "ltc" {
                         return Ok(true);
@@ -271,6 +272,7 @@ impl WalletPlugin for LtcPlugin {
             }
             "litecoin-testnet" => {
                 // Try bech32 checksum validation via segwit decode
+                #[allow(clippy::collapsible_if)]
                 if let Ok((hrp, _, _)) = bech32::segwit::decode(addr) {
                     if hrp.as_str() == "tltc" {
                         return Ok(true);
