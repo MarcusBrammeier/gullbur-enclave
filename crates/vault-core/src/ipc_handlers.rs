@@ -326,10 +326,12 @@ pub fn register_vault_handlers(
     // ── vault.sign_transaction ──────────────────────────────────────────
     {
         let ph = Arc::clone(&plugin_host);
+        let sd = Arc::clone(&seed);
         let aq = Arc::clone(&approval_queue);
         let auth = Arc::clone(&auth_manager);
         handler.register("vault.sign_transaction", move |params: Value| {
             let ph = Arc::clone(&ph);
+            let sd = Arc::clone(&sd);
             let aq = Arc::clone(&aq);
             let auth = Arc::clone(&auth);
             async move {
@@ -352,6 +354,15 @@ pub fn register_vault_handlers(
                     .get("key_type")
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?;
+
+                // Read the stored seed — sign_transaction needs the raw seed
+                // to pass as key_id for plugin-side derivation (matching
+                // create_account which takes seed directly).
+                let seed_guard = sd.read().await;
+                let seed_bytes = seed_guard
+                    .as_ref()
+                    .map(|s| s.as_slice())
+                    .ok_or_else(|| RpcError::new(-32000, "Vault is not initialized"))?;
 
                 // Approval gate: if called from extension with origin,
                 // require user consent before signing.
@@ -397,14 +408,16 @@ pub fn register_vault_handlers(
                     _ => return Err(RpcError::invalid_params()),
                 };
 
-                // Append account index to key_id so BTC/LTC plugins derive the correct key.
-                // Format: "hex_seed@index" — the plugin parses this to derive at the right BIP-84 path.
-                // If no account_index is provided, defaults to 0 (backward compatible).
+                // Use the hex-encoded seed as key_id so the plugin can
+                // derive the correct key — matching create_account's seed flow.
+                // Append account index so plugins derive at the right BIP path.
+                let seed_hex = hex::encode(seed_bytes);
+                drop(seed_guard);
                 let account_index = params
                     .get("account_index")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
-                let full_key_id = format!("{}@{}", key_id, account_index);
+                let full_key_id = format!("{}@{}", seed_hex, account_index);
 
                 let key_handle = KeyHandle {
                     key_id: full_key_id,
