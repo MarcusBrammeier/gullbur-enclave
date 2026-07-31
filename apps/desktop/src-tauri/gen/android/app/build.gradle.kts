@@ -16,6 +16,18 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 36
     namespace = "com.gullbur.enclave"
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/licenses/**",
+                "META-INF/*.version",
+                "META-INF/*.kotlin_module",
+                "kotlin/**",
+            )
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.gullbur.enclave"
