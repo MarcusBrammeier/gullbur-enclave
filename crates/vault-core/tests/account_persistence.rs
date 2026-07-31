@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use vault_core::Vault;
+use serial_test::serial;
 
 /// Helper: create a temp HOME and init the vault
 async fn init_vault_in(dir: &std::path::Path) -> Vault {
@@ -19,6 +20,7 @@ async fn init_vault_in(dir: &std::path::Path) -> Vault {
 /// Test that accounts are created with correct address formats
 /// and that the vault engine produces deterministic keys.
 #[tokio::test]
+#[serial]
 async fn test_account_address_formats() {
     let tmp = std::env::temp_dir().join(format!("gullbur-addr-{}", std::process::id()));
     let mut vault = init_vault_in(&tmp).await;
@@ -61,6 +63,7 @@ async fn test_account_address_formats() {
 
 /// Test that the keystore key file is generated on init and persists on disk.
 #[tokio::test]
+#[serial]
 async fn test_keystore_key_file_created() {
     let tmp = std::env::temp_dir().join(format!("gullbur-key-{}", std::process::id()));
     let _vault = init_vault_in(&tmp).await;
@@ -79,6 +82,7 @@ async fn test_keystore_key_file_created() {
 /// Test that vault state restores from disk after process-like restart.
 /// This simulates: init → persist → new process → restore.
 #[tokio::test]
+#[serial]
 async fn test_vault_restore_after_persist() {
     let tmp = std::env::temp_dir().join(format!("gullbur-restore-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);

@@ -10,7 +10,7 @@
   );
 
   let testnetOnly = $state(true);
-  let crashConsent = $state(false);
+  let crashConsent = $state(true);
   let enableBiometric = $state(true);
   let autoLockSecs = $state(30);
   let betaAccepted = $state(false);

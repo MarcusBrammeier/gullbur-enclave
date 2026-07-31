@@ -208,10 +208,7 @@
       </div>
 
       <div class="flex items-center gap-3 mt-4">
-        <button class="btn-primary text-sm flex-1" onclick={handleRestore} disabled={generating || !seedPhrase.trim()}>
-          Restore Wallet
-        </button>
-        <button class="btn-secondary text-sm flex items-center gap-2" onclick={handleGenerate} disabled={generating}>
+        <button class="btn-primary text-sm flex-1" onclick={handleGenerate} disabled={generating}>
           {#if generating}
             <span class="animate-spin inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"></span>
             Generating...
@@ -219,6 +216,9 @@
             <span class="text-vault-400">✨</span>
             Generate New
           {/if}
+        </button>
+        <button class="btn-secondary text-sm flex-1" onclick={handleRestore} disabled={generating || !seedPhrase.trim()}>
+          Restore Wallet
         </button>
       </div>
 

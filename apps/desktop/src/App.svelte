@@ -21,6 +21,14 @@
     applyTheme(vault.theme);
   });
 
+  // Auto-connect to the vault IPC server on mount
+  $effect(() => {
+    connect().catch((e: unknown) => {
+      console.warn('[auto-connect] IPC connection failed:', e);
+      // Status shows "Disconnected" — user can tap Connect to retry
+    });
+  });
+
   // Watch theme changes
   $effect(() => {
     if (typeof document !== 'undefined') {

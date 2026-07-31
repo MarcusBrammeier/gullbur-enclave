@@ -32,6 +32,7 @@ tar = ">=0.4,<1"
 sha2 = { workspace = true }
 
 [features]
+default = ["plugins"]
 plugins = [
     "plugin-btc",
     "plugin-evm",
@@ -57,3 +58,4 @@ optional = true
 
 [dev-dependencies]
 plugin-evm = { path = "../plugins/evm" }
+serial_test = "3"
