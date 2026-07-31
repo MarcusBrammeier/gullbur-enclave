@@ -1,8 +1,8 @@
 use serde_json::json;
 use std::sync::Mutex;
 use tauri::{
-    plugin::{Builder, TauriPlugin},
     Manager, Runtime,
+    plugin::{Builder, TauriPlugin},
 };
 
 /// Tauri MCP plugin — AI-driven E2E testing tools.
@@ -35,7 +35,10 @@ async fn mcp_dom_query<R: Runtime>(
     window: tauri::WebviewWindow<R>,
     selector: String,
 ) -> Result<String, String> {
-    let escaped = selector.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', " ");
+    let escaped = selector
+        .replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('\n', " ");
     let js = format!(
         r#"(() => {{
     try {{
@@ -56,7 +59,9 @@ async fn mcp_dom_query<R: Runtime>(
 }})()"#,
         escaped, escaped, escaped
     );
-    window.eval(format!("window.__tauri_mcp_tmp = {js}")).map_err(|e| e.to_string())?;
+    window
+        .eval(format!("window.__tauri_mcp_tmp = {js}"))
+        .map_err(|e| e.to_string())?;
     // Return the result inline for now — in production, use the callback pattern
     let result = json!({"selector": selector, "elements": [], "note": "run eval() above — result available via callback"});
     serde_json::to_string(&result).map_err(|e| e.to_string())
@@ -69,7 +74,10 @@ async fn mcp_dom_click<R: Runtime>(
     window: tauri::WebviewWindow<R>,
     selector: String,
 ) -> Result<String, String> {
-    let escaped = selector.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', " ");
+    let escaped = selector
+        .replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('\n', " ");
     let js = format!(
         r#"(() => {{
     try {{
@@ -85,8 +93,11 @@ async fn mcp_dom_click<R: Runtime>(
 }})()"#,
         escaped, escaped, escaped, escaped
     );
-    window.eval(format!("window.__tauri_mcp_tmp = {js}")).map_err(|e| e.to_string())?;
-    let result = json!({"selector": selector, "clicked": true, "note": "click dispatched via eval()"});
+    window
+        .eval(format!("window.__tauri_mcp_tmp = {js}"))
+        .map_err(|e| e.to_string())?;
+    let result =
+        json!({"selector": selector, "clicked": true, "note": "click dispatched via eval()"});
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
@@ -111,7 +122,9 @@ async fn mcp_webview_screenshot<R: Runtime>(
         return JSON.stringify({screenshot: '', width: 0, height: 0, error: e.message});
     }
 })()"#;
-    window.eval(format!("window.__tauri_mcp_tmp = {js}")).map_err(|e| e.to_string())?;
+    window
+        .eval(format!("window.__tauri_mcp_tmp = {js}"))
+        .map_err(|e| e.to_string())?;
     let result = json!({"screenshot": "", "width": 0, "height": 0, "note": "screenshot dispatched via eval()"});
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }

@@ -24,9 +24,15 @@ async fn setup_locking_server(
         .expect("test invariant")
         .to_string();
 
-    let r = call(port, &token, "vault.initialize", json!({
-        "seed_phrase": mnemonic
-    })).await;
+    let r = call(
+        port,
+        &token,
+        "vault.initialize",
+        json!({
+            "seed_phrase": mnemonic
+        }),
+    )
+    .await;
     assert_ok(&r, "vault.initialize");
 
     (token, handle, auth_manager)
@@ -55,10 +61,16 @@ async fn operations_blocked_after_lock() {
     assert_ok(&r, "vault.lock");
 
     // Create ETH account (then signing would also be blocked)
-    let r = call(PORT + 1, &token, "vault.create_account", json!({
-        "network": "ethereum",
-        "index": 0
-    })).await;
+    let r = call(
+        PORT + 1,
+        &token,
+        "vault.create_account",
+        json!({
+            "network": "ethereum",
+            "index": 0
+        }),
+    )
+    .await;
 
     // create_account needs seed but should work as long as we don't pass origin
     // (no approval gate). Let's verify it works.
@@ -69,18 +81,27 @@ async fn operations_blocked_after_lock() {
     // Try signing (requires BiometricUnlocked — should fail after lock)
     // First need an account
     let account_id = "ethereum-0";
-    let r = call(PORT + 1, &token, "vault.sign_transaction", json!({
-        "network": "ethereum",
-        "tx_hex": "02f8",
-        "key_id": account_id,
-        "key_type": "Secp256k1"
-    })).await;
+    let r = call(
+        PORT + 1,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "ethereum",
+            "tx_hex": "02f8",
+            "key_id": account_id,
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
 
     // Must error since vault is locked
     assert!(r.get("error").is_some(), "sign should error after lock");
     let code = r["error"]["code"].as_i64().unwrap_or(0);
     // AuthRequired errors are typically -32000 or similar (not -32601)
-    assert_ne!(code, -32601, "sign_transaction must be a registered handler");
+    assert_ne!(
+        code, -32601,
+        "sign_transaction must be a registered handler"
+    );
 }
 
 #[tokio::test]
@@ -94,7 +115,10 @@ async fn status_after_lock() {
     let r = call(PORT + 2, &token, "vault.status", json!({})).await;
     let result = assert_ok(&r, "vault.status");
     // Status should still show initialized=true (lock doesn't wipe init state)
-    assert_eq!(result["initialized"], true, "should still show initialized after lock");
+    assert_eq!(
+        result["initialized"], true,
+        "should still show initialized after lock"
+    );
 }
 
 #[tokio::test]
@@ -115,7 +139,10 @@ async fn re_init_after_lock() {
     // Must route (not -32601)
     assert!(r.get("error").is_some(), "re-init should error");
     let code = r["error"]["code"].as_i64().unwrap_or(0);
-    assert_ne!(code, -32601, "vault.initialize must be a registered handler");
+    assert_ne!(
+        code, -32601,
+        "vault.initialize must be a registered handler"
+    );
     // Should be -32000 (already initialized)
     assert_eq!(code, -32000, "re-init should say already initialized");
 }
@@ -130,31 +157,48 @@ async fn unlock_flow() {
     assert_ok(&r, "vault.lock");
 
     // Unlock via auth_manager (simulates biometric unlock)
-    auth_manager.try_biometric().expect("re-unlock should succeed");
+    auth_manager
+        .try_biometric()
+        .expect("re-unlock should succeed");
 
     // Now signing should work again
     // Create account first
-    let r = call(PORT + 4, &token, "vault.create_account", json!({
-        "network": "ethereum",
-        "index": 0
-    })).await;
+    let r = call(
+        PORT + 4,
+        &token,
+        "vault.create_account",
+        json!({
+            "network": "ethereum",
+            "index": 0
+        }),
+    )
+    .await;
     let result = assert_ok(&r, "vault.create_account");
     let account_id = result["id"].as_str().expect("test invariant").to_string();
 
     // Sign a simple transaction
-    let r = call(PORT + 4, &token, "vault.sign_transaction", json!({
-        "network": "ethereum",
-        "tx_hex": "02f8",
-        "key_id": &account_id,
-        "key_type": "Secp256k1"
-    })).await;
+    let r = call(
+        PORT + 4,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "ethereum",
+            "tx_hex": "02f8",
+            "key_id": &account_id,
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
     // Should now either succeed or error with something other than
     // method_not_found — the handler routes, auth passes
     if let Some(error) = r.get("error") {
         let code = error["code"].as_i64().unwrap_or(0);
         // Maybe a bad-key error since we're using "02f8" as the tx_hex
         // That's fine — just not -32601
-        assert_ne!(code, -32601, "sign_transaction must be registered after unlock");
+        assert_ne!(
+            code, -32601,
+            "sign_transaction must be registered after unlock"
+        );
     } else {
         // Actually succeeded — great
         assert!(r.get("result").is_some(), "should have a result");

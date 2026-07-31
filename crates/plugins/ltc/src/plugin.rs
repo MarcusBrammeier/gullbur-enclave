@@ -1,10 +1,10 @@
 use async_trait::async_trait;
+use bitcoin::hashes::Hash;
 use std::sync::LazyLock;
 use wallet_plugin::{
     Account, Balance, Capability, FeeEstimate, KeyHandle, NetworkSpec, PluginError, PluginMetadata,
     TxRecord, WalletPlugin,
 };
-use bitcoin::hashes::Hash;
 
 pub struct LtcPlugin;
 
@@ -20,10 +20,24 @@ impl Default for LtcPlugin {
     }
 }
 
-static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| [
-    NetworkSpec { id: "litecoin".into(), name: "Litecoin".into(), symbol: "LTC".into(), decimals: 8, is_testnet: false },
-    NetworkSpec { id: "litecoin-testnet".into(), name: "Litecoin Testnet".into(), symbol: "tLTC".into(), decimals: 8, is_testnet: true },
-]);
+static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| {
+    [
+        NetworkSpec {
+            id: "litecoin".into(),
+            name: "Litecoin".into(),
+            symbol: "LTC".into(),
+            decimals: 8,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: "litecoin-testnet".into(),
+            name: "Litecoin Testnet".into(),
+            symbol: "tLTC".into(),
+            decimals: 8,
+            is_testnet: true,
+        },
+    ]
+});
 
 fn esplora_base(network: &str) -> &str {
     match network {
@@ -45,7 +59,10 @@ fn esplora_base(network: &str) -> &str {
 /// Simply doing a string replacement of `bc1`→`ltc1` or `tb1`→`tltc1` produces an *invalid*
 /// checksum because the bech32 checksum includes the HRP. This function computes the correct
 /// checksum by encoding the witness program with the proper Litecoin HRP from scratch.
-fn ltc_p2wpkh_address(compressed: &bitcoin::CompressedPublicKey, network: &str) -> Result<String, PluginError> {
+fn ltc_p2wpkh_address(
+    compressed: &bitcoin::CompressedPublicKey,
+    network: &str,
+) -> Result<String, PluginError> {
     let hrp_str = match network {
         "litecoin" => "ltc",
         "litecoin-testnet" => "tltc",
@@ -91,9 +108,15 @@ fn coin_type(network: &str) -> u32 {
 
 #[async_trait]
 impl WalletPlugin for LtcPlugin {
-    fn id(&self) -> &'static str { "ltc" }
-    fn name(&self) -> &'static str { "Litecoin" }
-    fn supported_networks(&self) -> &[NetworkSpec] { &*LTC_NETWORKS }
+    fn id(&self) -> &'static str {
+        "ltc"
+    }
+    fn name(&self) -> &'static str {
+        "Litecoin"
+    }
+    fn supported_networks(&self) -> &[NetworkSpec] {
+        &*LTC_NETWORKS
+    }
 
     fn plugin_metadata(&self) -> PluginMetadata {
         PluginMetadata {
@@ -117,19 +140,28 @@ impl WalletPlugin for LtcPlugin {
         ]
     }
 
-    async fn create_account(&self, seed: &[u8], index: u32, network: &str) -> Result<Account, PluginError> {
+    async fn create_account(
+        &self,
+        seed: &[u8],
+        index: u32,
+        network: &str,
+    ) -> Result<Account, PluginError> {
         let btc_net = btc_network(network)?;
         let ct = coin_type(network);
         let path = format!("m/84'/{ct}'/0'/0/{index}");
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let master = bitcoin::bip32::Xpriv::new_master(btc_net, seed)
             .map_err(|e| PluginError::Internal(format!("BIP-32 master key error: {e}")))?;
-        let derivation_path: bitcoin::bip32::DerivationPath = path.parse()
-            .map_err(|e: bitcoin::bip32::Error| PluginError::Internal(format!("BIP-32 path: {e}")))?;
-        let child = master.derive_priv(&secp, &derivation_path)
+        let derivation_path: bitcoin::bip32::DerivationPath =
+            path.parse().map_err(|e: bitcoin::bip32::Error| {
+                PluginError::Internal(format!("BIP-32 path: {e}"))
+            })?;
+        let child = master
+            .derive_priv(&secp, &derivation_path)
             .map_err(|e| PluginError::Internal(format!("derivation: {e}")))?;
         let compressed = bitcoin::CompressedPublicKey(
-            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key));
+            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key),
+        );
         let address_str = ltc_p2wpkh_address(&compressed, network)?;
         Ok(Account {
             id: format!("ltc-{network}-{index}"),
@@ -140,22 +172,30 @@ impl WalletPlugin for LtcPlugin {
         })
     }
 
-    async fn sign_transaction(&self, tx: &[u8], key: &KeyHandle, network: &str) -> Result<Vec<u8>, PluginError> {
+    async fn sign_transaction(
+        &self,
+        tx: &[u8],
+        key: &KeyHandle,
+        network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
         use bitcoin::psbt::Psbt;
         use bitcoin::sighash::SighashCache;
-        let mut psbt = Psbt::deserialize(tx)
-            .map_err(|e| PluginError::Internal(format!("PSBT parse: {e}")))?;
+        let mut psbt =
+            Psbt::deserialize(tx).map_err(|e| PluginError::Internal(format!("PSBT parse: {e}")))?;
         if psbt.inputs.is_empty() {
             return Err(PluginError::Internal("PSBT has no inputs".into()));
         }
-        let utxo = psbt.inputs[0].witness_utxo.as_ref()
+        let utxo = psbt.inputs[0]
+            .witness_utxo
+            .as_ref()
             .ok_or_else(|| PluginError::Internal("PSBT missing witness UTXO".into()))?;
         // Decode seed from key_id (format: "hex_seed@index" or "0xhex_seed@index")
         let (seed_hex, acct_index): (String, u32) = {
             let raw = key.key_id.strip_prefix("0x").unwrap_or(&key.key_id);
             if let Some(at_pos) = raw.find('@') {
                 let seed_part = &raw[..at_pos];
-                let idx: u32 = raw[at_pos + 1..].parse()
+                let idx: u32 = raw[at_pos + 1..]
+                    .parse()
                     .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
                 (seed_part.to_string(), idx)
             } else {
@@ -170,12 +210,15 @@ impl WalletPlugin for LtcPlugin {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let master = bitcoin::bip32::Xpriv::new_master(btc_net, &seed)
             .map_err(|e| PluginError::Internal(format!("master key: {e}")))?;
-        let derivation_path: bitcoin::bip32::DerivationPath = path.parse()
+        let derivation_path: bitcoin::bip32::DerivationPath = path
+            .parse()
             .map_err(|e: bitcoin::bip32::Error| PluginError::Internal(format!("path: {e}")))?;
-        let child = master.derive_priv(&secp, &derivation_path)
+        let child = master
+            .derive_priv(&secp, &derivation_path)
             .map_err(|e| PluginError::Internal(format!("derive: {e}")))?;
         let compressed_pubkey = bitcoin::CompressedPublicKey(
-            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key));
+            bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key),
+        );
         let bitcoin_pubkey: bitcoin::PublicKey = compressed_pubkey.into();
         let secret_bytes = child.private_key.secret_bytes();
         let sighash_type = bitcoin::sighash::EcdsaSighashType::All;
@@ -192,20 +235,31 @@ impl WalletPlugin for LtcPlugin {
         sig_bytes.push(sighash_type.to_u32() as u8);
         let bitcoin_sig = bitcoin::ecdsa::Signature::from_slice(&sig_bytes)
             .map_err(|e| PluginError::Internal(format!("sig conversion: {e}")))?;
-        psbt.inputs[0].partial_sigs.insert(bitcoin_pubkey, bitcoin_sig);
+        psbt.inputs[0]
+            .partial_sigs
+            .insert(bitcoin_pubkey, bitcoin_sig);
         Ok(psbt.serialize())
     }
 
     async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
         let base = esplora_base(network);
         let url = format!("{base}/tx");
-        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
             .map_err(|e| PluginError::BroadcastFailed(format!("client: {e}")))?;
         let body = hex::encode(tx);
-        let resp = client.post(&url).header("Content-Type", "text/plain").body(body).send().await
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/plain")
+            .body(body)
+            .send()
+            .await
             .map_err(|e| PluginError::BroadcastFailed(format!("HTTP: {e}")))?;
         // Mempool.space returns the raw txid as text (not wrapped in JSON)
-        let txid = resp.text().await
+        let txid = resp
+            .text()
+            .await
             .map_err(|e| PluginError::BroadcastFailed(format!("read: {e}")))?;
         Ok(txid.trim().to_string())
     }
@@ -213,48 +267,89 @@ impl WalletPlugin for LtcPlugin {
     async fn get_balance(&self, account: &Account, network: &str) -> Result<Balance, PluginError> {
         let base = esplora_base(network);
         let url = format!("{}/address/{}", base, account.address);
-        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
             .map_err(|e| PluginError::NetworkError(format!("client: {e}")))?;
-        let resp = client.get(&url).send().await
+        let resp = client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("HTTP: {e}")))?;
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("JSON: {e}")))?;
 
         let chain_funded = json["chain_stats"]["funded_txo_sum"].as_u64().unwrap_or(0);
         let chain_spent = json["chain_stats"]["spent_txo_sum"].as_u64().unwrap_or(0);
-        let mempool_funded = json["mempool_stats"]["funded_txo_sum"].as_u64().unwrap_or(0);
+        let mempool_funded = json["mempool_stats"]["funded_txo_sum"]
+            .as_u64()
+            .unwrap_or(0);
         let mempool_spent = json["mempool_stats"]["spent_txo_sum"].as_u64().unwrap_or(0);
 
         let confirmed = chain_funded.saturating_sub(chain_spent);
         let unconfirmed = mempool_funded.saturating_sub(mempool_spent);
 
         let fmt = |v: u64| -> String {
-            if v == 0 { return "0".into(); }
+            if v == 0 {
+                return "0".into();
+            }
             let s = v as f64 / 100_000_000.0;
-            format!("{:.8}", s).trim_end_matches('0').trim_end_matches('.').to_string()
+            format!("{:.8}", s)
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
         };
-        Ok(Balance { confirmed: fmt(confirmed), unconfirmed: fmt(unconfirmed), unit: "LTC".into() })
+        Ok(Balance {
+            confirmed: fmt(confirmed),
+            unconfirmed: fmt(unconfirmed),
+            unit: "LTC".into(),
+        })
     }
 
-    async fn get_transaction_history(&self, _a: &Account, _n: &str, _l: u32) -> Result<Vec<TxRecord>, PluginError> {
+    async fn get_transaction_history(
+        &self,
+        _a: &Account,
+        _n: &str,
+        _l: u32,
+    ) -> Result<Vec<TxRecord>, PluginError> {
         Ok(vec![])
     }
 
     async fn estimate_fee(&self, _t: &[u8], network: &str) -> Result<FeeEstimate, PluginError> {
         let base = esplora_base(network);
         let url = format!("{base}/v1/fees/recommended");
-        let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
             .map_err(|e| PluginError::NetworkError(format!("client: {e}")))?;
-        let resp = client.get(&url).send().await
+        let resp = client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("HTTP: {e}")))?;
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("JSON: {e}")))?;
 
-        let fast = json["fastestFee"].as_u64().map_or("0".into(), |v| format!("{v}"));
-        let medium = json["halfHourFee"].as_u64().map_or("0".into(), |v| format!("{v}"));
-        let slow = json["hourFee"].as_u64().map_or("0".into(), |v| format!("{v}"));
+        let fast = json["fastestFee"]
+            .as_u64()
+            .map_or("0".into(), |v| format!("{v}"));
+        let medium = json["halfHourFee"]
+            .as_u64()
+            .map_or("0".into(), |v| format!("{v}"));
+        let slow = json["hourFee"]
+            .as_u64()
+            .map_or("0".into(), |v| format!("{v}"));
 
-        Ok(FeeEstimate { fast, medium, slow, unit: "sat/vB".into() })
+        Ok(FeeEstimate {
+            fast,
+            medium,
+            slow,
+            unit: "sat/vB".into(),
+        })
     }
 
     async fn validate_address(&self, addr: &str, network: &str) -> Result<bool, PluginError> {
@@ -279,7 +374,11 @@ impl WalletPlugin for LtcPlugin {
                     }
                 }
                 // Fall back to legacy P2PKH/P2SH prefix check
-                Ok(addr.starts_with("m") || addr.starts_with("n") || addr.starts_with("tltc1") || addr.starts_with("Q") || addr.starts_with("T"))
+                Ok(addr.starts_with("m")
+                    || addr.starts_with("n")
+                    || addr.starts_with("tltc1")
+                    || addr.starts_with("Q")
+                    || addr.starts_with("T"))
             }
             _ => Ok(false),
         }
@@ -310,14 +409,16 @@ mod tests {
     #[test]
     fn test_validate_ltc1_address() {
         let plugin = LtcPlugin::new();
-        let result = futures::executor::block_on(plugin.validate_address("ltc1q...", "litecoin")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address("ltc1q...", "litecoin"))
+            .expect("test invariant");
         assert!(result);
     }
 
     #[test]
     fn test_validate_invalid_address() {
         let plugin = LtcPlugin::new();
-        let result = futures::executor::block_on(plugin.validate_address("bad", "litecoin")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address("bad", "litecoin"))
+            .expect("test invariant");
         assert!(!result);
     }
 
@@ -338,12 +439,18 @@ mod tests {
 
     #[test]
     fn test_btc_network_mainnet() {
-        assert_eq!(btc_network("litecoin").expect("test invariant"), bitcoin::Network::Bitcoin);
+        assert_eq!(
+            btc_network("litecoin").expect("test invariant"),
+            bitcoin::Network::Bitcoin
+        );
     }
 
     #[test]
     fn test_btc_network_testnet() {
-        assert_eq!(btc_network("litecoin-testnet").expect("test invariant"), bitcoin::Network::Testnet);
+        assert_eq!(
+            btc_network("litecoin-testnet").expect("test invariant"),
+            bitcoin::Network::Testnet
+        );
     }
 
     #[test]
@@ -353,22 +460,34 @@ mod tests {
 
     #[test]
     fn test_esplora_base_mainnet() {
-        assert_eq!(esplora_base("litecoin"), "https://litecoin.mempool.space/api");
+        assert_eq!(
+            esplora_base("litecoin"),
+            "https://litecoin.mempool.space/api"
+        );
     }
 
     #[test]
     fn test_esplora_base_testnet() {
-        assert_eq!(esplora_base("litecoin-testnet"), "https://litecoin.mempool.space/testnet/api");
+        assert_eq!(
+            esplora_base("litecoin-testnet"),
+            "https://litecoin.mempool.space/testnet/api"
+        );
     }
 
     #[test]
     fn test_balance_base_mainnet() {
-        assert_eq!(esplora_base("litecoin"), "https://litecoin.mempool.space/api");
+        assert_eq!(
+            esplora_base("litecoin"),
+            "https://litecoin.mempool.space/api"
+        );
     }
 
     #[test]
     fn test_balance_base_testnet() {
-        assert_eq!(esplora_base("litecoin-testnet"), "https://litecoin.mempool.space/testnet/api");
+        assert_eq!(
+            esplora_base("litecoin-testnet"),
+            "https://litecoin.mempool.space/testnet/api"
+        );
     }
 
     #[test]
@@ -377,33 +496,53 @@ mod tests {
         // Using a known compressed pubkey to verify proper checksum
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
-            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798").unwrap()
-        ).unwrap();
+            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+                .unwrap(),
+        )
+        .unwrap();
         let compressed = bitcoin::CompressedPublicKey(pk);
         let addr = ltc_p2wpkh_address(&compressed, "litecoin").unwrap();
-        assert!(addr.starts_with("ltc1"), "LTC mainnet should start with ltc1, got {addr}");
+        assert!(
+            addr.starts_with("ltc1"),
+            "LTC mainnet should start with ltc1, got {addr}"
+        );
         // Verify it has a valid bech32 checksum (at least 52 chars for length 20 witness program)
-        assert_eq!(addr.len(), 43, "P2WPKH address should be 43 chars, got {addr}");
+        assert_eq!(
+            addr.len(),
+            43,
+            "P2WPKH address should be 43 chars, got {addr}"
+        );
     }
 
     #[test]
     fn test_ltc_p2wpkh_testnet() {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
-            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798").unwrap()
-        ).unwrap();
+            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+                .unwrap(),
+        )
+        .unwrap();
         let compressed = bitcoin::CompressedPublicKey(pk);
         let addr = ltc_p2wpkh_address(&compressed, "litecoin-testnet").unwrap();
-        assert!(addr.starts_with("tltc1"), "LTC testnet should start with tltc1, got {addr}");
-        assert_eq!(addr.len(), 44, "P2WPKH testnet address should be 44 chars, got {addr}");
+        assert!(
+            addr.starts_with("tltc1"),
+            "LTC testnet should start with tltc1, got {addr}"
+        );
+        assert_eq!(
+            addr.len(),
+            44,
+            "P2WPKH testnet address should be 44 chars, got {addr}"
+        );
     }
 
     #[test]
     fn test_ltc_p2wpkh_unsupported_network() {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
-            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798").unwrap()
-        ).unwrap();
+            &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+                .unwrap(),
+        )
+        .unwrap();
         let compressed = bitcoin::CompressedPublicKey(pk);
         let result = ltc_p2wpkh_address(&compressed, "dogecoin");
         assert!(result.is_err());
@@ -412,35 +551,43 @@ mod tests {
     #[test]
     fn test_validate_address_mainnet_legacy() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("Labc123", "litecoin")).expect("test invariant");
+        let r = futures::executor::block_on(plugin.validate_address("Labc123", "litecoin"))
+            .expect("test invariant");
         assert!(r);
     }
 
     #[test]
     fn test_validate_address_mainnet_bech32() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("ltc1qabc123", "litecoin")).expect("test invariant");
+        let r = futures::executor::block_on(plugin.validate_address("ltc1qabc123", "litecoin"))
+            .expect("test invariant");
         assert!(r);
     }
 
     #[test]
     fn test_validate_address_testnet_bech32() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("tltc1qabc123", "litecoin-testnet")).expect("test invariant");
+        let r = futures::executor::block_on(
+            plugin.validate_address("tltc1qabc123", "litecoin-testnet"),
+        )
+        .expect("test invariant");
         assert!(r);
     }
 
     #[test]
     fn test_validate_address_testnet_rejects_mainnet() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("ltc1qabc...", "litecoin-testnet")).expect("test invariant");
+        let r =
+            futures::executor::block_on(plugin.validate_address("ltc1qabc...", "litecoin-testnet"))
+                .expect("test invariant");
         assert!(!r);
     }
 
     #[test]
     fn test_validate_address_unknown_network_returns_false() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("Labc", "unknown")).expect("test invariant");
+        let r = futures::executor::block_on(plugin.validate_address("Labc", "unknown"))
+            .expect("test invariant");
         assert!(!r);
     }
 }

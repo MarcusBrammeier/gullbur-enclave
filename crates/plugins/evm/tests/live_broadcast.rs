@@ -12,12 +12,19 @@ use wallet_plugin::{KeyHandle, KeyType, WalletPlugin};
 // ── RLP helpers ─────────────────────────────────────────────────────────────
 
 fn rlp_bytes(data: &[u8]) -> Vec<u8> {
-    if data.len() == 1 && data[0] < 0x80 { return data.to_vec(); }
+    if data.len() == 1 && data[0] < 0x80 {
+        return data.to_vec();
+    }
     if data.len() <= 55 {
-        let mut out = vec![0x80 + data.len() as u8]; out.extend(data); out
+        let mut out = vec![0x80 + data.len() as u8];
+        out.extend(data);
+        out
     } else {
         let lb = rlp_len_bytes(data.len());
-        let mut out = vec![0xb7 + lb.len() as u8]; out.extend(&lb); out.extend(data); out
+        let mut out = vec![0xb7 + lb.len() as u8];
+        out.extend(&lb);
+        out.extend(data);
+        out
     }
 }
 
@@ -25,11 +32,18 @@ fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
     let total: usize = items.iter().map(|i| i.len()).sum();
     if total <= 55 {
         let mut out = vec![0xc0 + total as u8];
-        for i in items { out.extend(i); } out
+        for i in items {
+            out.extend(i);
+        }
+        out
     } else {
         let lb = rlp_len_bytes(total);
-        let mut out = vec![0xf7 + lb.len() as u8]; out.extend(&lb);
-        for i in items { out.extend(i); } out
+        let mut out = vec![0xf7 + lb.len() as u8];
+        out.extend(&lb);
+        for i in items {
+            out.extend(i);
+        }
+        out
     }
 }
 
@@ -40,7 +54,9 @@ fn rlp_len_bytes(len: usize) -> Vec<u8> {
 }
 
 fn rlp_u64(v: u64) -> Vec<u8> {
-    if v == 0 { return vec![]; }
+    if v == 0 {
+        return vec![];
+    }
     let be = v.to_be_bytes();
     let s = be.iter().position(|&b| b != 0).unwrap_or(be.len() - 1);
     be[s..].to_vec()
@@ -67,7 +83,8 @@ const RPC: &str = "https://ethereum-sepolia-rpc.publicnode.com";
 fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
-        .build().expect("test invariant")
+        .build()
+        .expect("test invariant")
 }
 
 async fn json_rpc(endpoint: &str, method: &str, params: serde_json::Value) -> serde_json::Value {
@@ -75,7 +92,9 @@ async fn json_rpc(endpoint: &str, method: &str, params: serde_json::Value) -> se
     let resp = client
         .post(endpoint)
         .json(&serde_json::json!({"jsonrpc":"2.0","method":method,"params":params,"id":1}))
-        .send().await.expect("RPC request failed");
+        .send()
+        .await
+        .expect("RPC request failed");
     let json: serde_json::Value = resp.json().await.expect("RPC parse failed");
     if let Some(err) = json.get("error") {
         panic!("RPC error: {}", err["message"].as_str().unwrap_or("?"));
@@ -103,21 +122,37 @@ async fn live_broadcast_sepolia() {
     let secret_key = k256::SecretKey::from_slice(&secret_bytes).expect("Invalid key");
     let output = std::process::Command::new("cast")
         .args(["wallet", "address", "--private-key", &format!("0x{pk_hex}")])
-        .output().expect("cast wallet address failed");
+        .output()
+        .expect("cast wallet address failed");
     let address = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    assert!(address.starts_with("0x"), "cast should return a valid address");
+    assert!(
+        address.starts_with("0x"),
+        "cast should return a valid address"
+    );
     eprintln!("Address: {address}");
 
     // Check balance
-    let bal_hex = json_rpc(RPC, "eth_getBalance", serde_json::json!([address, "latest"])).await;
+    let bal_hex = json_rpc(
+        RPC,
+        "eth_getBalance",
+        serde_json::json!([address, "latest"]),
+    )
+    .await;
     let balance = hex_to_u256(bal_hex.as_str().unwrap_or("0x0"));
     if balance == 0 {
-        panic!("❌ SEPOLIA NODE REJECTED: Address {address} has 0 balance.\n   Please fund it from a Sepolia faucet.");
+        panic!(
+            "❌ SEPOLIA NODE REJECTED: Address {address} has 0 balance.\n   Please fund it from a Sepolia faucet."
+        );
     }
     eprintln!("Balance: {balance} wei");
 
     // Get nonce + gas price
-    let nonce_hex = json_rpc(RPC, "eth_getTransactionCount", serde_json::json!([address, "latest"])).await;
+    let nonce_hex = json_rpc(
+        RPC,
+        "eth_getTransactionCount",
+        serde_json::json!([address, "latest"]),
+    )
+    .await;
     let nonce = hex_to_u256(nonce_hex.as_str().unwrap_or("0x0")) as u64;
     eprintln!("Nonce: {nonce}");
 
@@ -158,7 +193,9 @@ async fn live_broadcast_sepolia() {
     let (sig, recid) = signing_key.sign_prehash_recoverable(&hash);
     // Verify the signature is valid for our key
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
-    signing_key.verifying_key().verify_prehash(&hash, &sig)
+    signing_key
+        .verifying_key()
+        .verify_prehash(&hash, &sig)
         .expect("Signature should be valid for our key");
     eprintln!("✅ Signature valid");
 
@@ -169,8 +206,10 @@ async fn live_broadcast_sepolia() {
         eprintln!("recid: is_y_odd={}, raw={:?}", found, recid);
         for candidate in [false, true] {
             if let Ok(recovered) = VerifyingKey::recover_from_prehash(
-                &hash[..], &sig, k256::ecdsa::RecoveryId::new(candidate, false))
-            {
+                &hash[..],
+                &sig,
+                k256::ecdsa::RecoveryId::new(candidate, false),
+            ) {
                 let rbytes = recovered.to_sec1_point(false).to_bytes();
                 let raddr = hex::encode(&crypto_core::hash::keccak256(&rbytes[1..])[12..]);
                 if raddr == address[2..] {
@@ -195,14 +234,18 @@ async fn live_broadcast_sepolia() {
     let empty: Vec<u8> = vec![];
 
     let signed_fields = vec![
-        rlp_bytes(&rlp_chain_id), rlp_bytes(&rlp_nonce),
-        rlp_bytes(&rlp_priority), rlp_bytes(&rlp_u64(max_fee)),
-        rlp_bytes(&rlp_gas), rlp_bytes(&to),
-        rlp_bytes(&rlp_value), rlp_bytes(&empty),
-        vec![0xc0],                 // access list (empty list)
+        rlp_bytes(&rlp_chain_id),
+        rlp_bytes(&rlp_nonce),
+        rlp_bytes(&rlp_priority),
+        rlp_bytes(&rlp_u64(max_fee)),
+        rlp_bytes(&rlp_gas),
+        rlp_bytes(&to),
+        rlp_bytes(&rlp_value),
+        rlp_bytes(&empty),
+        vec![0xc0],                                    // access list (empty list)
         rlp_int(if y_parity { &[0x01] } else { &[] }), // V
-        rlp_int(&r),                // R
-        rlp_int(&s),                // S
+        rlp_int(&r),                                   // R
+        rlp_int(&s),                                   // S
     ];
     let signed_list = rlp_list(&signed_fields);
     let mut signed_tx = vec![0x02u8];
@@ -211,7 +254,9 @@ async fn live_broadcast_sepolia() {
     eprintln!("Signed tx: 0x{}", hex::encode(&signed_tx));
 
     // Broadcast
-    let tx_hash = plugin.broadcast_transaction(&signed_tx, "sepolia").await
+    let tx_hash = plugin
+        .broadcast_transaction(&signed_tx, "sepolia")
+        .await
         .expect("broadcast_transaction should succeed");
     eprintln!("Tx broadcast: {tx_hash}");
 
@@ -221,7 +266,12 @@ async fn live_broadcast_sepolia() {
     let mut receipt: Option<serde_json::Value> = None;
 
     while start.elapsed() < timeout {
-        let result = json_rpc(RPC, "eth_getTransactionReceipt", serde_json::json!([tx_hash])).await;
+        let result = json_rpc(
+            RPC,
+            "eth_getTransactionReceipt",
+            serde_json::json!([tx_hash]),
+        )
+        .await;
         if !result.is_null() {
             receipt = Some(result);
             break;
@@ -230,9 +280,11 @@ async fn live_broadcast_sepolia() {
     }
 
     let receipt = receipt.expect("Timeout waiting for transaction receipt (60s)");
-    let status = receipt["status"].as_str()
+    let status = receipt["status"]
+        .as_str()
         .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok());
-    let block = receipt["blockNumber"].as_str()
+    let block = receipt["blockNumber"]
+        .as_str()
         .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok());
 
     eprintln!("Block: #{block:?}");

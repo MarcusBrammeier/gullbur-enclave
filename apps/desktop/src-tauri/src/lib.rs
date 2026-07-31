@@ -59,7 +59,10 @@ fn install_crash_reporter() {
             .join("crashes");
         let _ = std::fs::create_dir_all(&crash_dir);
         let path = crash_dir.join(format!("crash-{timestamp}.json"));
-        let _ = std::fs::write(&path, serde_json::to_string_pretty(&payload).unwrap_or_default());
+        let _ = std::fs::write(
+            &path,
+            serde_json::to_string_pretty(&payload).unwrap_or_default(),
+        );
         // Still call the default hook so the user sees the panic too
         default_hook(panic_info);
     }));
@@ -95,7 +98,9 @@ pub fn run() {
                 if let Some(dir) = cache {
                     // SAFETY: set_var is marked unsafe in edition 2024; we
                     // control the env lifecycle in the Tauri setup context.
-                    unsafe { std::env::set_var("TMPDIR", &dir); }
+                    unsafe {
+                        std::env::set_var("TMPDIR", &dir);
+                    }
                     tracing::info!("IPC token dir: {}", dir.display());
                 }
             }
@@ -126,7 +131,7 @@ pub fn run() {
                     match vault.launch(state.ipc_port, None).await {
                         Ok(()) => {
                             let mut h = state.ipc_handle.write().await;
-                            *h = Some(tokio::spawn(std::future::pending()));
+                            *h = vault.take_ipc_handle();
                             tracing::info!(
                                 "vault-core IPC server launched on 127.0.0.1:{}",
                                 state.ipc_port
@@ -176,7 +181,7 @@ pub fn run() {
             // Account management
             commands::rename_account,
             // Seed re-export
-                commands::get_seed_phrase,
+            commands::get_seed_phrase,
             // Vault file management
             commands::open_vault_from_path,
             commands::open_vault_from_bytes,

@@ -13,14 +13,10 @@ use wallet_plugin::{
 };
 
 // ── Serai Monero primitives ────────────────────────────────────────────────
-use monero_serai_mirror::primitives::{keccak256_to_scalar, INV_EIGHT, Commitment, Decoys};
-use monero_serai_mirror::generators::hash_to_point;
+use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, edwards::EdwardsPoint, scalar::Scalar};
 use monero_clsag_mirror::{Clsag, ClsagContext};
-use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT,
-    edwards::EdwardsPoint,
-    scalar::Scalar,
-};
+use monero_serai_mirror::generators::hash_to_point;
+use monero_serai_mirror::primitives::{Commitment, Decoys, INV_EIGHT, keccak256_to_scalar};
 use zeroize::Zeroizing;
 
 pub struct XmrPlugin {
@@ -30,34 +26,68 @@ pub struct XmrPlugin {
     key_cache: Arc<Mutex<std::collections::HashMap<String, Vec<u8>>>>,
 }
 
-static XMR_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| [
-    NetworkSpec { id: String::from("monero"), name: String::from("Monero Mainnet"), symbol: String::from("XMR"), decimals: 12, is_testnet: false },
-    NetworkSpec { id: String::from("monero-stagenet"), name: String::from("Monero Stagenet"), symbol: String::from("XMR"), decimals: 12, is_testnet: true },
-    NetworkSpec { id: String::from("monero-testnet"), name: String::from("Monero Testnet"), symbol: String::from("XMR"), decimals: 12, is_testnet: true },
-]);
+static XMR_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| {
+    [
+        NetworkSpec {
+            id: String::from("monero"),
+            name: String::from("Monero Mainnet"),
+            symbol: String::from("XMR"),
+            decimals: 12,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("monero-stagenet"),
+            name: String::from("Monero Stagenet"),
+            symbol: String::from("XMR"),
+            decimals: 12,
+            is_testnet: true,
+        },
+        NetworkSpec {
+            id: String::from("monero-testnet"),
+            name: String::from("Monero Testnet"),
+            symbol: String::from("XMR"),
+            decimals: 12,
+            is_testnet: true,
+        },
+    ]
+});
 
 impl XmrPlugin {
     pub fn new() -> Self {
-        Self { socks5_proxy: None, wallet_rpc_url: None, key_cache: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            socks5_proxy: None,
+            wallet_rpc_url: None,
+            key_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     pub fn with_proxy(socks5_proxy: Option<String>) -> Self {
-        Self { socks5_proxy, wallet_rpc_url: None, key_cache: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            socks5_proxy,
+            wallet_rpc_url: None,
+            key_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     pub fn with_tor(socks_port: u16) -> Self {
-        Self { socks5_proxy: Some(format!("socks5://127.0.0.1:{socks_port}")), wallet_rpc_url: None, key_cache: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            socks5_proxy: Some(format!("socks5://127.0.0.1:{socks_port}")),
+            wallet_rpc_url: None,
+            key_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     /// Configure a local `monero-wallet-rpc` endpoint for balance queries.
     /// Example: `"http://127.0.0.1:18082/json_rpc"`
     pub fn with_wallet_rpc(self, url: impl Into<String>) -> Self {
-        Self { wallet_rpc_url: Some(url.into()), ..self }
+        Self {
+            wallet_rpc_url: Some(url.into()),
+            ..self
+        }
     }
 
     fn build_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        let mut builder = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30));
+        let mut builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
         if let Some(ref proxy_url) = self.socks5_proxy {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
         }
@@ -108,7 +138,9 @@ impl SpendKey {
         let intermediate = keccak256_to_scalar(self.scalar.to_bytes());
         // Apply INV_EIGHT to ensure the view key is a valid scalar
         let view_scalar = intermediate * INV_EIGHT();
-        ViewKey { scalar: view_scalar }
+        ViewKey {
+            scalar: view_scalar,
+        }
     }
 
     /// Compute the key image for this spend key.
@@ -171,7 +203,10 @@ const RING_SIZE: usize = 11;
 /// Each ring member is `[key, commitment]` where key is a random EdwardsPoint
 /// and commitment is key * 8 (a simple Pedersen commitment to zero).
 /// The real signer's key is placed at `signer_index`.
-fn build_decoy_ring(signer_key: &EdwardsPoint, signer_index: u8) -> ([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>) {
+fn build_decoy_ring(
+    signer_key: &EdwardsPoint,
+    signer_index: u8,
+) -> ([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>) {
     let mut rng = rand_core::OsRng;
     let mut ring = Vec::with_capacity(RING_SIZE);
 
@@ -218,16 +253,20 @@ fn sign_monero_tx(
     spend_key: &SpendKey,
     tx_json: &serde_json::Value,
 ) -> Result<Vec<u8>, PluginError> {
-    let inputs = tx_json.get("inputs")
+    let inputs = tx_json
+        .get("inputs")
         .and_then(|v| v.as_array())
         .ok_or_else(|| PluginError::Internal("tx must have inputs array".into()))?;
 
-    let outputs = tx_json.get("outputs")
+    let outputs = tx_json
+        .get("outputs")
         .and_then(|v| v.as_array())
         .ok_or_else(|| PluginError::Internal("tx must have outputs array".into()))?;
 
     if inputs.is_empty() {
-        return Err(PluginError::Internal("tx must have at least one input".into()));
+        return Err(PluginError::Internal(
+            "tx must have at least one input".into(),
+        ));
     }
 
     let signer_key = spend_key.public_spend_key();
@@ -238,9 +277,7 @@ fn sign_monero_tx(
     let mut clsag_inputs: Vec<(Zeroizing<Scalar>, ClsagContext)> = Vec::with_capacity(inputs.len());
 
     for (i, input) in inputs.iter().enumerate() {
-        let _amount = input.get("amount")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
+        let _amount = input.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
 
         let signer_index = (i % RING_SIZE) as u8;
         let (_signer_ring_member, ring) = build_decoy_ring(&signer_key, signer_index);
@@ -263,11 +300,10 @@ fn sign_monero_tx(
     }
 
     // Compute sum of output masks (for balancing)
-    let sum_outputs = outputs.iter()
-        .fold(Scalar::ZERO, |sum, out| {
-            let amount = out.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
-            sum + Scalar::from(amount)
-        });
+    let sum_outputs = outputs.iter().fold(Scalar::ZERO, |sum, out| {
+        let amount = out.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
+        sum + Scalar::from(amount)
+    });
 
     // Compute the signature hash from the transaction bytes
     let msg = compute_sighash(&serde_json::to_vec(tx_json).unwrap_or_default());
@@ -288,21 +324,24 @@ fn sign_monero_tx(
         for s in &clsag.s {
             s_hex.push(hex::encode(s.to_bytes()));
         }
-        sig_array.as_array_mut()
+        sig_array
+            .as_array_mut()
             .ok_or_else(|| PluginError::Internal("sig_array is not an array".into()))?
             .push(serde_json::json!({
                 "s": s_hex,
                 "c1": hex::encode(clsag.c1.to_bytes()),
                 "D": hex::encode(clsag.D.compress().to_bytes()),
             }));
-        pseudo_outs.as_array_mut()
+        pseudo_outs
+            .as_array_mut()
             .ok_or_else(|| PluginError::Internal("pseudo_outs is not an array".into()))?
-            .push(
-                serde_json::Value::String(hex::encode(pseudo_out.compress().to_bytes()))
-            );
+            .push(serde_json::Value::String(hex::encode(
+                pseudo_out.compress().to_bytes(),
+            )));
     }
 
-    let tx_obj = signed_tx.as_object_mut()
+    let tx_obj = signed_tx
+        .as_object_mut()
         .ok_or_else(|| PluginError::Internal("tx_json is not an object".into()))?;
     tx_obj.insert("key_image".into(), serde_json::json!(key_image_hex));
     tx_obj.insert("signatures".into(), sig_array);
@@ -367,9 +406,15 @@ async fn daemon_rpc(
 
 #[async_trait]
 impl WalletPlugin for XmrPlugin {
-    fn id(&self) -> &'static str { "xmr" }
-    fn name(&self) -> &'static str { "Monero" }
-    fn supported_networks(&self) -> &[NetworkSpec] { &*XMR_NETWORKS }
+    fn id(&self) -> &'static str {
+        "xmr"
+    }
+    fn name(&self) -> &'static str {
+        "Monero"
+    }
+    fn supported_networks(&self) -> &[NetworkSpec] {
+        &*XMR_NETWORKS
+    }
 
     fn plugin_metadata(&self) -> PluginMetadata {
         PluginMetadata {
@@ -393,9 +438,15 @@ impl WalletPlugin for XmrPlugin {
         ]
     }
 
-    async fn create_account(&self, seed: &[u8], index: u32, network: &str) -> Result<Account, PluginError> {
+    async fn create_account(
+        &self,
+        seed: &[u8],
+        index: u32,
+        network: &str,
+    ) -> Result<Account, PluginError> {
         // Use BIP-44 entropy from a 64-byte seed, then apply Monero keccak256→scalar
-        let seed_512: [u8; 64] = seed.try_into()
+        let seed_512: [u8; 64] = seed
+            .try_into()
             .map_err(|_| PluginError::Internal("expected 64-byte BIP-39 seed".into()))?;
         let key_entropy = crypto_core::keys::derive_bip44_xmr_entropy(&seed_512, index)
             .map_err(|e| PluginError::Internal(format!("Key derivation failed: {e}")))?;
@@ -431,14 +482,17 @@ impl WalletPlugin for XmrPlugin {
             id: account_id,
             network: network.into(),
             address: addr,
-            path: Some(format!(
-                "m/44'/128'/{index}'/0/0"
-            )),
+            path: Some(format!("m/44'/128'/{index}'/0/0")),
             label: None,
         })
     }
 
-    async fn sign_transaction(&self, tx: &[u8], key: &KeyHandle, _network: &str) -> Result<Vec<u8>, PluginError> {
+    async fn sign_transaction(
+        &self,
+        tx: &[u8],
+        key: &KeyHandle,
+        _network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
         // Parse the unsigned transaction JSON
         let tx_json: serde_json::Value = serde_json::from_slice(tx)
             .map_err(|e| PluginError::Internal(format!("invalid tx JSON: {e}")))?;
@@ -451,15 +505,14 @@ impl WalletPlugin for XmrPlugin {
     }
 
     async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
-        let client = self.build_client().map_err(|e| PluginError::Internal(e.to_string()))?;
+        let client = self
+            .build_client()
+            .map_err(|e| PluginError::Internal(e.to_string()))?;
         let tx_hex = hex::encode(tx);
         let params = serde_json::json!({ "tx_as_hex": tx_hex });
         let result = daemon_rpc(&client, network, "send_raw_transaction", params).await?;
 
-        let status = result
-            .get("status")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
         if status != "OK" {
             let reason = result
@@ -477,16 +530,15 @@ impl WalletPlugin for XmrPlugin {
         }
 
         let tx_hash = match result.get("tx_hash") {
-            Some(v) if v.is_string() => v.as_str()
+            Some(v) if v.is_string() => v
+                .as_str()
                 .ok_or_else(|| PluginError::Internal("tx_hash string conversion failed".into()))?
                 .to_string(),
             Some(v) => v.to_string(),
-            None => {
-                result
-                    .as_str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "unknown".into())
-            }
+            None => result
+                .as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "unknown".into()),
         };
 
         Ok(tx_hash)
@@ -497,7 +549,10 @@ impl WalletPlugin for XmrPlugin {
         if let Some(ref url) = self.wallet_rpc_url {
             // Check if we have cached key entropy for this account
             let entropy = {
-                let cache = self.key_cache.lock().map_err(|e| PluginError::Internal(format!("key cache lock: {e}")))?;
+                let cache = self
+                    .key_cache
+                    .lock()
+                    .map_err(|e| PluginError::Internal(format!("key cache lock: {e}")))?;
                 cache.get(&account.id).cloned()
             };
             if let Some(entropy) = entropy {
@@ -505,7 +560,8 @@ impl WalletPlugin for XmrPlugin {
             }
             // Entropy available but wallet not created via create_account first
             return Err(PluginError::NetworkError(
-                "XMR account not fully initialized — create the account first via the wallet".into()
+                "XMR account not fully initialized — create the account first via the wallet"
+                    .into(),
             ));
         }
         // No wallet-rpc configured — return zero instead of erroring.
@@ -518,15 +574,25 @@ impl WalletPlugin for XmrPlugin {
         })
     }
 
-    async fn get_transaction_history(&self, account: &Account, _network: &str, limit: u32) -> Result<Vec<TxRecord>, PluginError> {
+    async fn get_transaction_history(
+        &self,
+        account: &Account,
+        _network: &str,
+        limit: u32,
+    ) -> Result<Vec<TxRecord>, PluginError> {
         // If wallet-rpc is configured, query it for real transaction history
         if let Some(ref url) = self.wallet_rpc_url {
             let entropy = {
-                let cache = self.key_cache.lock().map_err(|e| PluginError::Internal(format!("key cache lock: {e}")))?;
+                let cache = self
+                    .key_cache
+                    .lock()
+                    .map_err(|e| PluginError::Internal(format!("key cache lock: {e}")))?;
                 cache.get(&account.id).cloned()
             };
             if let Some(entropy) = entropy {
-                return self.query_wallet_rpc_history(url, account, &entropy, limit).await;
+                return self
+                    .query_wallet_rpc_history(url, account, &entropy, limit)
+                    .await;
             }
         }
         // Fallback: return empty history
@@ -534,7 +600,9 @@ impl WalletPlugin for XmrPlugin {
     }
 
     async fn estimate_fee(&self, _t: &[u8], network: &str) -> Result<FeeEstimate, PluginError> {
-        let client = self.build_client().map_err(|e| PluginError::Internal(e.to_string()))?;
+        let client = self
+            .build_client()
+            .map_err(|e| PluginError::Internal(e.to_string()))?;
         let params = serde_json::json!({});
         let result = daemon_rpc(&client, network, "get_fee_estimate", params).await?;
 
@@ -586,21 +654,37 @@ impl XmrPlugin {
             .as_nanos();
         let wallet_file = format!("fossxmr_{ts}");
 
-        let open_result = self.wallet_rpc_call(url, "open_wallet", serde_json::json!({
-            "filename": &wallet_file, "password": "",
-        })).await;
+        let open_result = self
+            .wallet_rpc_call(
+                url,
+                "open_wallet",
+                serde_json::json!({
+                    "filename": &wallet_file, "password": "",
+                }),
+            )
+            .await;
 
         if open_result.is_err() {
-            self.wallet_rpc_call(url, "generate_from_keys", serde_json::json!({
-                "filename": &wallet_file, "password": "",
-                "spend_key": spend_hex, "viewkey": view_hex,
-                "restore_height": 2167700, "address": account.address,
-            })).await?;
+            self.wallet_rpc_call(
+                url,
+                "generate_from_keys",
+                serde_json::json!({
+                    "filename": &wallet_file, "password": "",
+                    "spend_key": spend_hex, "viewkey": view_hex,
+                    "restore_height": 2167700, "address": account.address,
+                }),
+            )
+            .await?;
         }
 
-        let balance = self.wallet_rpc_call(url, "get_balance", serde_json::json!({})).await?;
+        let balance = self
+            .wallet_rpc_call(url, "get_balance", serde_json::json!({}))
+            .await?;
         let confirmed = balance.get("balance").and_then(|v| v.as_u64()).unwrap_or(0);
-        let unconfirmed = balance.get("unlocked_balance").and_then(|v| v.as_u64()).unwrap_or(0);
+        let unconfirmed = balance
+            .get("unlocked_balance")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
 
         Ok(Balance {
             confirmed: confirmed.to_string(),
@@ -627,22 +711,39 @@ impl XmrPlugin {
             .as_nanos();
         let wallet_file = format!("fossxmr_{ts}");
 
-        let open_result = self.wallet_rpc_call(url, "open_wallet", serde_json::json!({
-            "filename": &wallet_file, "password": "",
-        })).await;
+        let open_result = self
+            .wallet_rpc_call(
+                url,
+                "open_wallet",
+                serde_json::json!({
+                    "filename": &wallet_file, "password": "",
+                }),
+            )
+            .await;
 
         if open_result.is_err() {
-            self.wallet_rpc_call(url, "generate_from_keys", serde_json::json!({
-                "filename": &wallet_file, "password": "",
-                "spend_key": spend_hex, "viewkey": view_hex,
-                "restore_height": 2167700, "address": account.address,
-            })).await?;
+            self.wallet_rpc_call(
+                url,
+                "generate_from_keys",
+                serde_json::json!({
+                    "filename": &wallet_file, "password": "",
+                    "spend_key": spend_hex, "viewkey": view_hex,
+                    "restore_height": 2167700, "address": account.address,
+                }),
+            )
+            .await?;
         }
 
-        let transfers = self.wallet_rpc_call(url, "get_transfers", serde_json::json!({
-            "in": true, "out": true, "pending": false, "failed": false,
-            "pool": false, "filter_by_height": false,
-        })).await?;
+        let transfers = self
+            .wallet_rpc_call(
+                url,
+                "get_transfers",
+                serde_json::json!({
+                    "in": true, "out": true, "pending": false, "failed": false,
+                    "pool": false, "filter_by_height": false,
+                }),
+            )
+            .await?;
 
         let mut records = Vec::new();
 
@@ -650,10 +751,18 @@ impl XmrPlugin {
         if let Some(ins) = transfers.get("in").and_then(|v| v.as_array()) {
             for tx in ins.iter().take(limit as usize) {
                 records.push(TxRecord {
-                    txid: tx.get("txid").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    txid: tx
+                        .get("txid")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     from_address: None,
                     to_address: Some(account.address.clone()),
-                    amount: tx.get("amount").and_then(|v| v.as_u64()).unwrap_or(0).to_string(),
+                    amount: tx
+                        .get("amount")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0)
+                        .to_string(),
                     fee: None,
                     block_height: tx.get("height").and_then(|v| v.as_u64()),
                     timestamp: tx.get("timestamp").and_then(|v| v.as_u64()),
@@ -666,11 +775,22 @@ impl XmrPlugin {
         if let Some(outs) = transfers.get("out").and_then(|v| v.as_array()) {
             for tx in outs.iter().take(limit as usize) {
                 records.push(TxRecord {
-                    txid: tx.get("txid").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    txid: tx
+                        .get("txid")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     from_address: Some(account.address.clone()),
                     to_address: None,
-                    amount: tx.get("amount").and_then(|v| v.as_u64()).unwrap_or(0).to_string(),
-                    fee: tx.get("fee").and_then(|v| v.as_u64()).map(|f| f.to_string()),
+                    amount: tx
+                        .get("amount")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0)
+                        .to_string(),
+                    fee: tx
+                        .get("fee")
+                        .and_then(|v| v.as_u64())
+                        .map(|f| f.to_string()),
                     block_height: tx.get("height").and_then(|v| v.as_u64()),
                     timestamp: tx.get("timestamp").and_then(|v| v.as_u64()),
                     status: wallet_plugin::TxStatus::Confirmed { confirmations: 1 },
@@ -692,22 +812,33 @@ impl XmrPlugin {
         method: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value, PluginError> {
-        let client = self.build_client().map_err(|e| PluginError::Internal(e.to_string()))?;
+        let client = self
+            .build_client()
+            .map_err(|e| PluginError::Internal(e.to_string()))?;
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "id": "0",
             "method": method,
             "params": params,
         });
-        let resp = client.post(url).json(&body).send().await
+        let resp = client
+            .post(url)
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("wallet-rpc {method}: {e}")))?;
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| PluginError::NetworkError(format!("wallet-rpc {method} JSON: {e}")))?;
         if let Some(err) = json.get("error") {
-            return Err(PluginError::NetworkError(format!("wallet-rpc {method} error: {err}")));
+            return Err(PluginError::NetworkError(format!(
+                "wallet-rpc {method} error: {err}"
+            )));
         }
-        json.get("result").cloned()
-            .ok_or_else(|| PluginError::NetworkError(format!("wallet-rpc {method}: missing 'result'")))
+        json.get("result").cloned().ok_or_else(|| {
+            PluginError::NetworkError(format!("wallet-rpc {method}: missing 'result'"))
+        })
     }
 }
 
@@ -758,8 +889,11 @@ fn base58_encode(data: &[u8]) -> Result<String, PluginError> {
     for block_idx in 0..full_blocks {
         let block_start = block_idx * 8;
         let block = &non_zero[block_start..block_start + 8];
-        let mut value = u64::from_be_bytes(block.try_into()
-            .expect("block slice is always 8 bytes as guarded by loop bounds"));
+        let mut value = u64::from_be_bytes(
+            block
+                .try_into()
+                .expect("block slice is always 8 bytes as guarded by loop bounds"),
+        );
 
         let mut block_chars = Vec::with_capacity(11);
         for _ in 0..11 {
@@ -784,7 +918,13 @@ fn base58_encode(data: &[u8]) -> Result<String, PluginError> {
         // Number of base58 chars needed for r bytes: ceil(r * log2(256) / log2(58))
         // r=1→2, r=2→3, r=3→5, r=4→6, r=5→7, r=6→8, r=7→10
         let num_chars = match remaining {
-            1 => 2, 2 => 3, 3 => 5, 4 => 6, 5 => 7, 6 => 8, 7 => 10,
+            1 => 2,
+            2 => 3,
+            3 => 5,
+            4 => 6,
+            5 => 7,
+            6 => 8,
+            7 => 10,
             _ => 0,
         };
 
@@ -809,17 +949,25 @@ mod tests {
     use futures;
 
     #[test]
-    fn plugin_id_is_xmr() { assert_eq!(XmrPlugin::new().id(), "xmr"); }
+    fn plugin_id_is_xmr() {
+        assert_eq!(XmrPlugin::new().id(), "xmr");
+    }
 
     #[test]
-    fn supported_networks_count() { assert_eq!(XmrPlugin::new().supported_networks().len(), 3); }
+    fn supported_networks_count() {
+        assert_eq!(XmrPlugin::new().supported_networks().len(), 3);
+    }
 
     #[test]
     fn test_spend_key_derivation_deterministic() {
         let seed = b"test-monero-seed-0001";
         let sk1 = SpendKey::from_seed(seed, 0);
         let sk2 = SpendKey::from_seed(seed, 0);
-        assert_eq!(sk1.to_bytes(), sk2.to_bytes(), "same seed+index must produce same spend key");
+        assert_eq!(
+            sk1.to_bytes(),
+            sk2.to_bytes(),
+            "same seed+index must produce same spend key"
+        );
     }
 
     #[test]
@@ -827,7 +975,11 @@ mod tests {
         let seed = b"test-monero-seed-0002";
         let sk0 = SpendKey::from_seed(seed, 0);
         let sk1 = SpendKey::from_seed(seed, 1);
-        assert_ne!(sk0.to_bytes(), sk1.to_bytes(), "different indices must produce different keys");
+        assert_ne!(
+            sk0.to_bytes(),
+            sk1.to_bytes(),
+            "different indices must produce different keys"
+        );
     }
 
     #[test]
@@ -836,8 +988,14 @@ mod tests {
         let sk = SpendKey::from_seed(seed, 0);
         let pk = sk.public_spend_key();
         // Verify the point is on the curve (not identity)
-        assert!(pk.is_torsion_free(), "public spend key must be on the curve");
-        assert!(!pk.compress().to_bytes().iter().all(|&b| b == 0), "public key must not be identity");
+        assert!(
+            pk.is_torsion_free(),
+            "public spend key must be on the curve"
+        );
+        assert!(
+            !pk.compress().to_bytes().iter().all(|&b| b == 0),
+            "public key must not be identity"
+        );
     }
 
     #[test]
@@ -846,7 +1004,10 @@ mod tests {
         let sk = SpendKey::from_seed(seed, 0);
         let ki = sk.key_image();
         assert!(ki.is_torsion_free(), "key image must be on the curve");
-        assert!(!ki.compress().to_bytes().iter().all(|&b| b == 0), "key image must not be identity");
+        assert!(
+            !ki.compress().to_bytes().iter().all(|&b| b == 0),
+            "key image must not be identity"
+        );
     }
 
     #[test]
@@ -855,7 +1016,10 @@ mod tests {
         let sk = SpendKey::from_seed(seed, 0);
         let vk = sk.view_key();
         let vk_pub = vk.public_view_key();
-        assert!(vk_pub.is_torsion_free(), "public view key must be on the curve");
+        assert!(
+            vk_pub.is_torsion_free(),
+            "public view key must be on the curve"
+        );
     }
 
     #[test]
@@ -864,7 +1028,11 @@ mod tests {
         let sk = SpendKey::from_seed(seed, 0);
         let ki1 = sk.key_image();
         let ki2 = sk.key_image();
-        assert_eq!(ki1.compress().to_bytes(), ki2.compress().to_bytes(), "key image must be deterministic");
+        assert_eq!(
+            ki1.compress().to_bytes(),
+            ki2.compress().to_bytes(),
+            "key image must be deterministic"
+        );
     }
 
     #[tokio::test]
@@ -872,16 +1040,32 @@ mod tests {
         let plugin = XmrPlugin::new();
         // Mainnet
         let seed = [42u8; 64];
-        let account = plugin.create_account(&seed, 0, "monero").await
+        let account = plugin
+            .create_account(&seed, 0, "monero")
+            .await
             .expect("create_account should succeed");
-        assert!(account.address.len() >= 94, "Monero address must be at least 94 chars, got {}", account.address.len());
-        assert!(account.address.chars().all(|c| c.is_alphanumeric()), "address must be alphanumeric");
+        assert!(
+            account.address.len() >= 94,
+            "Monero address must be at least 94 chars, got {}",
+            account.address.len()
+        );
+        assert!(
+            account.address.chars().all(|c| c.is_alphanumeric()),
+            "address must be alphanumeric"
+        );
         assert_eq!(account.network, "monero");
         // Mainnet addresses must start with '4'
-        assert!(account.address.starts_with('4'), "Mainnet address must start with '4', got: {}", account.address);
+        assert!(
+            account.address.starts_with('4'),
+            "Mainnet address must start with '4', got: {}",
+            account.address
+        );
 
         // Stagenet — print address for faucet
-        let stagenet = plugin.create_account(&[0xaa; 64], 0, "monero-stagenet").await.expect("test invariant");
+        let stagenet = plugin
+            .create_account(&[0xaa; 64], 0, "monero-stagenet")
+            .await
+            .expect("test invariant");
         eprintln!("XMR_STAGENET_ADDR:{}", stagenet.address);
         assert_eq!(stagenet.network, "monero-stagenet");
     }
@@ -905,16 +1089,29 @@ mod tests {
         let tx_bytes = serde_json::to_vec(&unsigned_tx).expect("test invariant");
 
         let result = plugin.sign_transaction(&tx_bytes, &key, "monero").await;
-        assert!(result.is_ok(), "CLSAG signing should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "CLSAG signing should succeed: {:?}",
+            result.err()
+        );
 
         let signed_bytes = result.expect("test invariant");
-        let signed: serde_json::Value = serde_json::from_slice(&signed_bytes)
-            .expect("signed tx should be valid JSON");
+        let signed: serde_json::Value =
+            serde_json::from_slice(&signed_bytes).expect("signed tx should be valid JSON");
 
         // Verify the signed transaction has all required fields
-        assert!(signed.get("key_image").is_some(), "signed tx must have key_image");
-        assert!(signed.get("signatures").is_some(), "signed tx must have signatures");
-        assert!(signed.get("pseudo_outputs").is_some(), "signed tx must have pseudo_outputs");
+        assert!(
+            signed.get("key_image").is_some(),
+            "signed tx must have key_image"
+        );
+        assert!(
+            signed.get("signatures").is_some(),
+            "signed tx must have signatures"
+        );
+        assert!(
+            signed.get("pseudo_outputs").is_some(),
+            "signed tx must have pseudo_outputs"
+        );
 
         let sigs = signed["signatures"].as_array().expect("test invariant");
         assert_eq!(sigs.len(), 1, "should have one signature for one input");
@@ -925,7 +1122,11 @@ mod tests {
         assert!(sig.get("D").is_some(), "signature must have D");
 
         let s_arr = sig["s"].as_array().expect("test invariant");
-        assert_eq!(s_arr.len(), 11, "s vector must have 11 elements (ring size)");
+        assert_eq!(
+            s_arr.len(),
+            11,
+            "s vector must have 11 elements (ring size)"
+        );
     }
 
     #[test]
@@ -933,7 +1134,8 @@ mod tests {
         let plugin = XmrPlugin::new();
         // Mainnet address: 95 chars starting with '4'
         let addr = format!("4{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero"))
+            .expect("test invariant");
         assert!(result, "mainnet address starting with '4' should be valid");
     }
 
@@ -941,7 +1143,8 @@ mod tests {
     fn test_validate_stagenet_address() {
         let plugin = XmrPlugin::new();
         let addr = format!("5{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero-stagenet")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero-stagenet"))
+            .expect("test invariant");
         assert!(result, "stagenet address starting with '5' should be valid");
     }
 
@@ -950,21 +1153,24 @@ mod tests {
         let plugin = XmrPlugin::new();
         // Stagenet address on mainnet should fail
         let addr = format!("5{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero"))
+            .expect("test invariant");
         assert!(!result, "stagenet prefix should be rejected on mainnet");
     }
 
     #[test]
     fn test_validate_address_wrong_length_rejected() {
         let plugin = XmrPlugin::new();
-        let result = futures::executor::block_on(plugin.validate_address("4short", "monero")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address("4short", "monero"))
+            .expect("test invariant");
         assert!(!result, "short address should be rejected");
     }
 
     #[test]
     fn test_validate_address_non_alphanumeric_rejected() {
         let plugin = XmrPlugin::new();
-        let result = futures::executor::block_on(plugin.validate_address("4abc!def", "monero")).expect("test invariant");
+        let result = futures::executor::block_on(plugin.validate_address("4abc!def", "monero"))
+            .expect("test invariant");
         assert!(!result, "non-alphanumeric address should be rejected");
     }
 
@@ -983,7 +1189,10 @@ mod tests {
             Err(e) => {
                 // Expected: no wallet-rpc configured → NetworkError
                 let msg = e.to_string().to_lowercase();
-                assert!(msg.contains("wallet-rpc") || msg.contains("setup"), "expected wallet-rpc error, got: {e}");
+                assert!(
+                    msg.contains("wallet-rpc") || msg.contains("setup"),
+                    "expected wallet-rpc error, got: {e}"
+                );
             }
             Ok(balance) => {
                 // Also acceptable if the plugin falls back to zero
@@ -1004,8 +1213,13 @@ mod tests {
             path: None,
             label: None,
         };
-        let result = futures::executor::block_on(plugin.get_transaction_history(&account, "monero", 10)).expect("test invariant");
-        assert!(result.is_empty(), "history should be empty when no wallet-rpc configured");
+        let result =
+            futures::executor::block_on(plugin.get_transaction_history(&account, "monero", 10))
+                .expect("test invariant");
+        assert!(
+            result.is_empty(),
+            "history should be empty when no wallet-rpc configured"
+        );
     }
 
     #[test]

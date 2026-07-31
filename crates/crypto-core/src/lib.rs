@@ -17,7 +17,5 @@ pub use keys::{
     derive_bip44_eth_key, derive_bip44_xmr_entropy, generate_mnemonic, generate_seed,
     mnemonic_from_string, mnemonic_to_seed, mnemonic_to_string,
 };
-pub use signer::{
-    sign_ecdsa_k256, sign_ecdsa_secp256k1, sign_schnorr, verify_ecdsa_secp256k1,
-};
+pub use signer::{sign_ecdsa_k256, sign_ecdsa_secp256k1, sign_schnorr, verify_ecdsa_secp256k1};
 pub use types::*;

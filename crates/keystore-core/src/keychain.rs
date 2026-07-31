@@ -10,11 +10,7 @@ pub struct KeychainStore;
 
 impl KeychainStore {
     /// Store a secret under the given `service` / `account` pair.
-    pub fn store(
-        service: &str,
-        account: &str,
-        secret: &[u8],
-    ) -> Result<(), KeystoreError> {
+    pub fn store(service: &str, account: &str, secret: &[u8]) -> Result<(), KeystoreError> {
         let entry = keyring::Entry::new(service, account)
             .map_err(|e| KeystoreError::Keychain(format!("failed to create keyring entry: {e}")))?;
 

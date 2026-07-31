@@ -54,3 +54,6 @@ optional = true
 [dependencies.plugin-ltc]
 path = "../plugins/ltc"
 optional = true
+
+[dev-dependencies]
+plugin-evm = { path = "../plugins/evm" }

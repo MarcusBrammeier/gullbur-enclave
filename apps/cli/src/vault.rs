@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 /// Create a PluginHost with the default core plugins registered.
 #[cfg(feature = "headless")]
-pub async fn create_plugin_host() -> Result<vault_core::host::PluginHost, Box<dyn std::error::Error>> {
+pub async fn create_plugin_host() -> Result<vault_core::host::PluginHost, Box<dyn std::error::Error>>
+{
     let mut host = vault_core::host::PluginHost::new();
 
     // Register default plugins

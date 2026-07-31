@@ -13,19 +13,31 @@ const RPC: &str = "https://blockstream.info/testnet/api";
 fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
-        .build().expect("test invariant")
+        .build()
+        .expect("test invariant")
 }
 
 async fn esplora_get_json(path: &str) -> serde_json::Value {
     let url = format!("{RPC}/{path}");
-    let resp = build_client().get(&url).send().await.expect("esplora GET failed");
+    let resp = build_client()
+        .get(&url)
+        .send()
+        .await
+        .expect("esplora GET failed");
     resp.json().await.expect("esplora JSON parse failed")
 }
 
 async fn esplora_get_bytes(path: &str) -> Vec<u8> {
     let url = format!("{RPC}/{path}");
-    let resp = build_client().get(&url).send().await.expect("esplora GET failed");
-    resp.bytes().await.expect("esplora bytes GET failed").to_vec()
+    let resp = build_client()
+        .get(&url)
+        .send()
+        .await
+        .expect("esplora GET failed");
+    resp.bytes()
+        .await
+        .expect("esplora bytes GET failed")
+        .to_vec()
 }
 
 async fn esplora_post(path: &str, body: &str) -> String {
@@ -34,20 +46,25 @@ async fn esplora_post(path: &str, body: &str) -> String {
         .post(&url)
         .header("Content-Type", "text/plain")
         .body(body.to_string())
-        .send().await.expect("esplora POST failed");
+        .send()
+        .await
+        .expect("esplora POST failed");
     resp.text().await.expect("esplora response failed")
 }
 
 #[tokio::test]
 #[ignore = "requires BTC_TESTNET_SEED env var and testnet BTC"]
 async fn live_broadcast_testnet() {
-    let seed_hex = std::env::var("BTC_TESTNET_SEED")
-        .expect("Set BTC_TESTNET_SEED=0x... to run this test");
+    let seed_hex =
+        std::env::var("BTC_TESTNET_SEED").expect("Set BTC_TESTNET_SEED=0x... to run this test");
     let seed_hex = seed_hex.strip_prefix("0x").unwrap_or(&seed_hex);
     let seed = hex::decode(seed_hex).expect("Seed must be hex");
 
     let plugin = BtcPlugin::new(None);
-    let account = plugin.create_account(&seed, 0, "bitcoin-testnet").await.expect("test invariant");
+    let account = plugin
+        .create_account(&seed, 0, "bitcoin-testnet")
+        .await
+        .expect("test invariant");
     eprintln!("Address: {}", account.address);
 
     // Wait for confirmed UTXO (poll up to 120s)
@@ -55,8 +72,12 @@ async fn live_broadcast_testnet() {
     let max_wait = std::time::Duration::from_secs(120);
     let utxo = loop {
         let utxos = esplora_get_json(&format!("address/{}/utxo", account.address)).await;
-        let utxos: Vec<serde_json::Value> = serde_json::from_value(utxos).expect("utxos should be an array");
-        if let Some(u) = utxos.iter().find(|u| u["status"]["confirmed"].as_bool().unwrap_or(false)) {
+        let utxos: Vec<serde_json::Value> =
+            serde_json::from_value(utxos).expect("utxos should be an array");
+        if let Some(u) = utxos
+            .iter()
+            .find(|u| u["status"]["confirmed"].as_bool().unwrap_or(false))
+        {
             break u.clone();
         }
         if start.elapsed() > max_wait {
@@ -76,7 +97,8 @@ async fn live_broadcast_testnet() {
 
     // Fetch the raw transaction for the UTXO to get the scriptPubKey
     let raw_tx_bytes = esplora_get_bytes(&format!("tx/{txid}/raw")).await;
-    let tx: bitcoin::Transaction = bitcoin::consensus::deserialize(&raw_tx_bytes).expect("test invariant");
+    let tx: bitcoin::Transaction =
+        bitcoin::consensus::deserialize(&raw_tx_bytes).expect("test invariant");
     let script_pubkey = tx.output[vout as usize].script_pubkey.clone();
 
     // Build a simple P2WPKH PSBT
@@ -86,7 +108,10 @@ async fn live_broadcast_testnet() {
     use bitcoin::{Amount, OutPoint, Sequence, TxIn, TxOut, Witness};
 
     // Burn address: tb1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3uc9uu
-    let dest_script = bitcoin::ScriptBuf::from_bytes(vec![0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    let dest_script = bitcoin::ScriptBuf::from_bytes(vec![
+        0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
 
     let unsigned_tx = bitcoin::Transaction {
         version: Version::TWO,
@@ -97,9 +122,10 @@ async fn live_broadcast_testnet() {
             sequence: Sequence::MAX,
             witness: Witness::new(),
         }],
-        output: vec![
-            TxOut { value: Amount::from_sat(send_amount), script_pubkey: dest_script },
-        ],
+        output: vec![TxOut {
+            value: Amount::from_sat(send_amount),
+            script_pubkey: dest_script,
+        }],
     };
 
     let psbt = Psbt {
@@ -125,14 +151,22 @@ async fn live_broadcast_testnet() {
         public_key: vec![],
     };
 
-    let signed_psbt_bytes = plugin.sign_transaction(&psbt_bytes, &key, "bitcoin-testnet").await
+    let signed_psbt_bytes = plugin
+        .sign_transaction(&psbt_bytes, &key, "bitcoin-testnet")
+        .await
         .expect("sign_transaction should succeed");
-    let signed_psbt = Psbt::deserialize(&signed_psbt_bytes)
-        .expect("signed PSBT should deserialize");
-    assert!(!signed_psbt.inputs[0].partial_sigs.is_empty(), "should have a signature");
+    let signed_psbt =
+        Psbt::deserialize(&signed_psbt_bytes).expect("signed PSBT should deserialize");
+    assert!(
+        !signed_psbt.inputs[0].partial_sigs.is_empty(),
+        "should have a signature"
+    );
 
     // Manually construct the final transaction with witness from PSBT
-    let (pk, sig) = signed_psbt.inputs[0].partial_sigs.iter().next()
+    let (pk, sig) = signed_psbt.inputs[0]
+        .partial_sigs
+        .iter()
+        .next()
         .expect("should have partial sigs");
     let mut witness = Witness::new();
     witness.push(&sig.to_vec());
@@ -147,9 +181,10 @@ async fn live_broadcast_testnet() {
             sequence: bitcoin::Sequence::MAX,
             witness,
         }],
-        output: vec![
-            bitcoin::TxOut { value: bitcoin::Amount::from_sat(send_amount), script_pubkey: signed_psbt.unsigned_tx.output[0].script_pubkey.clone() },
-        ],
+        output: vec![bitcoin::TxOut {
+            value: bitcoin::Amount::from_sat(send_amount),
+            script_pubkey: signed_psbt.unsigned_tx.output[0].script_pubkey.clone(),
+        }],
     };
     let signed_tx_bytes = bitcoin::consensus::serialize(&signed_tx);
     let signed_tx_hex = hex::encode(&signed_tx_bytes);
@@ -180,7 +215,10 @@ async fn live_broadcast_testnet() {
             eprintln!("   TxID still in mempool: {txid_result}");
             break;
         }
-        eprintln!("  Waiting for confirmation... ({:.0}s elapsed)", start.elapsed().as_secs_f64());
+        eprintln!(
+            "  Waiting for confirmation... ({:.0}s elapsed)",
+            start.elapsed().as_secs_f64()
+        );
         tokio::time::sleep(std::time::Duration::from_secs(15)).await;
     }
     // Broadcast success is the critical assertion — confirmation is a bonus

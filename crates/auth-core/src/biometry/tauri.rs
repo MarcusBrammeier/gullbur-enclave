@@ -1,6 +1,6 @@
 #![allow(clippy::type_complexity)]
-use crate::{AuthError, AuthStatus};
 use super::BiometricEngine;
+use crate::{AuthError, AuthStatus};
 use std::sync::Arc;
 
 /// A biometric engine backed by the Tauri biometric plugin.
@@ -56,15 +56,13 @@ impl BiometricEngine for TauriBiometryEngine {
     /// Verify biometric status — delegates to the platform dialog.
     fn verify(&self, status: AuthStatus) -> Result<(), AuthError> {
         match status {
-            AuthStatus::BiometricUnlocked => {
-                match self.auth_fn.as_ref() {
-                    Some(f) => match f("biometric authentication required") {
-                        Ok(()) => Ok(()),
-                        Err(msg) => Err(AuthError::BiometricFailed(msg)),
-                    },
-                    None => Err(AuthError::NotSupported),
-                }
-            }
+            AuthStatus::BiometricUnlocked => match self.auth_fn.as_ref() {
+                Some(f) => match f("biometric authentication required") {
+                    Ok(()) => Ok(()),
+                    Err(msg) => Err(AuthError::BiometricFailed(msg)),
+                },
+                None => Err(AuthError::NotSupported),
+            },
             AuthStatus::HardwareRequired => Err(AuthError::NotSupported),
             AuthStatus::Unauthenticated => Err(AuthError::NotSupported),
         }

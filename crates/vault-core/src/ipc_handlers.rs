@@ -16,14 +16,14 @@
 //! desktop app) bypass approval gating — the user is already
 //! interacting with the app.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use rand::TryRngCore;
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::RwLock;
 use ipc_core::handler::MessageHandler;
 use ipc_protocol::RpcError;
+use rand::TryRngCore;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::RwLock;
 use wallet_plugin::{Account, KeyHandle, KeyType};
 
 use crate::approval::ApprovalQueue;
@@ -48,7 +48,9 @@ fn enforce_auth(
     if current.can_sign() && required == auth_core::AuthStatus::BiometricUnlocked {
         return Ok(());
     }
-    if current == auth_core::AuthStatus::HardwareRequired && required == auth_core::AuthStatus::HardwareRequired {
+    if current == auth_core::AuthStatus::HardwareRequired
+        && required == auth_core::AuthStatus::HardwareRequired
+    {
         return Ok(());
     }
     // Map the current status to a string for the error payload
@@ -102,11 +104,16 @@ pub fn register_vault_handlers(
                 let (phrase_str, seed_512): (String, [u8; 64]) = if seed_phrase.is_empty() {
                     // Generate a new BIP-39 mnemonic and derive the 512-bit seed
                     let phrase = crypto_core::keys::generate_mnemonic(
-                        crypto_core::MnemonicStrength::TwentyFourWords
-                    ).map_err(|e| RpcError::new(-32000, format!("Mnemonic generation failed: {e}")))?;
+                        crypto_core::MnemonicStrength::TwentyFourWords,
+                    )
+                    .map_err(|e| {
+                        RpcError::new(-32000, format!("Mnemonic generation failed: {e}"))
+                    })?;
                     let phrase_str = phrase.to_string();
                     let seed = crypto_core::keys::mnemonic_to_seed(phrase.as_words(), passphrase)
-                        .map_err(|e| RpcError::new(-32000, format!("Seed derivation failed: {e}")))?;
+                        .map_err(|e| {
+                        RpcError::new(-32000, format!("Seed derivation failed: {e}"))
+                    })?;
                     (phrase_str, *seed)
                 } else {
                     // Parse an existing BIP-39 mnemonic
@@ -114,7 +121,9 @@ pub fn register_vault_handlers(
                         .map_err(|e| RpcError::new(-32000, format!("Invalid mnemonic: {e}")))?;
                     let phrase_str = phrase.to_string();
                     let seed = crypto_core::keys::mnemonic_to_seed(phrase.as_words(), passphrase)
-                        .map_err(|e| RpcError::new(-32000, format!("Seed derivation failed: {e}")))?;
+                        .map_err(|e| {
+                        RpcError::new(-32000, format!("Seed derivation failed: {e}"))
+                    })?;
                     (phrase_str, *seed)
                 };
 
@@ -130,12 +139,9 @@ pub fn register_vault_handlers(
                 // Encrypt seed (random per-device key, same approach as vault-core)
                 let mut dev_key = [0u8; 32];
                 rand::rngs::OsRng.try_fill_bytes(&mut dev_key).ok();
-                let _encrypted = keystore_core::vault::encrypt_with_password(
-                    &dev_key,
-                    &seed_512,
-                    b"vault-seed",
-                )
-                .map_err(|e| RpcError::new(-32000, format!("Encryption failed: {e}")))?;
+                let _encrypted =
+                    keystore_core::vault::encrypt_with_password(&dev_key, &seed_512, b"vault-seed")
+                        .map_err(|e| RpcError::new(-32000, format!("Encryption failed: {e}")))?;
 
                 // Store seed (64-byte BIP-39 seed)
                 *sd.write().await = Some(zeroize::Zeroizing::new(seed_512.to_vec()));
@@ -168,13 +174,11 @@ pub fn register_vault_handlers(
     }
 
     // ── vault.generate_mnemonic ───────────────────────────────────────────
-    handler.register("vault.generate_mnemonic", |_params: Value| {
-        async move {
-            let phrase = crypto_core::keys::generate_mnemonic(
-                crypto_core::MnemonicStrength::TwentyFourWords
-            ).map_err(|e| RpcError::new(-32000, e.to_string()))?;
-            Ok(serde_json::json!({ "mnemonic": phrase.to_string() }))
-        }
+    handler.register("vault.generate_mnemonic", |_params: Value| async move {
+        let phrase =
+            crypto_core::keys::generate_mnemonic(crypto_core::MnemonicStrength::TwentyFourWords)
+                .map_err(|e| RpcError::new(-32000, e.to_string()))?;
+        Ok(serde_json::json!({ "mnemonic": phrase.to_string() }))
     });
 
     // ── vault.status ────────────────────────────────────────────────────
@@ -244,7 +248,9 @@ pub fn register_vault_handlers(
                     };
                     tracing::info!(
                         "Approval requested: {} for {} from {}",
-                        approval_id, "vault.create_account", origin
+                        approval_id,
+                        "vault.create_account",
+                        origin
                     );
                     match rx.await {
                         Ok(crate::approval::ApprovalResponse::Approved) => {
@@ -365,7 +371,8 @@ pub fn register_vault_handlers(
                     };
                     tracing::info!(
                         "Approval requested: {} for sign_transaction from {}",
-                        approval_id, origin
+                        approval_id,
+                        origin
                     );
                     match rx.await {
                         Ok(crate::approval::ApprovalResponse::Approved) => {
@@ -469,10 +476,7 @@ pub fn register_vault_handlers(
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?
                     .to_string();
-                let limit = params
-                    .get("limit")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(10) as u32;
+                let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
 
                 let account = Account {
                     id: format!("{network}-temp"),
@@ -630,7 +634,10 @@ pub fn register_vault_handlers(
                     queue.submit(
                         origin,
                         "vault_executeBatch",
-                        &format!("Execute batch of {} transactions via ERC-4337 bundler", operations.len()),
+                        &format!(
+                            "Execute batch of {} transactions via ERC-4337 bundler",
+                            operations.len()
+                        ),
                         summary,
                     )
                 };
@@ -685,7 +692,8 @@ pub fn register_vault_handlers(
                     .unwrap_or("unknown");
                 let mut summary = HashMap::new();
                 summary.insert("network".into(), network.clone());
-                if let Some(methods) = permissions.get("allowedMethods").and_then(|v| v.as_array()) {
+                if let Some(methods) = permissions.get("allowedMethods").and_then(|v| v.as_array())
+                {
                     summary.insert("methods".into(), methods.len().to_string());
                 }
                 let (_approval_id, rx) = {
@@ -711,7 +719,9 @@ pub fn register_vault_handlers(
                 let session_key = host
                     .request_session_key(permissions, &network)
                     .await
-                    .map_err(|e| RpcError::new(-32000, format!("Session key generation failed: {e}")))?;
+                    .map_err(|e| {
+                        RpcError::new(-32000, format!("Session key generation failed: {e}"))
+                    })?;
 
                 Ok(session_key)
             }

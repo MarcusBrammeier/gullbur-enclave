@@ -83,16 +83,10 @@ mod tests {
     #[test]
     fn test_pending() {
         let mut pm = PermissionManager::new();
-        assert!(pm.request_permission(
-            "https://dapp.example",
-            vec!["evm-0".into()]
-        ));
+        assert!(pm.request_permission("https://dapp.example", vec!["evm-0".into()]));
         assert_eq!(pm.pending_for("https://dapp.example"), vec!["evm-0"]);
         // Second request for same origin+account should not signal new
-        assert!(!pm.request_permission(
-            "https://dapp.example",
-            vec!["evm-0".into()]
-        ));
+        assert!(!pm.request_permission("https://dapp.example", vec!["evm-0".into()]));
     }
 
     #[test]

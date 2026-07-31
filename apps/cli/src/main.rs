@@ -10,7 +10,11 @@ mod headless;
 mod vault;
 
 #[derive(Parser)]
-#[command(name = "gullbur-cli", version = "0.0.1", about = "Gullbúr Enclave Internal CLI")]
+#[command(
+    name = "gullbur-cli",
+    version = "0.0.1",
+    about = "Gullbúr Enclave Internal CLI"
+)]
 struct Cli {
     /// IPC server port (default: 19876)
     #[arg(short = 'p', long = "port", default_value = "19876")]
@@ -43,24 +47,15 @@ enum Commands {
     /// List all networks
     ListNetworks,
     /// Create a new account on a network
-    CreateAccount {
-        network: String,
-        index: Option<u32>,
-    },
+    CreateAccount { network: String, index: Option<u32> },
     /// List all accounts
     ListAccounts,
     /// Get balance for an address
-    GetBalance {
-        network: String,
-        address: String,
-    },
+    GetBalance { network: String, address: String },
     /// Generate a new mnemonic
     GenerateMnemonic,
     /// Validate an address
-    ValidateAddress {
-        network: String,
-        address: String,
-    },
+    ValidateAddress { network: String, address: String },
     /// Estimate fee for a transaction
     EstimateFee {
         network: String,
@@ -77,9 +72,7 @@ enum Commands {
         fee_level: String,
     },
     /// Broadcast a signed transaction
-    BroadcastTransaction {
-        signed_tx: String,
-    },
+    BroadcastTransaction { signed_tx: String },
     /// Get transaction history
     TransactionHistory {
         network: String,
@@ -111,7 +104,8 @@ async fn call(method: &str, params: Value, port: u16) -> Result<Value, String> {
     match timeout.await {
         Ok(Some(Ok(msg))) => {
             let text = msg.to_text().unwrap_or("");
-            let parsed: Value = serde_json::from_str(text).map_err(|e| format!("JSON parse: {e}"))?;
+            let parsed: Value =
+                serde_json::from_str(text).map_err(|e| format!("JSON parse: {e}"))?;
             if parsed.get("type").and_then(|v| v.as_str()) != Some("session_key") {
                 return Err(format!("Expected session_key, got: {text}"));
             }
@@ -139,7 +133,8 @@ async fn call(method: &str, params: Value, port: u16) -> Result<Value, String> {
     match timeout.await {
         Ok(Some(Ok(msg))) => {
             let text = msg.to_text().unwrap_or("");
-            let parsed: Value = serde_json::from_str(text).map_err(|e| format!("JSON parse: {e}"))?;
+            let parsed: Value =
+                serde_json::from_str(text).map_err(|e| format!("JSON parse: {e}"))?;
             if let Some(err) = parsed.get("error") {
                 Err(err["message"].as_str().unwrap_or("rpc error").to_string())
             } else {
@@ -158,7 +153,8 @@ fn print_result(result: Result<Value, String>, json: bool) {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&v)
-                    .expect("JSON serialization of Value should never fail"));
+                    .expect("JSON serialization of Value should never fail")
+            );
         }
         Err(e) => {
             if json {
@@ -178,21 +174,29 @@ async fn main() {
 
     match &cli.command {
         #[allow(unused_variables)]
-        Commands::Launch { tor_port, http_port } => {
-                    #[cfg(feature = "headless")]
-                    {
-                        if let Err(e) = headless::run_headless_vault(port, *tor_port, *http_port).await {
-                            eprintln!("Vault error: {e}");
-                            std::process::exit(1);
-                        }
-                    }
-                    #[cfg(not(feature = "headless"))]
-                    {
-                        println!("Launch IPC server via CLI not yet supported — start the desktop app first or use:\\\\n  cargo run -p gullbur-desktop -- --ipc-port {port}");
-                        println!("Or recompile with: cargo build -p gullbur-cli --features headless");
-                    }
+        Commands::Launch {
+            tor_port,
+            http_port,
+        } => {
+            #[cfg(feature = "headless")]
+            {
+                if let Err(e) = headless::run_headless_vault(port, *tor_port, *http_port).await {
+                    eprintln!("Vault error: {e}");
+                    std::process::exit(1);
                 }
-        Commands::Init { seed_phrase, passphrase } => {
+            }
+            #[cfg(not(feature = "headless"))]
+            {
+                println!(
+                    "Launch IPC server via CLI not yet supported — start the desktop app first or use:\\\\n  cargo run -p gullbur-desktop -- --ipc-port {port}"
+                );
+                println!("Or recompile with: cargo build -p gullbur-cli --features headless");
+            }
+        }
+        Commands::Init {
+            seed_phrase,
+            passphrase,
+        } => {
             let p = passphrase.as_deref().unwrap_or("");
             let r = call(
                 "vault.initialize",
@@ -203,36 +207,62 @@ async fn main() {
             print_result(r, json);
         }
         Commands::ListNetworks => {
-            print_result(call("vault.list_networks", serde_json::json!({}), port).await, json);
+            print_result(
+                call("vault.list_networks", serde_json::json!({}), port).await,
+                json,
+            );
         }
         Commands::CreateAccount { network, index } => {
             let idx = index.unwrap_or(0);
             print_result(
-                call("vault.create_account", serde_json::json!({"network": network, "index": idx}), port).await,
+                call(
+                    "vault.create_account",
+                    serde_json::json!({"network": network, "index": idx}),
+                    port,
+                )
+                .await,
                 json,
             );
         }
         Commands::ListAccounts => {
-            print_result(call("vault.list_accounts", serde_json::json!({}), port).await, json);
+            print_result(
+                call("vault.list_accounts", serde_json::json!({}), port).await,
+                json,
+            );
         }
         Commands::GetBalance { network, address } => {
             print_result(
-                call("vault.get_balance", serde_json::json!({"network": network, "address": address}), port)
-                    .await,
+                call(
+                    "vault.get_balance",
+                    serde_json::json!({"network": network, "address": address}),
+                    port,
+                )
+                .await,
                 json,
             );
         }
         Commands::GenerateMnemonic => {
-            print_result(call("vault.generate_mnemonic", serde_json::json!({}), port).await, json);
-        }
-        Commands::ValidateAddress { network, address } => {
             print_result(
-                call("vault.validate_address", serde_json::json!({"network": network, "address": address}), port)
-                    .await,
+                call("vault.generate_mnemonic", serde_json::json!({}), port).await,
                 json,
             );
         }
-        Commands::EstimateFee { network, to, amount } => {
+        Commands::ValidateAddress { network, address } => {
+            print_result(
+                call(
+                    "vault.validate_address",
+                    serde_json::json!({"network": network, "address": address}),
+                    port,
+                )
+                .await,
+                json,
+            );
+        }
+        Commands::EstimateFee {
+            network,
+            to,
+            amount,
+        } => {
             print_result(
                 call(
                     "vault.estimate_fee",
@@ -243,7 +273,13 @@ async fn main() {
                 json,
             );
         }
-        Commands::SignTransaction { network, from, to, amount, fee_level } => {
+        Commands::SignTransaction {
+            network,
+            from,
+            to,
+            amount,
+            fee_level,
+        } => {
             print_result(
                 call(
                     "vault.sign_transaction",
@@ -256,11 +292,20 @@ async fn main() {
         }
         Commands::BroadcastTransaction { signed_tx } => {
             print_result(
-                call("vault.broadcast_transaction", serde_json::json!({"signed_tx": signed_tx}), port).await,
+                call(
+                    "vault.broadcast_transaction",
+                    serde_json::json!({"signed_tx": signed_tx}),
+                    port,
+                )
+                .await,
                 json,
             );
         }
-        Commands::TransactionHistory { network, address, limit } => {
+        Commands::TransactionHistory {
+            network,
+            address,
+            limit,
+        } => {
             let lim = limit.unwrap_or(10);
             print_result(
                 call(
@@ -276,7 +321,10 @@ async fn main() {
             print_result(call("vault.lock", serde_json::json!({}), port).await, json);
         }
         Commands::Status => {
-            print_result(call("vault.status", serde_json::json!({}), port).await, json);
+            print_result(
+                call("vault.status", serde_json::json!({}), port).await,
+                json,
+            );
         }
     }
 }

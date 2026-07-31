@@ -20,7 +20,12 @@ pub struct Eip6963ProviderInfo {
 
 impl Eip6963ProviderInfo {
     /// Create a new provider info instance.
-    pub fn new(uuid: impl Into<String>, name: impl Into<String>, icon: impl Into<String>, rdns: impl Into<String>) -> Self {
+    pub fn new(
+        uuid: impl Into<String>,
+        name: impl Into<String>,
+        icon: impl Into<String>,
+        rdns: impl Into<String>,
+    ) -> Self {
         Self {
             uuid: uuid.into(),
             name: name.into(),

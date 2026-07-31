@@ -58,9 +58,8 @@ impl IpcServer {
         let token_path = PathBuf::from(&base_dir).join(&token_filename);
 
         // Write the auth token to the file with restricted permissions.
-        std::fs::write(&token_path, &auth_token).map_err(|e| {
-            IpcError::Internal(format!("failed to write token file: {e}"))
-        })?;
+        std::fs::write(&token_path, &auth_token)
+            .map_err(|e| IpcError::Internal(format!("failed to write token file: {e}")))?;
 
         // Set permissions to 0600 (owner read/write only).
         #[cfg(unix)]
@@ -183,19 +182,18 @@ impl IpcServer {
 
                     // Auth succeeded — generate session key for AES-GCM.
                     let session_key = crypto_core::isolation::generate_key();
-                    let session_key_hex: String = session_key
-                        .iter()
-                        .map(|b| format!("{:02x}", b))
-                        .collect();
+                    let session_key_hex: String =
+                        session_key.iter().map(|b| format!("{:02x}", b)).collect();
 
                     // Send session key to client.
                     let session_key_msg =
                         serde_json::json!({"type": "session_key", "key": session_key_hex});
                     if let Ok(json) = serde_json::to_string(&session_key_msg)
-                        && let Err(e) = write.send(Message::Text(json.into())).await {
-                            warn!("Failed to send session key to {peer}: {e}");
-                            return;
-                        }
+                        && let Err(e) = write.send(Message::Text(json.into())).await
+                    {
+                        warn!("Failed to send session key to {peer}: {e}");
+                        return;
+                    }
 
                     // Process JSON-RPC messages with optional encryption.
                     use futures_util::{SinkExt, StreamExt};
@@ -203,67 +201,64 @@ impl IpcServer {
                         match msg {
                             Ok(Message::Text(text)) => {
                                 // Parse as generic Value first to check for encryption.
-                                let raw_value: serde_json::Value =
-                                    match serde_json::from_str(&text) {
-                                        Ok(v) => v,
-                                        Err(e) => {
-                                            warn!("Parse error from {peer}: {e}");
-                                            let resp = ipc_protocol::JsonRpcError::new(
-                                                ipc_protocol::RpcError::parse_error(),
-                                                0,
-                                            );
-                                            if let Ok(json) = serde_json::to_string(&resp) {
-                                                let _ = write
-                                                    .send(Message::Text(json.into()))
-                                                    .await;
-                                            }
-                                            continue;
+                                let raw_value: serde_json::Value = match serde_json::from_str(&text)
+                                {
+                                    Ok(v) => v,
+                                    Err(e) => {
+                                        warn!("Parse error from {peer}: {e}");
+                                        let resp = ipc_protocol::JsonRpcError::new(
+                                            ipc_protocol::RpcError::parse_error(),
+                                            0,
+                                        );
+                                        if let Ok(json) = serde_json::to_string(&resp) {
+                                            let _ = write.send(Message::Text(json.into())).await;
                                         }
-                                    };
+                                        continue;
+                                    }
+                                };
 
                                 // Decrypt if encrypted.
                                 let was_encrypted;
-                                let request_value =
-                                    if crypto_core::isolation::is_encrypted(&raw_value) {
-                                        was_encrypted = true;
-                                        let payload = match crypto_core::isolation::extract_encrypted(&raw_value) {
-                                            Ok(p) => p,
-                                            Err(e) => {
-                                                warn!("Failed to extract encrypted payload from {peer}: {e}");
-                                                continue;
-                                            }
-                                        };
-                                        match crypto_core::isolation::decrypt(
-                                            &session_key,
-                                            &payload,
-                                        ) {
-                                            Ok(v) => v,
-                                            Err(e) => {
-                                                warn!("Decryption failed from {peer}: {e}");
-                                                continue;
-                                            }
+                                let request_value = if crypto_core::isolation::is_encrypted(
+                                    &raw_value,
+                                ) {
+                                    was_encrypted = true;
+                                    let payload = match crypto_core::isolation::extract_encrypted(
+                                        &raw_value,
+                                    ) {
+                                        Ok(p) => p,
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to extract encrypted payload from {peer}: {e}"
+                                            );
+                                            continue;
                                         }
-                                    } else {
-                                        was_encrypted = false;
-                                        raw_value
                                     };
+                                    match crypto_core::isolation::decrypt(&session_key, &payload) {
+                                        Ok(v) => v,
+                                        Err(e) => {
+                                            warn!("Decryption failed from {peer}: {e}");
+                                            continue;
+                                        }
+                                    }
+                                } else {
+                                    was_encrypted = false;
+                                    raw_value
+                                };
 
                                 // Parse as JSON-RPC request.
                                 let request: ipc_protocol::JsonRpcRequest =
                                     match serde_json::from_value(request_value) {
                                         Ok(req) => req,
                                         Err(e) => {
-                                            warn!(
-                                                "JSON-RPC parse error from {peer}: {e}"
-                                            );
+                                            warn!("JSON-RPC parse error from {peer}: {e}");
                                             let resp = ipc_protocol::JsonRpcError::new(
                                                 ipc_protocol::RpcError::parse_error(),
                                                 0,
                                             );
                                             if let Ok(json) = serde_json::to_string(&resp) {
-                                                let _ = write
-                                                    .send(Message::Text(json.into()))
-                                                    .await;
+                                                let _ =
+                                                    write.send(Message::Text(json.into())).await;
                                             }
                                             continue;
                                         }
@@ -296,41 +291,41 @@ impl IpcServer {
                                                 break;
                                             }
                                         } else {
-                                        // Encrypt the response.
-                                        let response_value: serde_json::Value =
-                                            serde_json::from_str(&json_str)
-                                                .unwrap_or(serde_json::Value::Null);
+                                            // Encrypt the response.
+                                            let response_value: serde_json::Value =
+                                                serde_json::from_str(&json_str)
+                                                    .unwrap_or(serde_json::Value::Null);
 
-                                        match crypto_core::isolation::encrypt(
-                                            &session_key,
-                                            &response_value,
-                                        ) {
-                                            Ok(payload) => {
-                                                let wrapped = serde_json::json!({
-                                                    "__encrypted__": true,
-                                                    "__payload__": payload
-                                                });
-                                                if let Ok(wrapped_json) =
-                                                    serde_json::to_string(&wrapped)
-                                                    && let Err(e) = write
-                                                        .send(Message::Text(
-                                                            wrapped_json.into(),
-                                                        ))
-                                                        .await
+                                            match crypto_core::isolation::encrypt(
+                                                &session_key,
+                                                &response_value,
+                                            ) {
+                                                Ok(payload) => {
+                                                    let wrapped = serde_json::json!({
+                                                        "__encrypted__": true,
+                                                        "__payload__": payload
+                                                    });
+                                                    if let Ok(wrapped_json) =
+                                                        serde_json::to_string(&wrapped)
+                                                        && let Err(e) = write
+                                                            .send(Message::Text(
+                                                                wrapped_json.into(),
+                                                            ))
+                                                            .await
                                                     {
                                                         warn!(
                                                             "Failed to send response to {peer}: {e}"
                                                         );
                                                         break;
                                                     }
+                                                }
+                                                Err(e) => {
+                                                    warn!(
+                                                        "Failed to encrypt response for {peer}: {e}"
+                                                    );
+                                                    continue;
+                                                }
                                             }
-                                            Err(e) => {
-                                                warn!(
-                                                    "Failed to encrypt response for {peer}: {e}"
-                                                );
-                                                continue;
-                                            }
-                                        }
                                         }
                                     }
                                 }
@@ -370,10 +365,7 @@ mod tests {
     fn test_server_creates_token_file() -> Result<(), IpcError> {
         let server = IpcServer::new(0)?;
         let path = server.auth_token_path();
-        assert!(
-            path.exists(),
-            "Token file should exist at {path:?}"
-        );
+        assert!(path.exists(), "Token file should exist at {path:?}");
         let content = std::fs::read_to_string(path)
             .map_err(|e| IpcError::Internal(format!("failed to read token file: {e}")))?;
         assert!(!content.is_empty(), "Token content should not be empty");
@@ -403,9 +395,6 @@ mod tests {
             assert!(path.exists(), "Token file should exist before drop");
         }
         // After drop, token file should be removed
-        assert!(
-            !path.exists(),
-            "Token file should be removed after drop"
-        );
+        assert!(!path.exists(), "Token file should be removed after drop");
     }
 }

@@ -27,8 +27,7 @@ impl EvmPlugin {
     }
 
     fn build_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        let mut builder = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30));
+        let mut builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
         if let Some(ref proxy_url) = self.socks5_proxy {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
         }
@@ -42,15 +41,59 @@ impl Default for EvmPlugin {
     }
 }
 
-static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| [
-    NetworkSpec { id: String::from("ethereum"), name: String::from("Ethereum"), symbol: String::from("ETH"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("arbitrum"), name: String::from("Arbitrum One"), symbol: String::from("ETH"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("optimism"), name: String::from("OP Mainnet"), symbol: String::from("ETH"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("base"), name: String::from("Base"), symbol: String::from("ETH"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("polygon"), name: String::from("Polygon"), symbol: String::from("POL"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("bnb"), name: String::from("BNB Chain"), symbol: String::from("BNB"), decimals: 18, is_testnet: false },
-    NetworkSpec { id: String::from("sepolia"), name: String::from("Sepolia"), symbol: String::from("ETH"), decimals: 18, is_testnet: true },
-]);
+static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| {
+    [
+        NetworkSpec {
+            id: String::from("ethereum"),
+            name: String::from("Ethereum"),
+            symbol: String::from("ETH"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("arbitrum"),
+            name: String::from("Arbitrum One"),
+            symbol: String::from("ETH"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("optimism"),
+            name: String::from("OP Mainnet"),
+            symbol: String::from("ETH"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("base"),
+            name: String::from("Base"),
+            symbol: String::from("ETH"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("polygon"),
+            name: String::from("Polygon"),
+            symbol: String::from("POL"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("bnb"),
+            name: String::from("BNB Chain"),
+            symbol: String::from("BNB"),
+            decimals: 18,
+            is_testnet: false,
+        },
+        NetworkSpec {
+            id: String::from("sepolia"),
+            name: String::from("Sepolia"),
+            symbol: String::from("ETH"),
+            decimals: 18,
+            is_testnet: true,
+        },
+    ]
+});
 
 /// Derive a k256 secret key from a hex seed (stored in key_id)
 /// following the same BIP-44 path as create_account.
@@ -62,12 +105,14 @@ fn derive_key_from_keyid(key_id: &str) -> Result<k256::ecdsa::SigningKey, Plugin
     let seed_bytes = hex::decode(seed_hex)
         .map_err(|e| PluginError::Internal(format!("invalid seed hex: {e}")))?;
     if seed_bytes.len() < 32 {
-        return Err(PluginError::Internal("seed too short for key derivation".into()));
+        return Err(PluginError::Internal(
+            "seed too short for key derivation".into(),
+        ));
     }
     let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&seed_bytes[..32]);
-        let secret = k256::SecretKey::from_slice(&key_bytes)
-            .map_err(|e| PluginError::Internal(format!("invalid k256 secret key: {e}")))?;
+    key_bytes.copy_from_slice(&seed_bytes[..32]);
+    let secret = k256::SecretKey::from_slice(&key_bytes)
+        .map_err(|e| PluginError::Internal(format!("invalid k256 secret key: {e}")))?;
     Ok(k256::ecdsa::SigningKey::from(&secret))
 }
 
@@ -77,12 +122,12 @@ fn derive_key_from_keyid(key_id: &str) -> Result<k256::ecdsa::SigningKey, Plugin
 pub fn rpc_endpoint(network: &str) -> Option<&'static str> {
     match network {
         "ethereum" => Some("https://ethereum-rpc.publicnode.com"),
-        "polygon"  => Some("https://polygon-bor-rpc.publicnode.com"),
+        "polygon" => Some("https://polygon-bor-rpc.publicnode.com"),
         "arbitrum" => Some("https://arbitrum-one-rpc.publicnode.com"),
         "optimism" => Some("https://optimism-rpc.publicnode.com"),
-        "bnb"      => Some("https://bsc-rpc.publicnode.com"),
-        "base"     => Some("https://base-rpc.publicnode.com"),
-        "sepolia"  => Some("https://ethereum-sepolia-rpc.publicnode.com"),
+        "bnb" => Some("https://bsc-rpc.publicnode.com"),
+        "base" => Some("https://base-rpc.publicnode.com"),
+        "sepolia" => Some("https://ethereum-sepolia-rpc.publicnode.com"),
         _ => None,
     }
 }
@@ -103,7 +148,8 @@ impl EvmPlugin {
             "id": 1,
         });
 
-        let client = self.build_client()
+        let client = self
+            .build_client()
             .map_err(|e| PluginError::NetworkError(format!("Failed to build HTTP client: {e}")))?;
         let resp = client
             .post(endpoint)
@@ -130,7 +176,10 @@ impl EvmPlugin {
         }
 
         json.get("result")
-            .ok_or_else(|| PluginError::NetworkError("JSON-RPC response missing 'result' field".into())).cloned()
+            .ok_or_else(|| {
+                PluginError::NetworkError("JSON-RPC response missing 'result' field".into())
+            })
+            .cloned()
     }
 }
 
@@ -210,14 +259,21 @@ fn rlp_decode_item(data: &[u8]) -> Result<(Vec<u8>, &[u8]), PluginError> {
     } else if prefix <= 0xbf {
         let len_len = (prefix - 0xb7) as usize;
         if data.len() < 1 + len_len {
-            return Err(PluginError::Internal("RLP decode: long string header too short".into()));
+            return Err(PluginError::Internal(
+                "RLP decode: long string header too short".into(),
+            ));
         }
         let len_bytes = &data[1..1 + len_len];
         let len = rlp_bytes_to_usize(len_bytes)?;
         if data.len() < 1 + len_len + len {
-            return Err(PluginError::Internal("RLP decode: long string payload too short".into()));
+            return Err(PluginError::Internal(
+                "RLP decode: long string payload too short".into(),
+            ));
         }
-        Ok((data[1 + len_len..1 + len_len + len].to_vec(), &data[1 + len_len + len..]))
+        Ok((
+            data[1 + len_len..1 + len_len + len].to_vec(),
+            &data[1 + len_len + len..],
+        ))
     } else if prefix <= 0xf7 {
         let len = (prefix - 0xc0) as usize;
         if data.len() < 1 + len {
@@ -227,20 +283,29 @@ fn rlp_decode_item(data: &[u8]) -> Result<(Vec<u8>, &[u8]), PluginError> {
     } else {
         let len_len = (prefix - 0xf7) as usize;
         if data.len() < 1 + len_len {
-            return Err(PluginError::Internal("RLP decode: long list header too short".into()));
+            return Err(PluginError::Internal(
+                "RLP decode: long list header too short".into(),
+            ));
         }
         let len_bytes = &data[1..1 + len_len];
         let len = rlp_bytes_to_usize(len_bytes)?;
         if data.len() < 1 + len_len + len {
-            return Err(PluginError::Internal("RLP decode: long list payload too short".into()));
+            return Err(PluginError::Internal(
+                "RLP decode: long list payload too short".into(),
+            ));
         }
-        Ok((data[..1 + len_len + len].to_vec(), &data[1 + len_len + len..]))
+        Ok((
+            data[..1 + len_len + len].to_vec(),
+            &data[1 + len_len + len..],
+        ))
     }
 }
 
 fn rlp_bytes_to_usize(bytes: &[u8]) -> Result<usize, PluginError> {
     if bytes.len() > 8 {
-        return Err(PluginError::Internal("RLP: length too large for usize".into()));
+        return Err(PluginError::Internal(
+            "RLP: length too large for usize".into(),
+        ));
     }
     let mut buf = [0u8; 8];
     buf[8 - bytes.len()..].copy_from_slice(bytes);
@@ -251,10 +316,16 @@ fn rlp_bytes_to_usize(bytes: &[u8]) -> Result<usize, PluginError> {
 
 #[async_trait]
 impl WalletPlugin for EvmPlugin {
-    fn id(&self) -> &'static str { "evm" }
-    fn name(&self) -> &'static str { "EVM (Ethereum + L2s)" }
+    fn id(&self) -> &'static str {
+        "evm"
+    }
+    fn name(&self) -> &'static str {
+        "EVM (Ethereum + L2s)"
+    }
 
-    fn supported_networks(&self) -> &[NetworkSpec] { &*EVM_NETWORKS }
+    fn supported_networks(&self) -> &[NetworkSpec] {
+        &*EVM_NETWORKS
+    }
 
     fn plugin_metadata(&self) -> PluginMetadata {
         PluginMetadata {
@@ -263,7 +334,9 @@ impl WalletPlugin for EvmPlugin {
             homepage: "https://github.com/gullbur/gullburcore",
             repository: "https://github.com/gullbur/gullburcore",
             min_wallet_version: "0.1.0",
-            tags: &["evm", "ethereum", "arbitrum", "optimism", "base", "polygon", "bnb", "eip1559"],
+            tags: &[
+                "evm", "ethereum", "arbitrum", "optimism", "base", "polygon", "bnb", "eip1559",
+            ],
         }
     }
 
@@ -278,9 +351,15 @@ impl WalletPlugin for EvmPlugin {
         ]
     }
 
-    async fn create_account(&self, seed: &[u8], index: u32, network: &str) -> Result<Account, PluginError> {
+    async fn create_account(
+        &self,
+        seed: &[u8],
+        index: u32,
+        network: &str,
+    ) -> Result<Account, PluginError> {
         // BIP-44 derivation from a 64-byte BIP-39 seed
-        let seed_512: [u8; 64] = seed.try_into()
+        let seed_512: [u8; 64] = seed
+            .try_into()
             .map_err(|_| PluginError::Internal("expected 64-byte BIP-39 seed".into()))?;
         let key = crypto_core::keys::derive_bip44_eth_key(&seed_512, index)
             .map_err(|e| PluginError::Internal(format!("Key derivation failed: {e}")))?;
@@ -296,22 +375,32 @@ impl WalletPlugin for EvmPlugin {
         })
     }
 
-    async fn sign_transaction(&self, tx: &[u8], key: &KeyHandle, _network: &str) -> Result<Vec<u8>, PluginError> {
+    async fn sign_transaction(
+        &self,
+        tx: &[u8],
+        key: &KeyHandle,
+        _network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
         if tx.is_empty() || tx[0] != 0x02 {
-            return Err(PluginError::Internal("Not a valid EIP-1559 transaction: missing 0x02 envelope byte".into()));
+            return Err(PluginError::Internal(
+                "Not a valid EIP-1559 transaction: missing 0x02 envelope byte".into(),
+            ));
         }
 
         let (mut list, _rem) = rlp_decode_item(&tx[1..])?;
         if list.is_empty() || list[0] < 0xc0 {
-            return Err(PluginError::Internal("Invalid EIP-1559 RLP: not a list".into()));
+            return Err(PluginError::Internal(
+                "Invalid EIP-1559 RLP: not a list".into(),
+            ));
         }
         list.remove(0); // Remove list prefix byte
 
         let mut fields: Vec<Vec<u8>> = Vec::with_capacity(9);
         let mut remaining: &[u8] = &list;
         for i in 0..9 {
-            let (item, rem) = rlp_decode_item(remaining)
-                .map_err(|e| PluginError::Internal(format!("Failed to decode RLP field {i}: {e}")))?;
+            let (item, rem) = rlp_decode_item(remaining).map_err(|e| {
+                PluginError::Internal(format!("Failed to decode RLP field {i}: {e}"))
+            })?;
             fields.push(item);
             remaining = rem;
         }
@@ -329,7 +418,6 @@ impl WalletPlugin for EvmPlugin {
         hash_input.extend_from_slice(rlp_encoded_list);
         let hash = crypto_core::hash::keccak256(&hash_input);
 
-        
         let (sig, recid) = signing_key.sign_prehash_recoverable(&hash);
         let r = sig.r().to_bytes();
         let s = sig.s().to_bytes();
@@ -351,8 +439,9 @@ impl WalletPlugin for EvmPlugin {
                     let mut sub_items = Vec::new();
                     let mut rem = &f[1..1 + payload_len];
                     while !rem.is_empty() {
-                        let (item, rest) = rlp_decode_item(rem)
-                            .map_err(|e| PluginError::Internal(format!("Failed to decode access list: {e}")))?;
+                        let (item, rest) = rlp_decode_item(rem).map_err(|e| {
+                            PluginError::Internal(format!("Failed to decode access list: {e}"))
+                        })?;
                         sub_items.push(item);
                         rem = rest;
                     }
@@ -393,12 +482,13 @@ impl WalletPlugin for EvmPlugin {
 
         let hex_tx = format!("0x{}", hex::encode(tx));
 
-        let result = self.json_rpc_call(
-            endpoint,
-            "eth_sendRawTransaction",
-            serde_json::json!([hex_tx]),
-        )
-        .await?;
+        let result = self
+            .json_rpc_call(
+                endpoint,
+                "eth_sendRawTransaction",
+                serde_json::json!([hex_tx]),
+            )
+            .await?;
 
         result
             .as_str()
@@ -410,16 +500,20 @@ impl WalletPlugin for EvmPlugin {
         let endpoint = rpc_endpoint(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
-        let result = self.json_rpc_call(
-            endpoint,
-            "eth_getBalance",
-            serde_json::json!([account.address, "latest"]),
-        )
-        .await?;
+        let result = self
+            .json_rpc_call(
+                endpoint,
+                "eth_getBalance",
+                serde_json::json!([account.address, "latest"]),
+            )
+            .await?;
 
         let wei = hex_str_to_u128(&result)?;
         let eth = wei as f64 / 1_000_000_000_000_000_000.0;
-        let balance_str = format!("{:.18}", eth).trim_end_matches('0').trim_end_matches('.').to_string();
+        let balance_str = format!("{:.18}", eth)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
 
         Ok(Balance {
             confirmed: balance_str,
@@ -428,16 +522,22 @@ impl WalletPlugin for EvmPlugin {
         })
     }
 
-    async fn get_transaction_history(&self, account: &Account, network: &str, _limit: u32) -> Result<Vec<TxRecord>, PluginError> {
+    async fn get_transaction_history(
+        &self,
+        account: &Account,
+        network: &str,
+        _limit: u32,
+    ) -> Result<Vec<TxRecord>, PluginError> {
         let endpoint = rpc_endpoint(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
-        let result = self.json_rpc_call(
-            endpoint,
-            "eth_getTransactionCount",
-            serde_json::json!([account.address, "latest"]),
-        )
-        .await?;
+        let result = self
+            .json_rpc_call(
+                endpoint,
+                "eth_getTransactionCount",
+                serde_json::json!([account.address, "latest"]),
+            )
+            .await?;
 
         let count = hex_str_to_u128(&result)?;
 
@@ -461,11 +561,16 @@ impl WalletPlugin for EvmPlugin {
         let endpoint = rpc_endpoint(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
-        let result = self.json_rpc_call(endpoint, "eth_gasPrice", serde_json::json!([])).await?;
+        let result = self
+            .json_rpc_call(endpoint, "eth_gasPrice", serde_json::json!([]))
+            .await?;
 
         let wei = hex_str_to_u128(&result)?;
         let gwei = wei as f64 / 1_000_000_000.0;
-        let gwei_str = format!("{:.9}", gwei).trim_end_matches('0').trim_end_matches('.').to_string();
+        let gwei_str = format!("{:.9}", gwei)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
 
         Ok(FeeEstimate {
             fast: gwei_str.clone(),
@@ -489,19 +594,27 @@ impl WalletPlugin for EvmPlugin {
         let lower = hex_chars.to_ascii_lowercase();
         let hash = crypto_core::hash::keccak256(lower.as_bytes());
 
-        let expected: String = lower.chars().enumerate().map(|(i, c)| {
-            if c.is_ascii_digit() {
-                c
-            } else {
-                let hash_byte = hash[i / 2];
-                let nybble = if i % 2 == 0 { hash_byte >> 4 } else { hash_byte & 0x0f };
-                if nybble >= 8 {
-                    c.to_ascii_uppercase()
-                } else {
+        let expected: String = lower
+            .chars()
+            .enumerate()
+            .map(|(i, c)| {
+                if c.is_ascii_digit() {
                     c
+                } else {
+                    let hash_byte = hash[i / 2];
+                    let nybble = if i % 2 == 0 {
+                        hash_byte >> 4
+                    } else {
+                        hash_byte & 0x0f
+                    };
+                    if nybble >= 8 {
+                        c.to_ascii_uppercase()
+                    } else {
+                        c
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         // All-lowercase and all-uppercase are also accepted (no EIP-55 protection)
         if addr[2..] == *lower || addr[2..] == expected {
@@ -548,10 +661,7 @@ mod tests {
 
     #[test]
     fn test_rpc_endpoint_bnb() {
-        assert_eq!(
-            rpc_endpoint("bnb"),
-            Some("https://bsc-rpc.publicnode.com")
-        );
+        assert_eq!(rpc_endpoint("bnb"), Some("https://bsc-rpc.publicnode.com"));
     }
 
     #[test]
@@ -604,11 +714,9 @@ mod tests {
     #[tokio::test]
     async fn test_validate_address_invalid_no_prefix() {
         let plugin = EvmPlugin::new();
-        let result = plugin.validate_address(
-            "d8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-            "ethereum",
-        )
-        .await;
+        let result = plugin
+            .validate_address("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "ethereum")
+            .await;
         assert!(!result.expect("test invariant"));
     }
 
@@ -630,48 +738,55 @@ mod tests {
     async fn test_sign_simple_eip1559() {
         let plugin = EvmPlugin::new();
 
-            let chain_id = vec![0x01u8];
-            let zero = vec![0x80u8];
-            let fee21000 = rlp_encode_bytes(&[0x52, 0x08]);
-            let to = rlp_encode_bytes(&[0u8; 20]);
-            let empty = vec![0x80u8];
-            let access_list = vec![0xc0u8];
+        let chain_id = vec![0x01u8];
+        let zero = vec![0x80u8];
+        let fee21000 = rlp_encode_bytes(&[0x52, 0x08]);
+        let to = rlp_encode_bytes(&[0u8; 20]);
+        let empty = vec![0x80u8];
+        let access_list = vec![0xc0u8];
 
-            let list_rlp = rlp_encode_list(&[
-                chain_id, zero.clone(), zero.clone(), fee21000.clone(), fee21000,
-                to, zero, empty, access_list,
-            ]);
-            let mut tx_bytes = vec![0x02];
-            tx_bytes.extend_from_slice(&list_rlp);
+        let list_rlp = rlp_encode_list(&[
+            chain_id,
+            zero.clone(),
+            zero.clone(),
+            fee21000.clone(),
+            fee21000,
+            to,
+            zero,
+            empty,
+            access_list,
+        ]);
+        let mut tx_bytes = vec![0x02];
+        tx_bytes.extend_from_slice(&list_rlp);
 
-            let key = KeyHandle {
-                key_id: hex::encode([42u8; 32]), // 32-byte seed as hex
-                key_type: wallet_plugin::KeyType::Secp256k1,
-                public_key: vec![],
-            };
+        let key = KeyHandle {
+            key_id: hex::encode([42u8; 32]), // 32-byte seed as hex
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
 
-            let signed = plugin
-                .sign_transaction(&tx_bytes, &key, "ethereum")
-                .await
-                .expect("sign_transaction should succeed for valid EIP-1559 tx");
+        let signed = plugin
+            .sign_transaction(&tx_bytes, &key, "ethereum")
+            .await
+            .expect("sign_transaction should succeed for valid EIP-1559 tx");
 
-            assert_eq!(signed.first(), Some(&0x02));
-            assert!(signed.len() > tx_bytes.len());
-        }
+        assert_eq!(signed.first(), Some(&0x02));
+        assert!(signed.len() > tx_bytes.len());
+    }
 
-        #[tokio::test]
-        async fn test_sign_transaction_invalid_rlp() {
-            let plugin = EvmPlugin::new();
-            let key = KeyHandle {
-                key_id: hex::encode([42u8; 32]),
-                key_type: wallet_plugin::KeyType::Secp256k1,
-                public_key: vec![],
-            };
-            let result = plugin
-                .sign_transaction(b"not a valid tx", &key, "ethereum")
-                .await;
-            assert!(result.is_err(), "passing garbage bytes should return Err");
-        }
+    #[tokio::test]
+    async fn test_sign_transaction_invalid_rlp() {
+        let plugin = EvmPlugin::new();
+        let key = KeyHandle {
+            key_id: hex::encode([42u8; 32]),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+        let result = plugin
+            .sign_transaction(b"not a valid tx", &key, "ethereum")
+            .await;
+        assert!(result.is_err(), "passing garbage bytes should return Err");
+    }
 
     // ── Tor / SOCKS5 proxy tests ────────────────────────────────────────────
 
@@ -703,7 +818,10 @@ mod tests {
     fn test_build_client_with_proxy() {
         let plugin = EvmPlugin::with_tor(9050);
         let client = plugin.build_client();
-        assert!(client.is_ok(), "build_client should succeed with valid proxy URL");
+        assert!(
+            client.is_ok(),
+            "build_client should succeed with valid proxy URL"
+        );
     }
 
     #[test]

@@ -11,10 +11,14 @@ use crate::types::{
 #[async_trait]
 pub trait WalletPlugin: Send + Sync {
     /// FPI (FOSS Plugin Interface) spec version this plugin conforms to.
-    fn fpi_version(&self) -> &'static str { "0.1.0" }
+    fn fpi_version(&self) -> &'static str {
+        "0.1.0"
+    }
 
     /// Plugin version in semver format.
-    fn plugin_version(&self) -> &'static str { "0.1.0" }
+    fn plugin_version(&self) -> &'static str {
+        "0.1.0"
+    }
 
     /// Unique identifier for this plugin (e.g. "bitcoin", "ethereum").
     fn id(&self) -> &'static str;
@@ -56,11 +60,7 @@ pub trait WalletPlugin: Send + Sync {
     ) -> Result<String, PluginError>;
 
     /// Get the balance of an account.
-    async fn get_balance(
-        &self,
-        account: &Account,
-        network: &str,
-    ) -> Result<Balance, PluginError>;
+    async fn get_balance(&self, account: &Account, network: &str) -> Result<Balance, PluginError>;
 
     /// Get transaction history for an account.
     async fn get_transaction_history(
@@ -71,16 +71,8 @@ pub trait WalletPlugin: Send + Sync {
     ) -> Result<Vec<TxRecord>, PluginError>;
 
     /// Estimate the fee for a transaction.
-    async fn estimate_fee(
-        &self,
-        tx: &[u8],
-        network: &str,
-    ) -> Result<FeeEstimate, PluginError>;
+    async fn estimate_fee(&self, tx: &[u8], network: &str) -> Result<FeeEstimate, PluginError>;
 
     /// Validate an address on the given network.
-    async fn validate_address(
-        &self,
-        address: &str,
-        network: &str,
-    ) -> Result<bool, PluginError>;
+    async fn validate_address(&self, address: &str, network: &str) -> Result<bool, PluginError>;
 }

@@ -113,9 +113,10 @@ impl LifecycleManager {
         if let Some(port) = self.tor_socks_port {
             tracing::info!("Tor daemon starting with SOCKS on 127.0.0.1:{}", port);
             let mut daemon = TorDaemon::with_port(port);
-            daemon.start().await.map_err(|e| {
-                VaultError::Internal(format!("Tor daemon start failed: {e}"))
-            })?;
+            daemon
+                .start()
+                .await
+                .map_err(|e| VaultError::Internal(format!("Tor daemon start failed: {e}")))?;
             self.tor_daemon = Some(daemon);
         }
 
@@ -124,20 +125,27 @@ impl LifecycleManager {
             // Determine cache directory (app data dir or ~/.gullbur/xmr-bin)
             let cache_dir = self.xmr_wallet_dir.clone().unwrap_or_else(|| {
                 dirs_next::home_dir()
-                    .map(|h| h.join(".gullbur").join("xmr-bin").to_string_lossy().to_string())
+                    .map(|h| {
+                        h.join(".gullbur")
+                            .join("xmr-bin")
+                            .to_string_lossy()
+                            .to_string()
+                    })
                     .unwrap_or_else(|| "/tmp/foss-xmr-bin".into())
             });
             let cache_path = std::path::PathBuf::from(&cache_dir);
             tracing::info!("Ensuring monero-wallet-rpc binary in {:?}", cache_path);
-            let ensured = xmr_downloader::ensure_binary(&cache_path).await.map_err(|e| {
-                VaultError::Internal(format!("XMR binary download failed: {e}"))
-            })?;
+            let ensured = xmr_downloader::ensure_binary(&cache_path)
+                .await
+                .map_err(|e| VaultError::Internal(format!("XMR binary download failed: {e}")))?;
 
             let network = "monero-stagenet";
             let wallet_dir = format!("{}/wallets", cache_dir);
             tracing::info!(
                 "Starting monero-wallet-rpc from {:?} (network: {}, dir: {})",
-                ensured.path, network, wallet_dir
+                ensured.path,
+                network,
+                wallet_dir
             );
             let mut xmr_proc = MoneroWalletRpcProcess::new(
                 ensured.path.to_string_lossy().to_string(),
@@ -147,14 +155,17 @@ impl LifecycleManager {
             xmr_proc.start().await.map_err(|e| {
                 VaultError::Internal(format!("monero-wallet-rpc start failed: {e}"))
             })?;
-            tracing::info!("monero-wallet-rpc ready at {}", xmr_proc.url().unwrap_or_default());
+            tracing::info!(
+                "monero-wallet-rpc ready at {}",
+                xmr_proc.url().unwrap_or_default()
+            );
             self.xmr_wallet_rpc = Some(xmr_proc);
         }
 
         // Return the IPC handle so the vault can manage abort
-        self.ipc_handle.take().ok_or_else(|| {
-            VaultError::Internal("No IPC server was configured".into())
-        })
+        self.ipc_handle
+            .take()
+            .ok_or_else(|| VaultError::Internal("No IPC server was configured".into()))
     }
 
     /// Gracefully shut down all sub-systems.
@@ -169,9 +180,10 @@ impl LifecycleManager {
 
         // Clean up the auth token file
         if let Some(path) = self.token_path.take()
-            && let Err(e) = std::fs::remove_file(&path) {
-                tracing::warn!("Failed to remove IPC token file {:?}: {e}", path);
-            }
+            && let Err(e) = std::fs::remove_file(&path)
+        {
+            tracing::warn!("Failed to remove IPC token file {:?}: {e}", path);
+        }
 
         // Shut down the Tor daemon if running
         if let Some(mut daemon) = self.tor_daemon.take() {
@@ -233,9 +245,16 @@ mod tests {
         let auth_manager = Arc::new(auth_core::AuthManager::new());
 
         let mnemonic = Arc::new(RwLock::new(None));
-        let result = lm.start(
-            plugin_host, seed, mnemonic, initialized, approval_queue, auth_manager,
-        ).await;
+        let result = lm
+            .start(
+                plugin_host,
+                seed,
+                mnemonic,
+                initialized,
+                approval_queue,
+                auth_manager,
+            )
+            .await;
         assert!(result.is_err(), "start without IPC port should fail");
         assert!(result.unwrap_err().to_string().contains("No IPC server"));
     }

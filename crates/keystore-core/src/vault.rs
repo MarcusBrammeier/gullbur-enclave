@@ -84,10 +84,7 @@ impl Vault {
             return Ok(());
         }
 
-        let sealed = self
-            .sealed
-            .as_ref()
-            .ok_or(KeystoreError::Locked)?;
+        let sealed = self.sealed.as_ref().ok_or(KeystoreError::Locked)?;
 
         let key = derive_key(password, &sealed.salt);
         self.derived_key = Some(key);
@@ -115,13 +112,7 @@ impl Vault {
 
         let nonce = Nonce::from_slice(&nonce_bytes);
         let ciphertext = cipher
-            .encrypt(
-                nonce,
-                Payload {
-                    msg: data,
-                    aad,
-                },
-            )
+            .encrypt(nonce, Payload { msg: data, aad })
             .map_err(|e| KeystoreError::Crypto(format!("encryption failed: {e}")))?;
 
         let sealed = SealedData {
@@ -159,10 +150,7 @@ impl Vault {
         let nonce_bytes = &sealed_bytes[32..44];
         let ciphertext = &sealed_bytes[44..];
 
-        let key = self
-            .derived_key
-            .as_ref()
-            .ok_or(KeystoreError::Locked)?;
+        let key = self.derived_key.as_ref().ok_or(KeystoreError::Locked)?;
 
         let cipher = Aes256Gcm::new_from_slice(key.as_ref())
             .map_err(|e| KeystoreError::Crypto(format!("AES-GCM init: {e}")))?;

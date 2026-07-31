@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use wallet_plugin::{Account, Balance, FeeEstimate, KeyHandle, PluginError, TxRecord, WalletPlugin};
+use wallet_plugin::{
+    Account, Balance, FeeEstimate, KeyHandle, PluginError, TxRecord, WalletPlugin,
+};
 
 /// Path for persisted accounts, relative to ~/.gullbur/
 const ACCOUNTS_FILE: &str = "accounts.json";
@@ -86,12 +88,17 @@ impl PluginHost {
     /// Stub for when plugin crates aren't linked — registers nothing.
     #[cfg(not(feature = "plugins"))]
     pub fn initialize_default_plugins(&mut self) {
-        tracing::warn!("initialize_default_plugins: plugin crates not linked (enable 'plugins' feature)");
+        tracing::warn!(
+            "initialize_default_plugins: plugin crates not linked (enable 'plugins' feature)"
+        );
     }
 
     /// Configure monero-wallet-rpc URL for real balance queries.
     pub fn with_xmr_wallet_rpc(self, url: impl Into<String>) -> Self {
-        Self { xmr_wallet_rpc_url: Some(url.into()), ..self }
+        Self {
+            xmr_wallet_rpc_url: Some(url.into()),
+            ..self
+        }
     }
 
     /// Set the monero-wallet-rpc URL (can be called after construction, before init).
@@ -139,10 +146,15 @@ impl PluginHost {
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
         let network_accounts = {
-            let accts = self.accounts
+            let accts = self
+                .accounts
                 .lock()
                 .expect("PluginHost accounts mutex poisoned");
-            accts.iter().filter(|a| a.network == network).cloned().collect::<Vec<Account>>()
+            accts
+                .iter()
+                .filter(|a| a.network == network)
+                .cloned()
+                .collect::<Vec<Account>>()
         };
 
         let mut results = Vec::new();
@@ -161,7 +173,8 @@ impl PluginHost {
     /// Each network is refreshed independently — one failure does not block others.
     pub async fn refresh_all(&self) -> Vec<Result<Vec<(Account, Balance)>, PluginError>> {
         let net_ids: Vec<String> = {
-            let accts = self.accounts
+            let accts = self
+                .accounts
                 .lock()
                 .expect("PluginHost accounts mutex poisoned");
             let mut ids: Vec<String> = accts.iter().map(|a| a.network.clone()).collect();
@@ -188,7 +201,8 @@ impl PluginHost {
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
         let account = plugin.create_account(seed, index, network).await?;
         {
-            let mut accts = self.accounts
+            let mut accts = self
+                .accounts
                 .lock()
                 .expect("PluginHost accounts mutex poisoned");
             accts.push(account.clone());
@@ -248,14 +262,12 @@ impl PluginHost {
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
-        plugin.get_transaction_history(account, network, limit).await
+        plugin
+            .get_transaction_history(account, network, limit)
+            .await
     }
 
-    pub async fn estimate_fee(
-        &self,
-        tx: &[u8],
-        network: &str,
-    ) -> Result<FeeEstimate, PluginError> {
+    pub async fn estimate_fee(&self, tx: &[u8], network: &str) -> Result<FeeEstimate, PluginError> {
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
@@ -290,43 +302,39 @@ impl PluginHost {
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
         if operations.is_empty() {
-            return Err(PluginError::Internal("Batch must contain at least one operation".into()));
+            return Err(PluginError::Internal(
+                "Batch must contain at least one operation".into(),
+            ));
         }
 
         let mut hashes = Vec::with_capacity(operations.len());
         for (i, op) in operations.iter().enumerate() {
             // Validate required UserOp fields
-            let sender = op.get("sender")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| PluginError::Internal(
-                    format!("UserOp[{i}]: missing required field 'sender'")
-                ))?;
-            let nonce = op.get("nonce")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| PluginError::Internal(
-                    format!("UserOp[{i}]: missing required field 'nonce'")
-                ))?;
-            let call_data = op.get("callData")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| PluginError::Internal(
-                    format!("UserOp[{i}]: missing required field 'callData'")
-                ))?;
+            let sender = op.get("sender").and_then(|v| v.as_str()).ok_or_else(|| {
+                PluginError::Internal(format!("UserOp[{i}]: missing required field 'sender'"))
+            })?;
+            let nonce = op.get("nonce").and_then(|v| v.as_str()).ok_or_else(|| {
+                PluginError::Internal(format!("UserOp[{i}]: missing required field 'nonce'"))
+            })?;
+            let call_data = op.get("callData").and_then(|v| v.as_str()).ok_or_else(|| {
+                PluginError::Internal(format!("UserOp[{i}]: missing required field 'callData'"))
+            })?;
 
             // Validate hex encoding of sender, nonce, callData
             if !sender.starts_with("0x") || sender.len() != 42 {
-                return Err(PluginError::Internal(
-                    format!("UserOp[{i}]: sender must be a 20-byte hex address")
-                ));
+                return Err(PluginError::Internal(format!(
+                    "UserOp[{i}]: sender must be a 20-byte hex address"
+                )));
             }
             if !nonce.starts_with("0x") {
-                return Err(PluginError::Internal(
-                    format!("UserOp[{i}]: nonce must be hex-encoded")
-                ));
+                return Err(PluginError::Internal(format!(
+                    "UserOp[{i}]: nonce must be hex-encoded"
+                )));
             }
             if !call_data.starts_with("0x") {
-                return Err(PluginError::Internal(
-                    format!("UserOp[{i}]: callData must be hex-encoded")
-                ));
+                return Err(PluginError::Internal(format!(
+                    "UserOp[{i}]: callData must be hex-encoded"
+                )));
             }
 
             // Compute a deterministic userOpHash from the packed UserOp fields.
@@ -334,12 +342,30 @@ impl PluginHost {
             //   callGasLimit || verificationGasLimit || preVerificationGas ||
             //   maxFeePerGas || maxPriorityFeePerGas || paymasterAndData)
             let init_code = op.get("initCode").and_then(|v| v.as_str()).unwrap_or("0x");
-            let call_gas = op.get("callGasLimit").and_then(|v| v.as_str()).unwrap_or("0x");
-            let verify_gas = op.get("verificationGasLimit").and_then(|v| v.as_str()).unwrap_or("0x");
-            let pre_verify_gas = op.get("preVerificationGas").and_then(|v| v.as_str()).unwrap_or("0x");
-            let max_fee = op.get("maxFeePerGas").and_then(|v| v.as_str()).unwrap_or("0x");
-            let max_priority = op.get("maxPriorityFeePerGas").and_then(|v| v.as_str()).unwrap_or("0x");
-            let paymaster = op.get("paymasterAndData").and_then(|v| v.as_str()).unwrap_or("0x");
+            let call_gas = op
+                .get("callGasLimit")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
+            let verify_gas = op
+                .get("verificationGasLimit")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
+            let pre_verify_gas = op
+                .get("preVerificationGas")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
+            let max_fee = op
+                .get("maxFeePerGas")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
+            let max_priority = op
+                .get("maxPriorityFeePerGas")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
+            let paymaster = op
+                .get("paymasterAndData")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x");
 
             let packed = format!(
                 "{sender}{nonce}{init_code}{call_data}{call_gas}{verify_gas}{pre_verify_gas}{max_fee}{max_priority}{paymaster}"
@@ -369,12 +395,12 @@ impl PluginHost {
         let allowed_methods = permissions
             .get("allowedMethods")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| PluginError::Internal(
-                "permissions.allowedMethods must be a non-empty array".into()
-            ))?;
+            .ok_or_else(|| {
+                PluginError::Internal("permissions.allowedMethods must be a non-empty array".into())
+            })?;
         if allowed_methods.is_empty() {
             return Err(PluginError::Internal(
-                "permissions.allowedMethods must contain at least one method".into()
+                "permissions.allowedMethods must contain at least one method".into(),
             ));
         }
 
@@ -431,16 +457,16 @@ impl PluginHost {
         // Step 1: Validate the destination address
         let address_valid = plugin.validate_address(&account.address, network).await?;
         if !address_valid {
-            return Err(PluginError::Internal(
-                format!("Invalid destination address: {}", account.address)
-            ));
+            return Err(PluginError::Internal(format!(
+                "Invalid destination address: {}",
+                account.address
+            )));
         }
 
         // Step 2: Simulate — estimate gas and check for reverts
-        let gas_estimate = plugin.estimate_fee(tx, network).await
-            .map_err(|e| PluginError::Internal(
-                format!("Simulation failed (gas estimation): {e}")
-            ))?;
+        let gas_estimate = plugin.estimate_fee(tx, network).await.map_err(|e| {
+            PluginError::Internal(format!("Simulation failed (gas estimation): {e}"))
+        })?;
 
         // Step 3: Sign the transaction
         let signed_tx = plugin.sign_transaction(tx, key, network).await?;
@@ -515,23 +541,28 @@ mod tests {
             "signature": "0x"
         }]);
 
-        let result = host.execute_batch(
-            ops.as_array().expect("test invariant"),
-            "ethereum"
-        ).await;
+        let result = host
+            .execute_batch(ops.as_array().expect("test invariant"), "ethereum")
+            .await;
 
         // Works when plugins are linked (feature=plugins) or returns
         // UnsupportedNetwork when they aren't.
         match result {
             Ok(hashes) => {
                 assert_eq!(hashes.len(), 1);
-                assert!(hashes[0].starts_with("0x"), "hash should be hex: {}", hashes[0]);
+                assert!(
+                    hashes[0].starts_with("0x"),
+                    "hash should be hex: {}",
+                    hashes[0]
+                );
                 assert_eq!(hashes[0].len(), 66, "keccak256 hash + 0x prefix");
             }
             Err(e) => {
                 // Acceptable: plugins not linked
-                assert!(e.to_string().contains("unsupported network"),
-                    "Expected UnsupportedNetwork, got: {e}");
+                assert!(
+                    e.to_string().contains("unsupported network"),
+                    "Expected UnsupportedNetwork, got: {e}"
+                );
             }
         }
     }
@@ -547,10 +578,9 @@ mod tests {
             "callData": "0xabcd"
         }]);
 
-        let result = host.execute_batch(
-            ops.as_array().expect("test invariant"),
-            "ethereum"
-        ).await;
+        let result = host
+            .execute_batch(ops.as_array().expect("test invariant"), "ethereum")
+            .await;
 
         if let Err(e) = result {
             // Either network unsupported (plugins not linked), or sender validation
@@ -591,17 +621,35 @@ mod tests {
         let result = host.request_session_key(&permissions, "ethereum").await;
         match result {
             Ok(session) => {
-                assert!(session.get("sessionKeyId").and_then(|v| v.as_str()).is_some());
-                assert!(session.get("sessionPublicKey").and_then(|v| v.as_str()).is_some());
+                assert!(
+                    session
+                        .get("sessionKeyId")
+                        .and_then(|v| v.as_str())
+                        .is_some()
+                );
+                assert!(
+                    session
+                        .get("sessionPublicKey")
+                        .and_then(|v| v.as_str())
+                        .is_some()
+                );
                 let perms = &session["permissions"];
-                assert_eq!(perms["allowedMethods"].as_array().expect("test invariant").len(), 2);
+                assert_eq!(
+                    perms["allowedMethods"]
+                        .as_array()
+                        .expect("test invariant")
+                        .len(),
+                    2
+                );
                 assert_eq!(perms["maxValue"], "1000000000000000000");
                 assert_eq!(perms["expirySeconds"], 3600);
                 assert_eq!(session["expiresAt"], 3600);
             }
             Err(e) => {
-                assert!(e.to_string().contains("unsupported network"),
-                    "Expected UnsupportedNetwork, got: {e}");
+                assert!(
+                    e.to_string().contains("unsupported network"),
+                    "Expected UnsupportedNetwork, got: {e}"
+                );
             }
         }
     }
@@ -644,7 +692,9 @@ mod tests {
             label: None,
         };
 
-        let result = host.simulate_and_send(&tx, &key, &account, "ethereum").await;
+        let result = host
+            .simulate_and_send(&tx, &key, &account, "ethereum")
+            .await;
         match result {
             Ok(output) => {
                 assert!(output.get("txid").is_some());

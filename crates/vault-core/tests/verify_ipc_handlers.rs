@@ -5,9 +5,9 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::RwLock;
 
+use auth_core::AuthManager;
 use ipc_core::handler::{DispatchResult, MessageHandler};
 use ipc_protocol::JsonRpcRequest;
-use auth_core::AuthManager;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
@@ -36,8 +36,16 @@ async fn all_13_methods_registered() {
     let approval_queue = Arc::new(RwLock::new(vault_core::approval::ApprovalQueue::new()));
 
     let auth_manager = Arc::new(AuthManager::new());
-        let mn = Arc::new(RwLock::new(None));
-        ipc_handlers::register_vault_handlers(&mut handler, plugin_host, seed, mn, initialized, approval_queue, auth_manager);
+    let mn = Arc::new(RwLock::new(None));
+    ipc_handlers::register_vault_handlers(
+        &mut handler,
+        plugin_host,
+        seed,
+        mn,
+        initialized,
+        approval_queue,
+        auth_manager,
+    );
 
     let mut passed = 0u32;
 
@@ -55,7 +63,10 @@ async fn all_13_methods_registered() {
         }
     }
 
-    assert_eq!(passed, METHODS.len() as u32,
-        "All {} methods should be registered", METHODS.len()
+    assert_eq!(
+        passed,
+        METHODS.len() as u32,
+        "All {} methods should be registered",
+        METHODS.len()
     );
 }

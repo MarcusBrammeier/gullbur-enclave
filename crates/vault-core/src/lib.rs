@@ -35,8 +35,8 @@
 pub mod approval;
 pub mod error;
 pub mod host;
-pub mod lifecycle;
 pub mod ipc_handlers;
+pub mod lifecycle;
 pub mod vault_bridge;
 pub mod xmr_downloader;
 pub mod xmr_wallet_rpc;
@@ -46,8 +46,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-use rand::rngs::OsRng;
 use rand::TryRngCore;
+use rand::rngs::OsRng;
 
 pub use error::VaultError;
 
@@ -105,7 +105,11 @@ impl Vault {
     ///
     /// Flow: BIP-39 mnemonic generation → PBKDF2 seed → crypto-core key derivation
     /// → keystore-core persistence → wallet-plugin registration → returns the master `KeyHandle`.
-    pub async fn initialize(&mut self, seed_phrase: &str, passphrase: &str) -> Result<crypto_core::KeyHandle, VaultError> {
+    pub async fn initialize(
+        &mut self,
+        seed_phrase: &str,
+        passphrase: &str,
+    ) -> Result<crypto_core::KeyHandle, VaultError> {
         if self.initialized.load(Ordering::SeqCst) {
             return Err(VaultError::AlreadyInitialized);
         }
@@ -114,8 +118,9 @@ impl Vault {
         let (mnemonic_str, seed_512): (String, [u8; 64]) = if seed_phrase.is_empty() {
             // Generate a new BIP-39 mnemonic (24 words)
             let phrase = crypto_core::keys::generate_mnemonic(
-                crypto_core::MnemonicStrength::TwentyFourWords
-            ).map_err(|e| VaultError::CryptoError(e.to_string()))?;
+                crypto_core::MnemonicStrength::TwentyFourWords,
+            )
+            .map_err(|e| VaultError::CryptoError(e.to_string()))?;
             let phrase_str = phrase.to_string();
             let seed = crypto_core::keys::mnemonic_to_seed(phrase.as_words(), passphrase)
                 .map_err(|e| VaultError::CryptoError(e.to_string()))?;
@@ -142,12 +147,9 @@ impl Vault {
         let keystore_bytes = serde_json::to_vec(&keystore_payload)
             .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
         let vault_key = Self::load_or_generate_key();
-        let encrypted = keystore_core::vault::encrypt_with_password(
-            &vault_key,
-            &keystore_bytes,
-            b"vault-seed",
-        )
-        .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
+        let encrypted =
+            keystore_core::vault::encrypt_with_password(&vault_key, &keystore_bytes, b"vault-seed")
+                .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
 
         *self.seed.write().await = Some(Zeroizing::new(seed_512.to_vec()));
         *self.mnemonic.write().await = Some(mnemonic_str);
@@ -185,9 +187,7 @@ impl Vault {
         index: u32,
     ) -> Result<wallet_plugin::Account, VaultError> {
         let seed_guard = self.seed.read().await;
-        let seed = seed_guard
-            .as_ref()
-            .ok_or(VaultError::NotInitialized)?;
+        let seed = seed_guard.as_ref().ok_or(VaultError::NotInitialized)?;
 
         let host = self.plugin_host.read().await;
         host.create_account(seed, index, network)
@@ -201,16 +201,26 @@ impl Vault {
         if let Some(tp) = tor_port {
             lm = lm.with_tor_port(tp);
         }
-        self.ipc_handle = Some(lm.start(
-            Arc::clone(&self.plugin_host),
-            Arc::clone(&self.seed),
-            Arc::clone(&self.mnemonic),
-            Arc::clone(&self.initialized),
-            Arc::clone(&self.approval_queue),
-            Arc::clone(&self.auth_manager),
-        ).await?);
+        self.ipc_handle = Some(
+            lm.start(
+                Arc::clone(&self.plugin_host),
+                Arc::clone(&self.seed),
+                Arc::clone(&self.mnemonic),
+                Arc::clone(&self.initialized),
+                Arc::clone(&self.approval_queue),
+                Arc::clone(&self.auth_manager),
+            )
+            .await?,
+        );
         tracing::info!("Vault sub-systems launched on port {}", ipc_port);
         Ok(())
+    }
+
+    /// Take the IPC server handle for external lifecycle tracking.
+    /// After calling this, the vault no longer owns the handle and
+    /// `shutdown()` will NOT abort the server — the caller is responsible.
+    pub fn take_ipc_handle(&mut self) -> Option<tokio::task::JoinHandle<()>> {
+        self.ipc_handle.take()
     }
 
     /// Shut down the vault, stopping IPC and Tor daemon.
@@ -234,9 +244,7 @@ impl Vault {
     /// Load and return the persisted encrypted seed from disk, if any.
     /// Returns `None` if no persisted seed file exists or it can't be read.
     pub fn load_persisted_seed() -> Option<Vec<u8>> {
-        let path = dirs_next::home_dir()?
-            .join(".gullbur")
-            .join(SEED_FILE);
+        let path = dirs_next::home_dir()?.join(".gullbur").join(SEED_FILE);
         if path.exists() {
             std::fs::read(&path).ok()
         } else {
@@ -250,14 +258,13 @@ impl Vault {
             .unwrap_or_default()
             .join(".gullbur")
             .join(KEY_FILE);
-        if key_path.exists() {
-            if let Ok(raw) = std::fs::read(&key_path) {
-                if raw.len() == 32 {
-                    let mut key = [0u8; 32];
-                    key.copy_from_slice(&raw);
-                    return key;
-                }
-            }
+        if key_path.exists()
+            && let Ok(raw) = std::fs::read(&key_path)
+            && raw.len() == 32
+        {
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&raw);
+            return key;
         }
         // Generate fresh random key and persist it
         let mut key = [0u8; 32];
@@ -270,7 +277,10 @@ impl Vault {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(data_dir.join(KEY_FILE), std::fs::Permissions::from_mode(0o600));
+                let _ = std::fs::set_permissions(
+                    data_dir.join(KEY_FILE),
+                    std::fs::Permissions::from_mode(0o600),
+                );
             }
         }
         key
@@ -292,26 +302,25 @@ impl Vault {
         };
 
         let vault_key = Self::load_or_generate_key();
-        let decrypted = keystore_core::vault::decrypt_with_password(
-            &vault_key,
-            &encrypted,
-            b"vault-seed",
-        )
-        .map_err(|e| {
-            tracing::warn!("Failed to decrypt persisted keystore: {e}");
-            VaultError::KeystoreError(e.to_string())
-        })?;
+        let decrypted =
+            keystore_core::vault::decrypt_with_password(&vault_key, &encrypted, b"vault-seed")
+                .map_err(|e| {
+                    tracing::warn!("Failed to decrypt persisted keystore: {e}");
+                    VaultError::KeystoreError(e.to_string())
+                })?;
 
         // Extract seed and mnemonic from the JSON payload
         let payload: serde_json::Value = serde_json::from_slice(&decrypted)
             .map_err(|e| VaultError::KeystoreError(format!("Keystore parse failed: {e}")))?;
 
-        let seed_hex = payload["seed"].as_str()
+        let seed_hex = payload["seed"]
+            .as_str()
             .ok_or_else(|| VaultError::KeystoreError("Missing seed in keystore".into()))?;
         let seed_bytes = hex::decode(seed_hex)
             .map_err(|e| VaultError::KeystoreError(format!("Invalid seed hex: {e}")))?;
 
-        let mnemonic_str = payload["mnemonic"].as_str()
+        let mnemonic_str = payload["mnemonic"]
+            .as_str()
             .ok_or_else(|| VaultError::KeystoreError("Missing mnemonic in keystore".into()))?
             .to_string();
 
@@ -360,7 +369,10 @@ impl Vault {
         // concurrent async access to encrypted_seed. The tokio RwLock
         // get_mut() is safe in this context because we hold no other
         // references and we're in a synchronous setup path.
-        *self.encrypted_seed.try_write().expect("try_restore not yet running") = Some(encrypted);
+        *self
+            .encrypted_seed
+            .try_write()
+            .expect("try_restore not yet running") = Some(encrypted);
     }
 }
 
@@ -384,21 +396,27 @@ mod tests {
     #[tokio::test]
     async fn vault_initialize_sets_flag() {
         // Generate a valid BIP-39 mnemonic
-        let phrase = crypto_core::keys::generate_mnemonic(
-            crypto_core::MnemonicStrength::TwelveWords
-        ).expect("test invariant");
+        let phrase =
+            crypto_core::keys::generate_mnemonic(crypto_core::MnemonicStrength::TwelveWords)
+                .expect("test invariant");
         let mut vault = Vault::new();
-        vault.initialize(&phrase.to_string(), "").await.expect("test invariant");
+        vault
+            .initialize(&phrase.to_string(), "")
+            .await
+            .expect("test invariant");
         assert!(vault.initialized.load(Ordering::SeqCst));
     }
 
     #[tokio::test]
     async fn vault_initialize_returns_bip44_key() {
-        let phrase = crypto_core::keys::generate_mnemonic(
-            crypto_core::MnemonicStrength::TwelveWords
-        ).expect("test invariant");
+        let phrase =
+            crypto_core::keys::generate_mnemonic(crypto_core::MnemonicStrength::TwelveWords)
+                .expect("test invariant");
         let mut vault = Vault::new();
-        let key = vault.initialize(&phrase.to_string(), "").await.expect("test invariant");
+        let key = vault
+            .initialize(&phrase.to_string(), "")
+            .await
+            .expect("test invariant");
         assert_eq!(key.key_type, crypto_core::KeyType::Secp256k1);
         assert!(key.key_id.contains("bip44"));
         assert!(!key.public_key.is_empty());

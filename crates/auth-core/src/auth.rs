@@ -104,8 +104,15 @@ impl AuthManager {
     pub fn try_biometric(&self) -> Result<(), AuthError> {
         // Can only transition from Unauthenticated
         self.status
-            .compare_exchange(UNAUTHENTICATED, BIOMETRIC_UNLOCKED, Ordering::AcqRel, Ordering::Relaxed)
-            .map_err(|_| AuthError::Internal("Already authenticated or hardware required".into()))?;
+            .compare_exchange(
+                UNAUTHENTICATED,
+                BIOMETRIC_UNLOCKED,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            )
+            .map_err(|_| {
+                AuthError::Internal("Already authenticated or hardware required".into())
+            })?;
         Ok(())
     }
 
@@ -114,7 +121,12 @@ impl AuthManager {
     /// Called when a high-value operation needs a physical FIDO2 touch.
     pub fn request_hardware(&self) -> Result<(), AuthError> {
         self.status
-            .compare_exchange(BIOMETRIC_UNLOCKED, HARDWARE_REQUIRED, Ordering::AcqRel, Ordering::Relaxed)
+            .compare_exchange(
+                BIOMETRIC_UNLOCKED,
+                HARDWARE_REQUIRED,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            )
             .map_err(|_| AuthError::Internal("Must be biometric unlocked first".into()))?;
         Ok(())
     }
@@ -122,7 +134,12 @@ impl AuthManager {
     /// Confirm the FIDO2 touch — transition back to `BiometricUnlocked`.
     pub fn confirm_hardware(&self) -> Result<(), AuthError> {
         self.status
-            .compare_exchange(HARDWARE_REQUIRED, BIOMETRIC_UNLOCKED, Ordering::AcqRel, Ordering::Relaxed)
+            .compare_exchange(
+                HARDWARE_REQUIRED,
+                BIOMETRIC_UNLOCKED,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            )
             .map_err(|_| AuthError::Internal("Hardware confirmation not pending".into()))?;
         Ok(())
     }
@@ -222,11 +239,7 @@ impl AuthManager {
     /// Returns `Ok(())` if `BiometricUnlocked`, `Err(AuthStatus)` otherwise.
     pub fn require_signing(&self) -> Result<(), AuthStatus> {
         let s = self.status();
-        if s.can_sign() {
-            Ok(())
-        } else {
-            Err(s)
-        }
+        if s.can_sign() { Ok(()) } else { Err(s) }
     }
 }
 

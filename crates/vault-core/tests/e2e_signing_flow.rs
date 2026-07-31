@@ -8,9 +8,9 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::RwLock;
 
+use auth_core::AuthManager;
 use ipc_core::handler::{DispatchResult, MessageHandler};
 use ipc_protocol::JsonRpcRequest;
-use auth_core::AuthManager;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
@@ -41,9 +41,8 @@ async fn e2e_signing_flow() {
     let plugin_host = Arc::new(RwLock::new(PluginHost::new()));
     let seed = Arc::new(RwLock::new(None::<zeroize::Zeroizing<Vec<u8>>>));
     let initialized = Arc::new(AtomicBool::new(false));
-    let approval_queue = Arc::new(RwLock::new(vault_core::approval::ApprovalQueue::new(
-        )));
-        let mn = Arc::new(RwLock::new(None));
+    let approval_queue = Arc::new(RwLock::new(vault_core::approval::ApprovalQueue::new()));
+    let mn = Arc::new(RwLock::new(None));
 
     // Register EVM plugin manually before initialize so it's available even
     // when the `plugins` feature is not enabled.
@@ -66,9 +65,8 @@ async fn e2e_signing_flow() {
     );
 
     // ── Step 1: vault.initialize ───────────────────────────────────────────
-    let mnemonic = crypto_core::keys::generate_mnemonic(
-        crypto_core::MnemonicStrength::TwelveWords
-    ).expect("test invariant");
+    let mnemonic = crypto_core::keys::generate_mnemonic(crypto_core::MnemonicStrength::TwelveWords)
+        .expect("test invariant");
     let result = handler
         .dispatch(JsonRpcRequest::new(
             "vault.initialize",
@@ -113,9 +111,7 @@ async fn e2e_signing_flow() {
         }
     };
     assert_eq!(
-        status_val
-            .get("initialized")
-            .and_then(|v| v.as_bool()),
+        status_val.get("initialized").and_then(|v| v.as_bool()),
         Some(true),
         "vault.status should report initialized=true"
     );
@@ -203,7 +199,9 @@ async fn e2e_signing_flow() {
     }
 
     // ── Authenticate before signing ────────────────────────────────────────
-    am_for_test.try_biometric().expect("biometric unlock should succeed");
+    am_for_test
+        .try_biometric()
+        .expect("biometric unlock should succeed");
 
     // ── Step 5: vault.sign_transaction ─────────────────────────────────────
     // Build a minimal valid EIP-1559 transaction:

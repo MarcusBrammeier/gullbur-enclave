@@ -1,10 +1,10 @@
 //! Comprehensive E2E test: full vault lifecycle via WebSocket IPC.
+use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
 
 use auth_core::AuthManager;
 use vault_core::approval::ApprovalQueue;
@@ -32,12 +32,21 @@ async fn e2e_full_vault_lifecycle() {
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // ── 2. Connect WebSocket + hello handshake ───────────────────────────
-    let (ws, _) = connect_async(format!("ws://127.0.0.1:{PORT}")).await.expect("test invariant");
+    let (ws, _) = connect_async(format!("ws://127.0.0.1:{PORT}"))
+        .await
+        .expect("test invariant");
     let (mut write, mut read) = ws.split();
-    write.send(Message::Text(r#"{"type":"hello"}"#.into())).await.expect("test invariant");
+    write
+        .send(Message::Text(r#"{"type":"hello"}"#.into()))
+        .await
+        .expect("test invariant");
     let msg = tokio::time::timeout(Duration::from_secs(5), read.next())
-        .await.expect("timeout").expect("test invariant").expect("test invariant");
-    let v: serde_json::Value = serde_json::from_str(msg.to_text().expect("test invariant")).expect("test invariant");
+        .await
+        .expect("timeout")
+        .expect("test invariant")
+        .expect("test invariant");
+    let v: serde_json::Value =
+        serde_json::from_str(msg.to_text().expect("test invariant")).expect("test invariant");
     assert_eq!(v["type"], "session_key");
     println!("[e2e] Connected ✓");
 
@@ -71,14 +80,22 @@ async fn e2e_full_vault_lifecycle() {
     // ── 5. Status ────────────────────────────────────────────────────────
     let s = rpc!("vault.status", {});
     assert!(s["initialized"].as_bool().expect("test invariant"));
-    assert!(!s["plugin_ids"].as_array().expect("test invariant").is_empty());
+    assert!(
+        !s["plugin_ids"]
+            .as_array()
+            .expect("test invariant")
+            .is_empty()
+    );
     assert!(!s["networks"].as_array().expect("test invariant").is_empty());
     println!("[e2e] 3. Status OK ✓");
 
     // ── 6. Create ETH account ────────────────────────────────────────────
     let r = rpc!("vault.create_account", {"network":"ethereum","index":0});
     let addr = r["address"].as_str().expect("test invariant").to_string();
-    assert!(addr.starts_with("0x") && addr.len() == 42, "bad ETH address: {addr}");
+    assert!(
+        addr.starts_with("0x") && addr.len() == 42,
+        "bad ETH address: {addr}"
+    );
     println!("[e2e] 4. ETH account {addr} ✓");
 
     // ── 7. Create BTC account ────────────────────────────────────────────

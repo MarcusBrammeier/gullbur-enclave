@@ -35,17 +35,31 @@ fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
 
 async fn setup_signing_server(
     port: u16,
-) -> (String, tokio::task::JoinHandle<()>, String, Arc<AuthManager>) {
+) -> (
+    String,
+    tokio::task::JoinHandle<()>,
+    String,
+    Arc<AuthManager>,
+) {
     let (token, handle, auth_manager) = spawn_test_server(port).await;
 
     // Generate mnemonic and initialize
     let r = call(port, &token, "vault.generate_mnemonic", json!({})).await;
     let result = assert_ok(&r, "vault.generate_mnemonic");
-    let mnemonic = result["mnemonic"].as_str().expect("test invariant").to_string();
+    let mnemonic = result["mnemonic"]
+        .as_str()
+        .expect("test invariant")
+        .to_string();
 
-    let r = call(port, &token, "vault.initialize", json!({
-        "seed_phrase": &mnemonic
-    })).await;
+    let r = call(
+        port,
+        &token,
+        "vault.initialize",
+        json!({
+            "seed_phrase": &mnemonic
+        }),
+    )
+    .await;
     let result = assert_ok(&r, "vault.initialize");
 
     // Extract the seed hex from initialization — the master_key key_id
@@ -56,10 +70,16 @@ async fn setup_signing_server(
     let seed_hex = hex::encode(&seed_bytes);
 
     // Create ETH account (for reference, signing uses the seed directly)
-    let r = call(port, &token, "vault.create_account", json!({
-        "network": "ethereum",
-        "index": 0
-    })).await;
+    let r = call(
+        port,
+        &token,
+        "vault.create_account",
+        json!({
+            "network": "ethereum",
+            "index": 0
+        }),
+    )
+    .await;
     let result = assert_ok(&r, "vault.create_account");
     let account_id = result["id"].as_str().expect("test invariant").to_string();
 
@@ -71,7 +91,9 @@ async fn sign_eth_transaction() {
     let (token, _handle, account_id, auth_manager) = setup_signing_server(PORT).await;
 
     // Authenticate (biometric unlock) before signing
-    auth_manager.try_biometric().expect("biometric unlock should succeed");
+    auth_manager
+        .try_biometric()
+        .expect("biometric unlock should succeed");
 
     // Build a minimal valid EIP-1559 transaction envelope
     let chain_id = vec![0x01u8]; // Ethereum mainnet
@@ -97,12 +119,18 @@ async fn sign_eth_transaction() {
     tx_bytes.extend_from_slice(&encoded_list);
     let tx_hex = hex::encode(&tx_bytes);
 
-    let r = call(PORT, &token, "vault.sign_transaction", json!({
-        "network": "ethereum",
-        "tx_hex": tx_hex,
-        "key_id": &account_id,
-        "key_type": "Secp256k1"
-    })).await;
+    let r = call(
+        PORT,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "ethereum",
+            "tx_hex": tx_hex,
+            "key_id": &account_id,
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
     let result = assert_ok(&r, "vault.sign_transaction");
     let signed_tx_hex = result["signed_tx_hex"].as_str().expect("test invariant");
     assert!(
@@ -116,12 +144,18 @@ async fn sign_with_bad_key_id() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 1).await;
     auth_manager.try_biometric().expect("biometric unlock");
 
-    let r = call(PORT + 1, &token, "vault.sign_transaction", json!({
-        "network": "ethereum",
-        "tx_hex": "02f8",
-        "key_id": "nonexistent-key",
-        "key_type": "Secp256k1"
-    })).await;
+    let r = call(
+        PORT + 1,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "ethereum",
+            "tx_hex": "02f8",
+            "key_id": "nonexistent-key",
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
     assert!(
         r.get("error").is_some(),
         "sign with bad key_id should error"
@@ -135,16 +169,25 @@ async fn broadcast_invalid_tx() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 2).await;
     auth_manager.try_biometric().expect("biometric unlock");
 
-    let r = call(PORT + 2, &token, "vault.broadcast_transaction", json!({
-        "network": "ethereum",
-        "signed_tx_hex": "00"
-    })).await;
+    let r = call(
+        PORT + 2,
+        &token,
+        "vault.broadcast_transaction",
+        json!({
+            "network": "ethereum",
+            "signed_tx_hex": "00"
+        }),
+    )
+    .await;
     assert!(
         r.get("error").is_some(),
         "broadcast with garbage hex should error"
     );
     let code = r["error"]["code"].as_i64().unwrap_or(0);
-    assert_ne!(code, -32601, "broadcast_transaction must be a registered handler");
+    assert_ne!(
+        code, -32601,
+        "broadcast_transaction must be a registered handler"
+    );
 }
 
 #[tokio::test]
@@ -152,14 +195,23 @@ async fn broadcast_error_routes() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 3).await;
     auth_manager.try_biometric().expect("biometric unlock");
 
-    let r = call(PORT + 3, &token, "vault.broadcast_transaction", json!({
-        "network": "bitcoin",
-        "signed_tx_hex": "001122"
-    })).await;
+    let r = call(
+        PORT + 3,
+        &token,
+        "vault.broadcast_transaction",
+        json!({
+            "network": "bitcoin",
+            "signed_tx_hex": "001122"
+        }),
+    )
+    .await;
     // Handler must route (not -32601) — accept success or operational error
     if let Some(error) = r.get("error") {
         let code = error["code"].as_i64().unwrap_or(0);
-        assert_ne!(code, -32601, "broadcast_transaction must be registered (got method_not_found)");
+        assert_ne!(
+            code, -32601,
+            "broadcast_transaction must be registered (got method_not_found)"
+        );
     } else {
         // Handler routed and succeeded — e.g. BTC plugin returned simulated txid
         assert!(r.get("result").is_some(), "should have result on success");

@@ -1,3 +1,4 @@
+use crate::isolation;
 /// Tauri command handlers — the bridge between Svelte UI and Rust vault engine.
 ///
 /// SECURITY: These commands route through the vault-core engine. The UI never
@@ -6,11 +7,10 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use tauri::State;
 use tauri::Emitter;
+use tauri::State;
 use tokio::sync::RwLock;
 use vault_core::Vault;
-use crate::isolation;
 
 /// Application state holding the vault engine + IPC lifecycle.
 pub struct VaultState {
@@ -99,12 +99,20 @@ pub async fn biometric_unlock_vault(
 
     if vault_guard.is_some() {
         // Vault already loaded — just verify biometric
-        let vault = vault_guard.as_ref().expect("vault_guard.is_some() just checked");
+        let vault = vault_guard
+            .as_ref()
+            .expect("vault_guard.is_some() just checked");
         if vault.initialized.load(std::sync::atomic::Ordering::SeqCst) {
             // Prompt biometric auth
-            match vs.biometric_engine.verify(auth_core::AuthStatus::BiometricUnlocked) {
+            match vs
+                .biometric_engine
+                .verify(auth_core::AuthStatus::BiometricUnlocked)
+            {
                 Ok(()) => {
-                    vault.auth_manager.try_biometric().map_err(|e| format!("Auth error: {e}"))?;
+                    vault
+                        .auth_manager
+                        .try_biometric()
+                        .map_err(|e| format!("Auth error: {e}"))?;
                     vault.auth_manager.touch();
                     return Ok(VaultStatus {
                         initialized: true,
@@ -129,13 +137,22 @@ pub async fn biometric_unlock_vault(
 
     // No vault loaded — try restoring from persisted keystore
     let mut vault = vault_core::Vault::new();
-    vault.try_restore().await.map_err(|e| format!("Failed to restore vault: {e}"))?;
+    vault
+        .try_restore()
+        .await
+        .map_err(|e| format!("Failed to restore vault: {e}"))?;
 
     if vault.initialized.load(std::sync::atomic::Ordering::SeqCst) {
         // Prompt biometric before releasing the dashboard
-        match vs.biometric_engine.verify(auth_core::AuthStatus::BiometricUnlocked) {
+        match vs
+            .biometric_engine
+            .verify(auth_core::AuthStatus::BiometricUnlocked)
+        {
             Ok(()) => {
-                vault.auth_manager.try_biometric().map_err(|e| format!("Auth error: {e}"))?;
+                vault
+                    .auth_manager
+                    .try_biometric()
+                    .map_err(|e| format!("Auth error: {e}"))?;
                 vault.auth_manager.touch();
                 *vault_guard = Some(vault);
                 Ok(VaultStatus {
@@ -169,13 +186,14 @@ pub async fn initialize_vault(
 ) -> Result<VaultStatus, String> {
     let vs = state.read().await;
     let mut vault_guard = vs.vault.write().await;
-    let vault = vault_guard
-        .as_mut()
-        .ok_or("Vault state not available")?;
+    let vault = vault_guard.as_mut().ok_or("Vault state not available")?;
 
     let seed_phrase = seed.unwrap_or_default();
     let pass = passphrase.as_deref().unwrap_or("");
-    vault.initialize(&seed_phrase, pass).await.map_err(|e| e.to_string())?;
+    vault
+        .initialize(&seed_phrase, pass)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(VaultStatus {
         initialized: true,
@@ -199,7 +217,10 @@ pub async fn create_account(
         return Err("Vault not initialized".into());
     }
 
-    let account = vault.create_account(&network, index).await.map_err(|e| e.to_string())?;
+    let account = vault
+        .create_account(&network, index)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(AccountInfo {
         id: account.id,
         network: account.network,
@@ -230,7 +251,10 @@ pub async fn get_balance(
         label: None,
     };
     let host = vault.plugin_host.read().await;
-    let balance = host.get_balance(&account, &network).await.map_err(|e| e.to_string())?;
+    let balance = host
+        .get_balance(&account, &network)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(balance.confirmed)
 }
 
@@ -258,7 +282,10 @@ pub async fn sign_transaction(
         public_key: Vec::new(),
     };
     let host = vault.plugin_host.read().await;
-    let signed = host.sign_transaction(&tx_bytes, &key, &network).await.map_err(|e| e.to_string())?;
+    let signed = host
+        .sign_transaction(&tx_bytes, &key, &network)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(hex::encode(signed))
 }
 
@@ -274,7 +301,10 @@ pub async fn broadcast_transaction(
 
     let tx_bytes = hex::decode(&signed_tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
     let host = vault.plugin_host.read().await;
-    let txid = host.broadcast_transaction(&tx_bytes, &network).await.map_err(|e| e.to_string())?;
+    let txid = host
+        .broadcast_transaction(&tx_bytes, &network)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(txid)
 }
 
@@ -366,15 +396,27 @@ pub async fn simulate_transfer(
             "params": [tx_obj.clone()],
             "id": 1,
         });
-        let resp = client.post(rpc_url).json(&body).send().await
+        let resp = client
+            .post(rpc_url)
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| format!("Gas estimation HTTP failed: {e}"))?;
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| format!("Gas estimation response invalid: {e}"))?;
         if let Some(err) = json.get("error") {
-            let msg = err.get("message").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let msg = err
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             return Err(format!("Gas estimation failed: {msg}"));
         }
-        let hex = json.get("result").and_then(|v| v.as_str()).unwrap_or("0x5208");
+        let hex = json
+            .get("result")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0x5208");
         u64::from_str_radix(hex.trim_start_matches("0x"), 16).unwrap_or(21000)
     };
 
@@ -386,12 +428,21 @@ pub async fn simulate_transfer(
             "params": [tx_obj, "latest"],
             "id": 2,
         });
-        let resp = client.post(rpc_url).json(&body).send().await
+        let resp = client
+            .post(rpc_url)
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| format!("eth_call HTTP failed: {e}"))?;
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| format!("eth_call response invalid: {e}"))?;
         if let Some(err) = json.get("error") {
-            let msg = err.get("message").and_then(|v| v.as_str()).unwrap_or("reverted");
+            let msg = err
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("reverted");
             (false, format!("reverted: {msg}"))
         } else {
             let hex = json.get("result").and_then(|v| v.as_str()).unwrap_or("0x");
@@ -421,7 +472,10 @@ pub async fn execute_batch(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let host = vault.plugin_host.read().await;
-    let hashes = host.execute_batch(&operations, &network).await.map_err(|e| e.to_string())?;
+    let hashes = host
+        .execute_batch(&operations, &network)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(serde_json::json!({
         "userOpHashes": hashes,
         "status": "validated",
@@ -439,7 +493,9 @@ pub async fn request_session_key(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let host = vault.plugin_host.read().await;
-    host.request_session_key(&permissions, &network).await.map_err(|e| e.to_string())
+    host.request_session_key(&permissions, &network)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -468,7 +524,9 @@ pub async fn simulate_and_send(
         label: None,
     };
     let host = vault.plugin_host.read().await;
-    host.simulate_and_send(&tx_bytes, &key, &account, &network).await.map_err(|e| e.to_string())
+    host.simulate_and_send(&tx_bytes, &key, &account, &network)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -479,9 +537,7 @@ pub fn list_accounts() -> Vec<AccountInfo> {
 }
 
 #[tauri::command]
-pub async fn launch_ipc_server(
-    state: State<'_, Arc<RwLock<VaultState>>>,
-) -> Result<u16, String> {
+pub async fn launch_ipc_server(state: State<'_, Arc<RwLock<VaultState>>>) -> Result<u16, String> {
     let vs = state.read().await;
     let handle_guard = vs.ipc_handle.write().await;
     if handle_guard.is_some() {
@@ -494,10 +550,9 @@ pub async fn launch_ipc_server(
     let port = vs.ipc_port;
     vault.launch(port, None).await.map_err(|e| e.to_string())?;
 
-    // The launch method returns the IPC handle — store it
-    // Vault::launch stores ipc_handle internally; we track it here too
+    // Take the real IPC handle from vault and track it in VaultState
     let mut handle_guard = vs.ipc_handle.write().await;
-    *handle_guard = Some(tokio::spawn(std::future::pending())); // placeholder marker
+    *handle_guard = vault.take_ipc_handle();
     Ok(port)
 }
 
@@ -561,27 +616,33 @@ async fn dispatch_method(
         }
 
         "initialize_vault" | "vault.initialize" => {
-            let seed_phrase = args.get("seed_phrase")
+            let seed_phrase = args
+                .get("seed_phrase")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let passphrase = args.get("passphrase")
+            let passphrase = args
+                .get("passphrase")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             drop(vault_guard);
             let mut vault_guard = vs.vault.write().await;
             let vault = vault_guard.as_mut().ok_or("Vault not available")?;
-            vault.initialize(seed_phrase, passphrase).await.map_err(|e| e.to_string())?;
+            vault
+                .initialize(seed_phrase, passphrase)
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"success": true}))
         }
 
         "create_account" | "vault.create_account" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let index = args.get("index")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u32;
-            let account = vault.create_account(network, index).await
+            let index = args.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let account = vault
+                .create_account(network, index)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({
                 "account": {
@@ -594,10 +655,12 @@ async fn dispatch_method(
         }
 
         "get_balance" | "vault.get_balance" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let address = args.get("address")
+            let address = args
+                .get("address")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing address")?;
             let account = wallet_plugin::Account {
@@ -608,59 +671,68 @@ async fn dispatch_method(
                 label: None,
             };
             let host = vault.plugin_host.read().await;
-            let balance = host.get_balance(&account, network).await
+            let balance = host
+                .get_balance(&account, network)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"balance": balance.confirmed}))
         }
 
         "sign_transaction" | "vault.sign_transaction" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let tx_hex = args.get("tx_hex")
+            let tx_hex = args
+                .get("tx_hex")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing tx_hex")?;
-            let key_id = args.get("key_id")
+            let key_id = args
+                .get("key_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
-            let tx_bytes = hex::decode(tx_hex)
-                .map_err(|e| format!("Invalid hex: {e}"))?;
+            let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
             let key = wallet_plugin::KeyHandle {
                 key_id: key_id.to_string(),
                 key_type: wallet_plugin::KeyType::Secp256k1,
                 public_key: Vec::new(),
             };
             let host = vault.plugin_host.read().await;
-            let signed = host.sign_transaction(&tx_bytes, &key, network).await
+            let signed = host
+                .sign_transaction(&tx_bytes, &key, network)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"signed_tx_hex": hex::encode(signed)}))
         }
 
         "broadcast_transaction" | "vault.broadcast_transaction" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let signed_tx_hex = args.get("signed_tx_hex")
+            let signed_tx_hex = args
+                .get("signed_tx_hex")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing signed_tx_hex")?;
-            let tx_bytes = hex::decode(signed_tx_hex)
-                .map_err(|e| format!("Invalid hex: {e}"))?;
+            let tx_bytes = hex::decode(signed_tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
             let host = vault.plugin_host.read().await;
-            let txid = host.broadcast_transaction(&tx_bytes, network).await
+            let txid = host
+                .broadcast_transaction(&tx_bytes, network)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"txid": txid}))
         }
 
         "get_transaction_history" | "vault.get_transaction_history" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let address = args.get("address")
+            let address = args
+                .get("address")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing address")?;
-            let limit = args.get("limit")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(10) as u32;
+            let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
             let account = wallet_plugin::Account {
                 id: format!("{network}-hist"),
                 network: network.to_string(),
@@ -670,67 +742,82 @@ async fn dispatch_method(
             };
             let host = vault.plugin_host.read().await;
             let records = host
-                .get_transaction_history(&account, network, limit).await
+                .get_transaction_history(&account, network, limit)
+                .await
                 .map_err(|e| e.to_string())?;
-            let txs: Vec<serde_json::Value> = records.into_iter().map(|r| {
-                serde_json::json!({
-                    "txid": r.txid,
-                    "from": r.from_address.unwrap_or_default(),
-                    "to": r.to_address.unwrap_or_default(),
-                    "amount": r.amount,
-                    "status": match r.status {
-                        wallet_plugin::TxStatus::Pending => "pending",
-                        wallet_plugin::TxStatus::Confirmed { .. } => "confirmed",
-                        wallet_plugin::TxStatus::Failed { .. } => "failed",
-                    },
-                    "timestamp": r.timestamp,
+            let txs: Vec<serde_json::Value> = records
+                .into_iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "txid": r.txid,
+                        "from": r.from_address.unwrap_or_default(),
+                        "to": r.to_address.unwrap_or_default(),
+                        "amount": r.amount,
+                        "status": match r.status {
+                            wallet_plugin::TxStatus::Pending => "pending",
+                            wallet_plugin::TxStatus::Confirmed { .. } => "confirmed",
+                            wallet_plugin::TxStatus::Failed { .. } => "failed",
+                        },
+                        "timestamp": r.timestamp,
+                    })
                 })
-            }).collect();
+                .collect();
             Ok(serde_json::json!({"transactions": txs}))
         }
 
         "execute_batch" | "vault.execute_batch" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let operations = args.get("operations")
+            let operations = args
+                .get("operations")
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
             let host = vault.plugin_host.read().await;
-            let hashes = host.execute_batch(&operations, network).await
+            let hashes = host
+                .execute_batch(&operations, network)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"userOpHashes": hashes, "status": "validated"}))
         }
 
         "request_session_key" | "vault.request_session_key" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let permissions = args.get("permissions")
+            let permissions = args
+                .get("permissions")
                 .cloned()
                 .unwrap_or(serde_json::Value::Null);
             let host = vault.plugin_host.read().await;
-            let result = host.request_session_key(&permissions, network).await
+            let result = host
+                .request_session_key(&permissions, network)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(result)
         }
 
         "simulate_and_send" | "vault.simulate_and_send" => {
-            let network = args.get("network")
+            let network = args
+                .get("network")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing network")?;
-            let tx_hex = args.get("tx_hex")
+            let tx_hex = args
+                .get("tx_hex")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing tx_hex")?;
-            let key_id = args.get("key_id")
+            let key_id = args
+                .get("key_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
-            let address = args.get("address")
+            let address = args
+                .get("address")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing address")?;
-            let tx_bytes = hex::decode(tx_hex)
-                .map_err(|e| format!("Invalid hex: {e}"))?;
+            let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
             let key = wallet_plugin::KeyHandle {
                 key_id: key_id.to_string(),
                 key_type: wallet_plugin::KeyType::Secp256k1,
@@ -744,7 +831,9 @@ async fn dispatch_method(
                 label: None,
             };
             let host = vault.plugin_host.read().await;
-            let result = host.simulate_and_send(&tx_bytes, &key, &account, network).await
+            let result = host
+                .simulate_and_send(&tx_bytes, &key, &account, network)
+                .await
                 .map_err(|e| e.to_string())?;
             drop(host);
             Ok(result)
@@ -760,7 +849,7 @@ async fn dispatch_method(
             // WASM crypto dependency in the mobile WebView.
             vault.launch(port, None).await.map_err(|e| e.to_string())?;
             let mut handle_guard = vs.ipc_handle.write().await;
-            *handle_guard = Some(tokio::spawn(std::future::pending()));
+            *handle_guard = vault.take_ipc_handle();
             Ok(serde_json::json!({"port": port}))
         }
 
@@ -784,11 +873,17 @@ pub async fn toggle_tor(
     if enabled {
         // Start Tor — the tor-daemon is already built into the workspace
         // vault-core's `set_tor_enabled(true)` will configure plugins to proxy through Tor
-        vault.set_tor_enabled(true).await.map_err(|e| e.to_string())?;
+        vault
+            .set_tor_enabled(true)
+            .await
+            .map_err(|e| e.to_string())?;
         tracing::info!("[tor] Tor daemon enabled");
         Ok(true)
     } else {
-        vault.set_tor_enabled(false).await.map_err(|e| e.to_string())?;
+        vault
+            .set_tor_enabled(false)
+            .await
+            .map_err(|e| e.to_string())?;
         tracing::info!("[tor] Tor daemon disabled");
         Ok(false)
     }
@@ -845,12 +940,11 @@ pub async fn confirm_hardware(
             let challenge: [u8; 32] = rand::random();
 
             // Spawn blocking HID I/O
-            let result = tokio::task::spawn_blocking(move || {
-                fido2.authenticate(&challenge, 30_000)
-            })
-            .await
-            .map_err(|e| format!("FIDO2 task failed: {e}"))?
-            .map_err(|e| format!("FIDO2 error: {e}"))?;
+            let result =
+                tokio::task::spawn_blocking(move || fido2.authenticate(&challenge, 30_000))
+                    .await
+                    .map_err(|e| format!("FIDO2 task failed: {e}"))?
+                    .map_err(|e| format!("FIDO2 error: {e}"))?;
 
             match result {
                 auth_core::Fido2Status::AssertionReceived(_sig) => {
@@ -858,7 +952,9 @@ pub async fn confirm_hardware(
                     drop(vault_guard);
                     let vault_guard = vs.vault.read().await;
                     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
-                    vault.auth_manager.confirm_hardware()
+                    vault
+                        .auth_manager
+                        .confirm_hardware()
                         .map_err(|e| format!("Auth error: {e}"))?;
                     vault.auth_manager.touch();
                     tracing::info!("[auth] FIDO2 authentication succeeded");
@@ -870,7 +966,10 @@ pub async fn confirm_hardware(
                     let vault_guard = vs.vault.read().await;
                     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
                     vault.auth_manager.lock();
-                    let _ = app_handle.emit("security-lock", serde_json::json!({"reason": "fido2_timeout"}));
+                    let _ = app_handle.emit(
+                        "security-lock",
+                        serde_json::json!({"reason": "fido2_timeout"}),
+                    );
                     return Err("FIDO2 authentication timed out".into());
                 }
                 _ => return Err("FIDO2 authentication failed".into()),
@@ -879,14 +978,23 @@ pub async fn confirm_hardware(
     } // vault_guard dropped here — FIDO2 path done
 
     // ── Tier 1: Biometric path ─────────────────────────────────────────
-    if vs.native_biometry_enabled.load(std::sync::atomic::Ordering::Acquire) {
-        match vs.biometric_engine.verify(auth_core::AuthStatus::BiometricUnlocked) {
+    if vs
+        .native_biometry_enabled
+        .load(std::sync::atomic::Ordering::Acquire)
+    {
+        match vs
+            .biometric_engine
+            .verify(auth_core::AuthStatus::BiometricUnlocked)
+        {
             Ok(()) => {
                 // Success — reset failure counter
-                vs.biometric_failures.store(0, std::sync::atomic::Ordering::Release);
+                vs.biometric_failures
+                    .store(0, std::sync::atomic::Ordering::Release);
                 let vault_guard = vs.vault.read().await;
                 let vault = vault_guard.as_ref().ok_or("Vault not available")?;
-                vault.auth_manager.try_biometric()
+                vault
+                    .auth_manager
+                    .try_biometric()
                     .map_err(|e| format!("Auth error: {e}"))?;
                 vault.auth_manager.touch();
                 tracing::info!("[auth] Biometric authentication succeeded");
@@ -894,14 +1002,21 @@ pub async fn confirm_hardware(
             }
             Err(auth_core::AuthError::NotSupported) => {
                 // Engine can't handle this — fall back to SoftwareAuth
-                vs.native_biometry_enabled.store(false, std::sync::atomic::Ordering::Release);
-                tracing::warn!("[auth] Biometric engine not supported — falling back to SoftwareAuth");
+                vs.native_biometry_enabled
+                    .store(false, std::sync::atomic::Ordering::Release);
+                tracing::warn!(
+                    "[auth] Biometric engine not supported — falling back to SoftwareAuth"
+                );
             }
             Err(auth_core::AuthError::PermissionDenied) => {
-                let failures = vs.biometric_failures.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+                let failures = vs
+                    .biometric_failures
+                    .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
+                    + 1;
                 tracing::warn!("[auth] Biometric denied ({failures}/5)");
                 if failures >= 5 {
-                    vs.native_biometry_enabled.store(false, std::sync::atomic::Ordering::Release);
+                    vs.native_biometry_enabled
+                        .store(false, std::sync::atomic::Ordering::Release);
                     return Err("Biometric authentication failed 5 times. Falling back to manual confirmation.".into());
                 }
                 return Err("Biometric authentication denied".into());
@@ -919,7 +1034,9 @@ pub async fn confirm_hardware(
     // Fallback path: SoftwareAuth (no hardware needed)
     let vault_guard = vs.vault.read().await;
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
-    vault.auth_manager.confirm_hardware()
+    vault
+        .auth_manager
+        .confirm_hardware()
         .map_err(|e| format!("Hardware confirmation failed: {e}"))?;
     vault.auth_manager.touch();
     tracing::info!("[auth] Software confirmation — vault unlocked");
@@ -966,7 +1083,10 @@ pub async fn get_seed_phrase(
     let vs = vault_state.read().await;
     let vault_guard = vs.vault.read().await;
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
-    vault.get_mnemonic().await.ok_or("Vault not initialized".into())
+    vault
+        .get_mnemonic()
+        .await
+        .ok_or("Vault not initialized".into())
 }
 
 // ── Bug Reporter ────────────────────────────────────────────────────────────
@@ -1164,12 +1284,16 @@ pub async fn open_vault_from_path(
         return Err(format!("Keystore file not found: {path}"));
     }
     // Load the keystore from the file and restore vault state
-    let encrypted = std::fs::read(&path_buf).map_err(|e| format!("Failed to read keystore: {e}"))?;
+    let encrypted =
+        std::fs::read(&path_buf).map_err(|e| format!("Failed to read keystore: {e}"))?;
     let vs = vault_state.write().await;
     let mut vault = vault_core::Vault::new();
     // Copy the encrypted seed into vault so try_restore can decrypt it
     vault.set_encrypted_seed(encrypted);
-    vault.try_restore().await.map_err(|e| format!("Failed to open vault: {e}"))?;
+    vault
+        .try_restore()
+        .await
+        .map_err(|e| format!("Failed to open vault: {e}"))?;
     *vs.vault.write().await = Some(vault);
     tracing::info!("Vault opened from custom path: {path}");
     Ok(())
@@ -1189,7 +1313,10 @@ pub async fn open_vault_from_bytes(
     let vs = vault_state.write().await;
     let mut vault = vault_core::Vault::new();
     vault.set_encrypted_seed(data.clone());
-    vault.try_restore().await.map_err(|e| format!("Failed to open vault: {e}"))?;
+    vault
+        .try_restore()
+        .await
+        .map_err(|e| format!("Failed to open vault: {e}"))?;
     *vs.vault.write().await = Some(vault);
     tracing::info!("Vault opened from raw bytes ({} bytes)", data.len());
     Ok(())
@@ -1386,11 +1513,11 @@ pub async fn generate_debug_report(
             crash_files.sort_by_key(|e| e.path());
             // Take up to 3 most recent crashes
             for entry in crash_files.iter().rev().take(3) {
-                if let Ok(raw) = std::fs::read_to_string(entry.path()) {
-                    if let Ok(crash) = serde_json::from_str::<serde_json::Value>(&raw) {
-                        let sanitized = sanitize_crash_report(&crash);
-                        recent_crashes.push(sanitized);
-                    }
+                if let Ok(raw) = std::fs::read_to_string(entry.path())
+                    && let Ok(crash) = serde_json::from_str::<serde_json::Value>(&raw)
+                {
+                    let sanitized = sanitize_crash_report(&crash);
+                    recent_crashes.push(sanitized);
                 }
             }
         }

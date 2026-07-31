@@ -46,7 +46,11 @@ impl MoneroWalletRpcProcess {
     /// `network` is a Monero network string ("monero", "monero-stagenet", "monero-testnet").
     /// The daemon address is auto-selected from public nodes.
     /// Call `.start().await` to actually launch.
-    pub fn new(binary_path: impl Into<String>, network: &str, wallet_dir: impl Into<String>) -> Self {
+    pub fn new(
+        binary_path: impl Into<String>,
+        network: &str,
+        wallet_dir: impl Into<String>,
+    ) -> Self {
         let daemon_address = match network {
             "monero" => "xmr-node.cakewallet.com:18081",
             "monero-stagenet" => "stagenet.xmr-node.cakewallet.com:38081",
@@ -77,9 +81,9 @@ impl MoneroWalletRpcProcess {
     /// The JSON-RPC URL of the running wallet-rpc process.
     /// Returns `None` if the process hasn't been started yet.
     pub fn url(&self) -> Option<String> {
-        self.child.as_ref().map(|_| {
-            format!("http://127.0.0.1:{}/json_rpc", self.rpc_bind_port)
-        })
+        self.child
+            .as_ref()
+            .map(|_| format!("http://127.0.0.1:{}/json_rpc", self.rpc_bind_port))
     }
 
     /// Spawn the `monero-wallet-rpc` process and wait for it to become ready.
@@ -201,7 +205,10 @@ mod tests {
     fn test_new_configures_defaults() {
         let proc = MoneroWalletRpcProcess::new("monero-wallet-rpc", "monero-stagenet", "/tmp/xmr");
         assert_eq!(proc.rpc_bind_port, 18082);
-        assert_eq!(proc.daemon_address, "stagenet.xmr-node.cakewallet.com:38081");
+        assert_eq!(
+            proc.daemon_address,
+            "stagenet.xmr-node.cakewallet.com:38081"
+        );
         assert!(proc.url().is_none());
         assert!(!proc.is_running());
     }
@@ -220,8 +227,7 @@ mod tests {
 
     #[test]
     fn test_custom_port() {
-        let proc = MoneroWalletRpcProcess::new("mw", "monero-stagenet", "/tmp/x")
-            .with_port(19000);
+        let proc = MoneroWalletRpcProcess::new("mw", "monero-stagenet", "/tmp/x").with_port(19000);
         assert_eq!(proc.rpc_bind_port, 19000);
     }
 
@@ -240,8 +246,7 @@ mod tests {
 
     #[test]
     fn test_url_some_when_started() {
-        let proc = MoneroWalletRpcProcess::new("mw", "monero", "/tmp/x")
-            .with_port(18082);
+        let proc = MoneroWalletRpcProcess::new("mw", "monero", "/tmp/x").with_port(18082);
         assert_eq!(proc.url(), None);
         // Verify URL format
         let url = format!("http://127.0.0.1:{}/json_rpc", 18082);

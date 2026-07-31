@@ -1,12 +1,14 @@
-use vault_core::Vault;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use vault_core::Vault;
 
 /// Helper: create a temp HOME and init the vault
 async fn init_vault_in(dir: &std::path::Path) -> Vault {
     let _ = std::fs::remove_dir_all(dir);
     std::fs::create_dir_all(dir).ok();
-    unsafe { std::env::set_var("HOME", dir); }
+    unsafe {
+        std::env::set_var("HOME", dir);
+    }
     // Reset the dirs_next cache by dropping the old value
     // (dirs_next doesn't cache on Linux, so this is safe)
     let mut vault = Vault::new();
@@ -22,19 +24,36 @@ async fn test_account_address_formats() {
     let mut vault = init_vault_in(&tmp).await;
 
     // BTC testnet
-    let btc = vault.create_account("bitcoin-testnet", 0).await.expect("btc");
-    assert!(btc.address.starts_with("tb1"), "BTC testnet: {}", btc.address);
+    let btc = vault
+        .create_account("bitcoin-testnet", 0)
+        .await
+        .expect("btc");
+    assert!(
+        btc.address.starts_with("tb1"),
+        "BTC testnet: {}",
+        btc.address
+    );
     assert_eq!(btc.network, "bitcoin-testnet");
 
     // XMR stagenet
-    let xmr = vault.create_account("monero-stagenet", 0).await.expect("xmr");
-    assert!(xmr.address.starts_with("5") || xmr.address.starts_with("7"),
-        "XMR stagenet: {}", xmr.address);
+    let xmr = vault
+        .create_account("monero-stagenet", 0)
+        .await
+        .expect("xmr");
+    assert!(
+        xmr.address.starts_with("5") || xmr.address.starts_with("7"),
+        "XMR stagenet: {}",
+        xmr.address
+    );
     assert_eq!(xmr.network, "monero-stagenet");
 
     // ETH Sepolia
     let eth = vault.create_account("sepolia", 0).await.expect("eth");
-    assert!(eth.address.starts_with("0x"), "ETH Sepolia: {}", eth.address);
+    assert!(
+        eth.address.starts_with("0x"),
+        "ETH Sepolia: {}",
+        eth.address
+    );
     assert_eq!(eth.network, "sepolia");
 
     let _ = std::fs::remove_dir_all(&tmp);
@@ -64,14 +83,22 @@ async fn test_vault_restore_after_persist() {
     let tmp = std::env::temp_dir().join(format!("gullbur-restore-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).ok();
-    unsafe { std::env::set_var("HOME", &tmp); }
+    unsafe {
+        std::env::set_var("HOME", &tmp);
+    }
 
     // Session 1: init
     {
         let mut vault = Vault::new();
         vault.initialize("", "").await.expect("init");
-        vault.create_account("bitcoin-testnet", 0).await.expect("btc");
-        vault.create_account("monero-stagenet", 0).await.expect("xmr");
+        vault
+            .create_account("bitcoin-testnet", 0)
+            .await
+            .expect("btc");
+        vault
+            .create_account("monero-stagenet", 0)
+            .await
+            .expect("xmr");
     } // vault drops, keystore persists
 
     // Session 2: restore (same process, different Vault instance)
@@ -84,8 +111,14 @@ async fn test_vault_restore_after_persist() {
     );
 
     // Verify files still exist
-    assert!(tmp.join(".gullbur").join("keystore").exists(), "keystore persists");
-    assert!(tmp.join(".gullbur").join("keystore.key").exists(), "key persists");
+    assert!(
+        tmp.join(".gullbur").join("keystore").exists(),
+        "keystore persists"
+    );
+    assert!(
+        tmp.join(".gullbur").join("keystore.key").exists(),
+        "key persists"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp);
 }

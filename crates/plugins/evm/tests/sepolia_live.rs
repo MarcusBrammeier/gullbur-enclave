@@ -20,11 +20,15 @@ async fn sepolia_live_get_balance() {
         path: None,
         label: None,
     };
-    let balance = plugin.get_balance(&account, "sepolia").await
+    let balance = plugin
+        .get_balance(&account, "sepolia")
+        .await
         .expect("live Sepolia get_balance should succeed");
     eprintln!("Balance on Sepolia: {} {}", balance.confirmed, balance.unit);
     // Just verify it's parseable as a number — don't assert exact value
-    let _: f64 = balance.confirmed.parse()
+    let _: f64 = balance
+        .confirmed
+        .parse()
         .expect("balance should be a valid decimal string");
     assert!(!balance.confirmed.is_empty(), "balance should not be empty");
 }
@@ -33,10 +37,14 @@ async fn sepolia_live_get_balance() {
 #[ignore = "requires network access to public RPC endpoint"]
 async fn sepolia_live_estimate_gas() {
     let plugin = EvmPlugin::new();
-    let fee = plugin.estimate_fee(b"", "sepolia").await
+    let fee = plugin
+        .estimate_fee(b"", "sepolia")
+        .await
         .expect("live gas estimate should succeed");
-    eprintln!("Sepolia gas: fast={} medium={} slow={} {}", 
-        fee.fast, fee.medium, fee.slow, fee.unit);
+    eprintln!(
+        "Sepolia gas: fast={} medium={} slow={} {}",
+        fee.fast, fee.medium, fee.slow, fee.unit
+    );
     assert!(!fee.fast.is_empty(), "gas price should not be empty");
 }
 
@@ -44,7 +52,9 @@ async fn sepolia_live_estimate_gas() {
 #[ignore = "requires network access to public RPC endpoint"]
 async fn plugin_rpc_endpoints_all_resolve() {
     // Verify all 7 network endpoints can be reached
-    let networks = ["ethereum", "polygon", "arbitrum", "optimism", "bnb", "base", "sepolia"];
+    let networks = [
+        "ethereum", "polygon", "arbitrum", "optimism", "bnb", "base", "sepolia",
+    ];
     for net in &networks {
         let endpoint = plugin_evm::rpc_endpoint(net);
         assert!(endpoint.is_some(), "{net} should have an endpoint");

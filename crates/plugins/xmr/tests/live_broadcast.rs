@@ -45,19 +45,29 @@ async fn wallet_rpc(
         "method": method,
         "params": params,
     });
-    let resp = client.post(url).json(&body).send().await.expect("wallet RPC POST failed");
+    let resp = client
+        .post(url)
+        .json(&body)
+        .send()
+        .await
+        .expect("wallet RPC POST failed");
     let json: serde_json::Value = resp.json().await.expect("wallet RPC JSON parse failed");
     if let Some(err) = json.get("error") {
         panic!("wallet RPC error: {err}");
     }
-    json.get("result").cloned().expect("missing 'result' in wallet RPC response")
+    json.get("result")
+        .cloned()
+        .expect("missing 'result' in wallet RPC response")
 }
 
 async fn wait_for_balance(client: &reqwest::Client, min_unlocked: u64, timeout_secs: u64) {
     let start = std::time::Instant::now();
     loop {
         let info = wallet_rpc(client, "get_balance", serde_json::json!({})).await;
-        let unlocked = info.get("unlocked_balance").and_then(|v| v.as_u64()).unwrap_or(0);
+        let unlocked = info
+            .get("unlocked_balance")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         eprintln!("  Balance: {unlocked} piconero unlocked (need {min_unlocked})");
         if unlocked >= min_unlocked {
             return;
@@ -75,9 +85,19 @@ async fn check_confirmation(client: &reqwest::Client, network: &str, tx_hash: &s
         "jsonrpc": "2.0", "id": "0", "method": "get_transactions",
         "params": { "txs_hashes": [tx_hash], "decode_as_json": false },
     });
-    let resp = client.post(daemon_url(network)).json(&body).send().await.ok()?;
+    let resp = client
+        .post(daemon_url(network))
+        .json(&body)
+        .send()
+        .await
+        .ok()?;
     let json: serde_json::Value = resp.json().await.ok()?;
-    json.get("result")?.get("txs")?.as_array()?.first()?.get("confirmations")?.as_u64()
+    json.get("result")?
+        .get("txs")?
+        .as_array()?
+        .first()?
+        .get("confirmations")?
+        .as_u64()
 }
 
 #[tokio::test]
@@ -99,17 +119,28 @@ async fn live_broadcast_stagenet() {
     // Step 1: Derive stagenet address from seed via plugin
     let network = "monero-stagenet";
     let plugin = XmrPlugin::new();
-    let account = plugin.create_account(&seed, 0, network).await.expect("test invariant");
+    let account = plugin
+        .create_account(&seed, 0, network)
+        .await
+        .expect("test invariant");
 
     // Step 2: Restore wallet from keys in wallet-rpc
     eprintln!("  Restoring wallet from keys in monero-wallet-rpc...");
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).expect("test invariant").as_nanos();
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("test invariant")
+        .as_nanos();
     let wallet_file = format!("test_wallet_{ts}");
-    wallet_rpc(&client, "generate_from_keys", serde_json::json!({
-        "filename": wallet_file, "password": "",
-        "spend_key": spend_key, "viewkey": view_key,
-        "restore_height": 2167700, "address": account.address,
-    })).await;
+    wallet_rpc(
+        &client,
+        "generate_from_keys",
+        serde_json::json!({
+            "filename": wallet_file, "password": "",
+            "spend_key": spend_key, "viewkey": view_key,
+            "restore_height": 2167700, "address": account.address,
+        }),
+    )
+    .await;
     eprintln!("  Wallet restored ✅");
 
     // Step 3: Get wallet address
@@ -123,10 +154,15 @@ async fn live_broadcast_stagenet() {
     eprintln!("\n✅ Funded! Sending transfer...\n");
 
     // Step 5: Transfer via wallet-rpc
-    let transfer = wallet_rpc(&client, "transfer", serde_json::json!({
-        "destinations": [{ "amount": 8_000_000_000u64, "address": wallet_addr }],
-        "priority": 0, "ring_size": 11, "get_tx_key": true, "do_not_relay": false,
-    })).await;
+    let transfer = wallet_rpc(
+        &client,
+        "transfer",
+        serde_json::json!({
+            "destinations": [{ "amount": 8_000_000_000u64, "address": wallet_addr }],
+            "priority": 0, "ring_size": 11, "get_tx_key": true, "do_not_relay": false,
+        }),
+    )
+    .await;
 
     let tx_hash = transfer["tx_hash"].as_str().expect("tx_hash").to_string();
     eprintln!("\n🎉 Transaction broadcast! Hash: {tx_hash}\n");

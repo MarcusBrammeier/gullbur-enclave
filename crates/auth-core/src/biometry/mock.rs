@@ -1,5 +1,5 @@
-use crate::{AuthError, AuthStatus};
 use super::BiometricEngine;
+use crate::{AuthError, AuthStatus};
 
 /// A mock biometric engine that always succeeds for `BiometricUnlocked`
 /// and returns `Err(NotSupported)` for `HardwareRequired`.

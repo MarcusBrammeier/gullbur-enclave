@@ -8,19 +8,19 @@
 //! - Phase 2 next-gen vault_* API routing
 //! - PermissionManager lifecycle
 
+use futures_util::{SinkExt, StreamExt};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use futures_util::{SinkExt, StreamExt};
-use serde_json::{json, Value};
 
+use auth_core::AuthManager;
 use extension_relay::native_host;
 use extension_relay::permissions::PermissionManager;
 use extension_relay::router;
-use auth_core::AuthManager;
 use vault_core::approval::ApprovalQueue;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
@@ -49,15 +49,25 @@ impl WsClient {
         let url = format!("ws://127.0.0.1:{port}");
         let (ws, _) = connect_async(&url).await.expect("WebSocket connect");
         let (mut write, read) = ws.split();
-        write.send(Message::Text(token.into())).await.expect("send auth");
-        WsClient { write, read, next_id: 1 }
+        write
+            .send(Message::Text(token.into()))
+            .await
+            .expect("send auth");
+        WsClient {
+            write,
+            read,
+            next_id: 1,
+        }
     }
 
     async fn call(&mut self, method: &str, params: Value) -> Value {
         let id = self.next_id;
         self.next_id += 1;
         let req = json!({"jsonrpc":"2.0","method":method,"params":params,"id":id});
-        self.write.send(Message::Text(req.to_string().into())).await.expect("send");
+        self.write
+            .send(Message::Text(req.to_string().into()))
+            .await
+            .expect("send");
         loop {
             match self.read.next().await {
                 Some(Ok(Message::Text(text))) => {
@@ -73,10 +83,15 @@ impl WsClient {
         }
     }
 
-    fn is_ok(resp: &Value) -> bool { resp.get("error").is_none() }
+    fn is_ok(resp: &Value) -> bool {
+        resp.get("error").is_none()
+    }
 
     fn error_code(resp: &Value) -> i64 {
-        resp.get("error").and_then(|e| e.get("code")).and_then(|c| c.as_i64()).unwrap_or(0)
+        resp.get("error")
+            .and_then(|e| e.get("code"))
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0)
     }
 }
 
@@ -101,8 +116,8 @@ async fn e2e_full_browser_extension_flow() {
         let init = Arc::new(AtomicBool::new(false));
         let aq = Arc::new(RwLock::new(ApprovalQueue::new()));
         let am = Arc::new(AuthManager::new());
-                let mn = Arc::new(RwLock::new(None));
-                ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
+        let mn = Arc::new(RwLock::new(None));
+        ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
     }
 
     let _handle = server.run();
@@ -117,7 +132,10 @@ async fn e2e_full_browser_extension_flow() {
     let has_plugins = {
         let r = client.call("vault.status", json!({})).await;
         let s = &r["result"];
-        !s["plugin_ids"].as_array().expect("test invariant").is_empty()
+        !s["plugin_ids"]
+            .as_array()
+            .expect("test invariant")
+            .is_empty()
     };
     println!("has_plugins: {has_plugins}");
 
@@ -129,7 +147,11 @@ async fn e2e_full_browser_extension_flow() {
     let r = routed.expect("test invariant");
     assert!(r.requires_approval, "eth_requestAccounts requires approval");
     assert_eq!(r.vault_method, "vault.create_account");
-    assert!(r.approval_description.expect("test invariant").contains("requesting access"));
+    assert!(
+        r.approval_description
+            .expect("test invariant")
+            .contains("requesting access")
+    );
     println!("✅ eth_requestAccounts: routed, requires approval");
 
     // 4b. eth_chainId → vault.list_networks (no approval needed)
@@ -146,7 +168,10 @@ async fn e2e_full_browser_extension_flow() {
     println!("✅ eth_chainId → vault.list_networks: routed");
 
     // 4c. eth_getBalance → vault.get_balance
-    let routed = route_envelope("eth_getBalance", json!({"address":"0xtest","network":"ethereum"}));
+    let routed = route_envelope(
+        "eth_getBalance",
+        json!({"address":"0xtest","network":"ethereum"}),
+    );
     assert!(routed.is_some());
     let r = routed.expect("test invariant");
     assert!(!r.requires_approval);
@@ -173,7 +198,11 @@ async fn e2e_full_browser_extension_flow() {
     let r = routed.expect("test invariant");
     assert!(r.requires_approval, "eth_sendTransaction requires approval");
     assert_eq!(r.vault_method, "vault.sign_transaction");
-    assert!(r.approval_description.expect("test invariant").contains("Confirm transaction"));
+    assert!(
+        r.approval_description
+            .expect("test invariant")
+            .contains("Confirm transaction")
+    );
     println!("✅ eth_sendTransaction: routed, requires approval");
 
     // 4f. personal_sign → vault.sign_transaction (requires approval)
@@ -200,75 +229,115 @@ async fn e2e_full_browser_extension_flow() {
         "initCode": "0x",
         "signature": "0x"
     }]);
-    let routed = route_envelope("vault_executeBatch", json!({"network":"ethereum","operations":ops}));
+    let routed = route_envelope(
+        "vault_executeBatch",
+        json!({"network":"ethereum","operations":ops}),
+    );
     assert!(routed.is_some(), "vault_executeBatch must be routable");
     let r = routed.expect("test invariant");
     assert!(r.requires_approval, "vault_executeBatch requires approval");
     assert_eq!(r.vault_method, "vault_executeBatch");
-    assert!(r.approval_description.expect("test invariant").contains("ERC-4337"));
+    assert!(
+        r.approval_description
+            .expect("test invariant")
+            .contains("ERC-4337")
+    );
     println!("✅ vault_executeBatch: routed, requires approval");
 
     // 5b. vault_requestSessionKey (requires approval)
-    let routed = route_envelope("vault_requestSessionKey", json!({
-        "network":"ethereum",
-        "permissions":{"allowedMethods":["eth_sendTransaction"],"maxValue":"0","expirySeconds":3600}
-    }));
+    let routed = route_envelope(
+        "vault_requestSessionKey",
+        json!({
+            "network":"ethereum",
+            "permissions":{"allowedMethods":["eth_sendTransaction"],"maxValue":"0","expirySeconds":3600}
+        }),
+    );
     assert!(routed.is_some(), "vault_requestSessionKey must be routable");
     let r = routed.expect("test invariant");
     assert!(r.requires_approval);
     assert_eq!(r.vault_method, "vault_requestSessionKey");
-    assert!(r.approval_description.expect("test invariant").contains("ERC-7579"));
+    assert!(
+        r.approval_description
+            .expect("test invariant")
+            .contains("ERC-7579")
+    );
     println!("✅ vault_requestSessionKey: routed, requires approval");
 
     // 5c. vault_simulateAndSend (requires approval)
-    let routed = route_envelope("vault_simulateAndSend", json!({
-        "network":"ethereum",
-        "tx_hex":"02f8",
-        "key_id":"test",
-        "key_type":"Secp256k1",
-        "address":"0xtest"
-    }));
+    let routed = route_envelope(
+        "vault_simulateAndSend",
+        json!({
+            "network":"ethereum",
+            "tx_hex":"02f8",
+            "key_id":"test",
+            "key_type":"Secp256k1",
+            "address":"0xtest"
+        }),
+    );
     assert!(routed.is_some(), "vault_simulateAndSend must be routable");
     let r = routed.expect("test invariant");
     assert!(r.requires_approval);
     assert_eq!(r.vault_method, "vault_simulateAndSend");
-    assert!(r.approval_description.expect("test invariant").contains("Simulate"));
+    assert!(
+        r.approval_description
+            .expect("test invariant")
+            .contains("Simulate")
+    );
     println!("✅ vault_simulateAndSend: routed, requires approval");
 
     // ── 6. Phase 2 Live IPC Calls ───────────────────────────────────────
 
     // 6a. vault_executeBatch live call
-    let resp = client.call("vault_executeBatch", json!({
-        "network":"ethereum",
-        "operations": [{
-            "sender": "0x1234567890123456789012345678901234567890",
-            "nonce": "0x1",
-            "callData": "0xabcd"
-        }]
-    })).await;
+    let resp = client
+        .call(
+            "vault_executeBatch",
+            json!({
+                "network":"ethereum",
+                "operations": [{
+                    "sender": "0x1234567890123456789012345678901234567890",
+                    "nonce": "0x1",
+                    "callData": "0xabcd"
+                }]
+            }),
+        )
+        .await;
     if has_plugins {
         if WsClient::is_ok(&resp) {
             let result = &resp["result"];
-            assert!(result.get("userOpHashes").and_then(|v| v.as_array()).is_some());
+            assert!(
+                result
+                    .get("userOpHashes")
+                    .and_then(|v| v.as_array())
+                    .is_some()
+            );
             assert_eq!(result["status"], "validated");
             println!("✅ vault_executeBatch: live call OK — hashes returned");
         } else {
             println!("⚠ vault_executeBatch: live call errored (network unreachable)");
         }
     } else {
-        assert_ne!(WsClient::error_code(&resp), -32601, "vault_executeBatch: routed");
+        assert_ne!(
+            WsClient::error_code(&resp),
+            -32601,
+            "vault_executeBatch: routed"
+        );
         println!("✅ vault_executeBatch: routed (no plugins)");
     }
 
     // 6b. vault_requestSessionKey live call
-    let resp = client.call("vault_requestSessionKey", json!({
-        "network":"ethereum",
-        "permissions": {
-            "allowedMethods": ["eth_sendTransaction", "personal_sign"],
-            "maxValue": "1000000000000000000",
-            "expirySeconds": 3600
-        }
-    })).await;
+    let resp = client
+        .call(
+            "vault_requestSessionKey",
+            json!({
+                "network":"ethereum",
+                "permissions": {
+                    "allowedMethods": ["eth_sendTransaction", "personal_sign"],
+                    "maxValue": "1000000000000000000",
+                    "expirySeconds": 3600
+                }
+            }),
+        )
+        .await;
     if has_plugins {
         if WsClient::is_ok(&resp) {
             let result = &resp["result"];
@@ -280,7 +349,11 @@ async fn e2e_full_browser_extension_flow() {
             println!("⚠ vault_requestSessionKey: live call errored");
         }
     } else {
-        assert_ne!(WsClient::error_code(&resp), -32601, "vault_requestSessionKey: routed");
+        assert_ne!(
+            WsClient::error_code(&resp),
+            -32601,
+            "vault_requestSessionKey: routed"
+        );
         println!("✅ vault_requestSessionKey: routed (no plugins)");
     }
 
@@ -290,25 +363,31 @@ async fn e2e_full_browser_extension_flow() {
 
     // Valid origins
     assert!(native_host::validate_origin(
-        "chrome-extension://trusted-ext", &allowed_ids
+        "chrome-extension://trusted-ext",
+        &allowed_ids
     ));
     assert!(native_host::validate_origin(
-        "moz-extension://trusted-ext", &allowed_ids
+        "moz-extension://trusted-ext",
+        &allowed_ids
     ));
     assert!(native_host::validate_origin(
-        "chrome-extension://helper-ext", &allowed_ids
+        "chrome-extension://helper-ext",
+        &allowed_ids
     ));
 
     // Invalid origins
     assert!(!native_host::validate_origin("", &allowed_ids));
     assert!(!native_host::validate_origin(
-        "chrome-extension://evil-ext", &allowed_ids
+        "chrome-extension://evil-ext",
+        &allowed_ids
     ));
     assert!(!native_host::validate_origin(
-        "https://phishing.com", &allowed_ids
+        "https://phishing.com",
+        &allowed_ids
     ));
     assert!(!native_host::validate_origin(
-        "http://localhost:3000", &allowed_ids
+        "http://localhost:3000",
+        &allowed_ids
     ));
     println!("✅ Origin validation: 3 allowed, 4 rejected");
 

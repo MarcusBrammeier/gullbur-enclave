@@ -27,19 +27,15 @@ pub async fn run_headless_vault(
     let plugin_host = Arc::new(RwLock::new(host));
 
     // Seed storage, initialized flag, approval queue, auth
-    let seed: Arc<RwLock<Option<zeroize::Zeroizing<Vec<u8>>>>> =
-        Arc::new(RwLock::new(None));
+    let seed: Arc<RwLock<Option<zeroize::Zeroizing<Vec<u8>>>>> = Arc::new(RwLock::new(None));
     let initialized = Arc::new(AtomicBool::new(false));
-    let approval_queue = Arc::new(RwLock::new(
-        vault_core::approval::ApprovalQueue::new(),
-    ));
+    let approval_queue = Arc::new(RwLock::new(vault_core::approval::ApprovalQueue::new()));
 
     let auth_manager = Arc::new(auth_core::AuthManager::new());
     let mnemonic: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
 
     // Configure and start the lifecycle manager (no encryption for CLI)
-    let mut lifecycle = vault_core::lifecycle::LifecycleManager::new()
-        .with_no_encrypt();
+    let mut lifecycle = vault_core::lifecycle::LifecycleManager::new().with_no_encrypt();
     lifecycle = lifecycle.with_ipc_port(ipc_port);
     if let Some(tor) = tor_socks_port {
         lifecycle = lifecycle.with_tor_port(tor);

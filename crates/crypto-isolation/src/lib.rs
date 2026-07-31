@@ -4,10 +4,7 @@
 /// or other native-only crates that fail to compile to wasm32-unknown-unknown.
 ///
 /// `crypto-core` re-exports everything from this crate in its `isolation` module.
-use aes_gcm::{
-    aead::Aead,
-    Aes256Gcm, Key, KeyInit, Nonce,
-};
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -38,8 +35,7 @@ pub fn encrypt(key: &[u8; 32], value: &Value) -> Result<EncryptedPayload, String
     let mut iv_arr = [0u8; 12];
     rand::Rng::fill(&mut rand::rng(), &mut iv_arr);
     let nonce = Nonce::from_iter(iv_arr.iter().copied());
-    let plaintext = serde_json::to_vec(value)
-        .map_err(|e| format!("Serialize failed: {e}"))?;
+    let plaintext = serde_json::to_vec(value).map_err(|e| format!("Serialize failed: {e}"))?;
     let combined = cipher
         .encrypt(&nonce, plaintext.as_ref())
         .map_err(|e| format!("AES-GCM encrypt failed: {e}"))?;
@@ -53,31 +49,30 @@ pub fn encrypt(key: &[u8; 32], value: &Value) -> Result<EncryptedPayload, String
 pub fn decrypt(key: &[u8; 32], payload: &EncryptedPayload) -> Result<Value, String> {
     let aes_key = Key::<Aes256Gcm>::from_iter(key.iter().copied());
     let cipher = Aes256Gcm::new(&aes_key);
-    let iv_bytes = hex::decode(&payload.iv_hex)
-        .map_err(|e| format!("Bad IV hex: {e}"))?;
+    let iv_bytes = hex::decode(&payload.iv_hex).map_err(|e| format!("Bad IV hex: {e}"))?;
     let nonce = Nonce::from_iter(iv_bytes.iter().copied());
-    let combined = general_purpose::STANDARD.decode(&payload.data_b64)
+    let combined = general_purpose::STANDARD
+        .decode(&payload.data_b64)
         .map_err(|e| format!("Bad base64: {e}"))?;
     let plaintext = cipher
         .decrypt(&nonce, combined.as_ref())
         .map_err(|e| format!("AES-GCM decrypt failed: {e}"))?;
-    serde_json::from_slice(&plaintext)
-        .map_err(|e| format!("JSON parse failed: {e}"))
+    serde_json::from_slice(&plaintext).map_err(|e| format!("JSON parse failed: {e}"))
 }
 
 /// Check if a JSON value is an encrypted payload wrapper.
 pub fn is_encrypted(args: &Value) -> bool {
     args.as_object()
         .and_then(|o| o.get("__encrypted__"))
-        .and_then(|v| v.as_bool()) == Some(true)
+        .and_then(|v| v.as_bool())
+        == Some(true)
 }
 
 /// Extract EncryptedPayload from `{ __encrypted__: true, __payload__: {...} }`.
 pub fn extract_encrypted(args: &Value) -> Result<EncryptedPayload, String> {
     let obj = args.as_object().ok_or("Args is not an object")?;
     let payload_val = obj.get("__payload__").ok_or("Missing __payload__ field")?;
-    serde_json::from_value(payload_val.clone())
-        .map_err(|e| format!("Bad encrypted payload: {e}"))
+    serde_json::from_value(payload_val.clone()).map_err(|e| format!("Bad encrypted payload: {e}"))
 }
 
 /// Encode bytes to base64 using the `base64` crate.
@@ -87,7 +82,9 @@ pub fn encode_base64(input: &[u8]) -> String {
 
 /// Decode base64 string to bytes using the `base64` crate.
 pub fn decode_base64(input: &str) -> Result<Vec<u8>, &'static str> {
-    general_purpose::STANDARD.decode(input).map_err(|_| "Invalid base64")
+    general_purpose::STANDARD
+        .decode(input)
+        .map_err(|_| "Invalid base64")
 }
 
 #[cfg(test)]
@@ -114,7 +111,9 @@ mod tests {
         let key = generate_key();
         let original = serde_json::json!({"test": "value"});
         let encrypted = encrypt(&key, &original).expect("encrypt");
-        let mut decrypted_bytes = general_purpose::STANDARD.decode(&encrypted.data_b64).expect("test invariant");
+        let mut decrypted_bytes = general_purpose::STANDARD
+            .decode(&encrypted.data_b64)
+            .expect("test invariant");
         if let Some(b) = decrypted_bytes.last_mut() {
             *b ^= 0x01;
         }
@@ -126,7 +125,10 @@ mod tests {
     #[test]
     fn test_base64_roundtrip() {
         let data = b"hello world! 123";
-        assert_eq!(decode_base64(&encode_base64(data)).expect("test invariant"), data);
+        assert_eq!(
+            decode_base64(&encode_base64(data)).expect("test invariant"),
+            data
+        );
     }
 
     // ── Proptest: AES-GCM roundtrip ───────────────────────────────────────

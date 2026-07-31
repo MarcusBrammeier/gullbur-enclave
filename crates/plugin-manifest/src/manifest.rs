@@ -97,32 +97,31 @@ impl PluginManifest {
     /// Load and validate a manifest from a TOML file at `path`.
     pub fn load_toml(path: impl AsRef<Path>) -> Result<Self, ManifestError> {
         let text = std::fs::read_to_string(path.as_ref())?;
-        let manifest: PluginManifest = toml::from_str(&text)
-            .map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let manifest: PluginManifest =
+            toml::from_str(&text).map_err(|e| ManifestError::Toml(e.to_string()))?;
         manifest.validate()?;
         Ok(manifest)
     }
 
     /// Load and validate a manifest from a TOML string.
     pub fn from_toml_str(text: &str) -> Result<Self, ManifestError> {
-        let manifest: PluginManifest = toml::from_str(text)
-            .map_err(|e| ManifestError::Toml(e.to_string()))?;
+        let manifest: PluginManifest =
+            toml::from_str(text).map_err(|e| ManifestError::Toml(e.to_string()))?;
         manifest.validate()?;
         Ok(manifest)
     }
 
     /// Load and validate a manifest from a YAML string.
     pub fn from_yaml_str(text: &str) -> Result<Self, ManifestError> {
-        let manifest: PluginManifest = serde_yaml::from_str(text)
-            .map_err(|e| ManifestError::Yaml(e.to_string()))?;
+        let manifest: PluginManifest =
+            serde_yaml::from_str(text).map_err(|e| ManifestError::Yaml(e.to_string()))?;
         manifest.validate()?;
         Ok(manifest)
     }
 
     /// Serialize this manifest back to TOML.
     pub fn to_toml_string(&self) -> Result<String, ManifestError> {
-        toml::to_string_pretty(self)
-            .map_err(|e| ManifestError::Toml(e.to_string()))
+        toml::to_string_pretty(self).map_err(|e| ManifestError::Toml(e.to_string()))
     }
 
     /// Validate required fields.
@@ -134,13 +133,16 @@ impl PluginManifest {
             return Err(ManifestError::Validation("name must not be empty".into()));
         }
         if self.version.is_empty() {
-            return Err(ManifestError::Validation("version must not be empty".into()));
+            return Err(ManifestError::Validation(
+                "version must not be empty".into(),
+            ));
         }
         // Validate semver-ish — at least X.Y
         if !self.version.contains('.') {
-            return Err(ManifestError::Validation(
-                format!("version '{}' is not semver (expected X.Y.Z)", self.version),
-            ));
+            return Err(ManifestError::Validation(format!(
+                "version '{}' is not semver (expected X.Y.Z)",
+                self.version
+            )));
         }
         // Validate chain entries have required fields
         for chain in &self.chains {
@@ -148,9 +150,10 @@ impl PluginManifest {
                 return Err(ManifestError::Validation("chain entry has empty id".into()));
             }
             if chain.rpc_urls.is_empty() {
-                return Err(ManifestError::Validation(
-                    format!("chain '{}' has no rpc_urls", chain.id),
-                ));
+                return Err(ManifestError::Validation(format!(
+                    "chain '{}' has no rpc_urls",
+                    chain.id
+                )));
             }
         }
         Ok(())

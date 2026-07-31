@@ -45,11 +45,7 @@ pub trait Fido2Authenticator: Send + Sync {
     ///
     /// NOTE: This method may block HID I/O. Callers MUST use
     /// `tokio::task::spawn_blocking` to run it.
-    fn authenticate(
-        &self,
-        challenge: &[u8],
-        timeout_ms: u32,
-    ) -> Result<Fido2Status, AuthError>;
+    fn authenticate(&self, challenge: &[u8], timeout_ms: u32) -> Result<Fido2Status, AuthError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,11 +70,7 @@ impl Fido2Authenticator for MockFido2Authenticator {
         Fido2Status::DeviceFound
     }
 
-    fn authenticate(
-        &self,
-        challenge: &[u8],
-        timeout_ms: u32,
-    ) -> Result<Fido2Status, AuthError> {
+    fn authenticate(&self, challenge: &[u8], timeout_ms: u32) -> Result<Fido2Status, AuthError> {
         // Reject empty challenges as a sanity check.
         if challenge.is_empty() {
             return Err(AuthError::Internal(

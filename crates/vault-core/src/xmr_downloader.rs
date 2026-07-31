@@ -31,36 +31,38 @@ const MONERO_VERSION: &str = "v0.18.5.1";
 /// V=v0.18.5.1
 /// curl -sL "https://downloads.getmonero.org/cli/monero-linux-x64-$V.tar.bz2" | sha256sum
 /// ```
-static KNOWN_HASHES: LazyLock<[PlatformHash; 4]> = LazyLock::new(|| [
-    PlatformHash {
-        triple: "x86_64-linux",
-        archive_name: "monero-linux-x64-v0.18.5.1.tar.bz2",
-        archive_url: "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.5.1.tar.bz2",
-        binary_name: "monero-wallet-rpc",
-        sha256: "", // FIXME: set real hash after first download
-    },
-    PlatformHash {
-        triple: "aarch64-linux-android",
-        archive_name: "monero-android-armv8-v0.18.5.1.tar.bz2",
-        archive_url: "https://downloads.getmonero.org/cli/monero-android-armv8-v0.18.5.1.tar.bz2",
-        binary_name: "monero-wallet-rpc",
-        sha256: "",
-    },
-    PlatformHash {
-        triple: "aarch64-macos",
-        archive_name: "monero-mac-armv8-v0.18.5.1.tar.bz2",
-        archive_url: "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.5.1.tar.bz2",
-        binary_name: "monero-wallet-rpc",
-        sha256: "",
-    },
-    PlatformHash {
-        triple: "x86_64-macos",
-        archive_name: "monero-mac-x64-v0.18.5.1.tar.bz2",
-        archive_url: "https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.5.1.tar.bz2",
-        binary_name: "monero-wallet-rpc",
-        sha256: "",
-    },
-]);
+static KNOWN_HASHES: LazyLock<[PlatformHash; 4]> = LazyLock::new(|| {
+    [
+        PlatformHash {
+            triple: "x86_64-linux",
+            archive_name: "monero-linux-x64-v0.18.5.1.tar.bz2",
+            archive_url: "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.5.1.tar.bz2",
+            binary_name: "monero-wallet-rpc",
+            sha256: "", // FIXME: set real hash after first download
+        },
+        PlatformHash {
+            triple: "aarch64-linux-android",
+            archive_name: "monero-android-armv8-v0.18.5.1.tar.bz2",
+            archive_url: "https://downloads.getmonero.org/cli/monero-android-armv8-v0.18.5.1.tar.bz2",
+            binary_name: "monero-wallet-rpc",
+            sha256: "",
+        },
+        PlatformHash {
+            triple: "aarch64-macos",
+            archive_name: "monero-mac-armv8-v0.18.5.1.tar.bz2",
+            archive_url: "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.5.1.tar.bz2",
+            binary_name: "monero-wallet-rpc",
+            sha256: "",
+        },
+        PlatformHash {
+            triple: "x86_64-macos",
+            archive_name: "monero-mac-x64-v0.18.5.1.tar.bz2",
+            archive_url: "https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.5.1.tar.bz2",
+            binary_name: "monero-wallet-rpc",
+            sha256: "",
+        },
+    ]
+});
 
 /// Known hash for one platform binary.
 struct PlatformHash {
@@ -97,11 +99,18 @@ pub async fn ensure_binary(cache_dir: &Path) -> Result<EnsuredBinary, String> {
 
     // Already cached — fast path
     if binary_path.exists() {
-        return Ok(EnsuredBinary { path: binary_path, version: MONERO_VERSION });
+        return Ok(EnsuredBinary {
+            path: binary_path,
+            version: MONERO_VERSION,
+        });
     }
 
     // Download and cache
-    tracing::info!("monero-wallet-rpc not cached — downloading {} ({})", info.archive_name, platform);
+    tracing::info!(
+        "monero-wallet-rpc not cached — downloading {} ({})",
+        info.archive_name,
+        platform
+    );
     std::fs::create_dir_all(&version_dir)
         .map_err(|e| format!("Failed to create cache dir: {e}"))?;
 
@@ -109,7 +118,10 @@ pub async fn ensure_binary(cache_dir: &Path) -> Result<EnsuredBinary, String> {
     download_and_extract(info, &temp_file, &binary_path).await?;
 
     tracing::info!("monero-wallet-rpc cached at {:?}", binary_path);
-    Ok(EnsuredBinary { path: binary_path, version: MONERO_VERSION })
+    Ok(EnsuredBinary {
+        path: binary_path,
+        version: MONERO_VERSION,
+    })
 }
 
 /// Detect the current target triple.
@@ -140,10 +152,15 @@ async fn download_and_extract(
         .build()
         .map_err(|e| format!("HTTP client: {e}"))?;
 
-    let response = client.get(url).send().await
+    let response = client
+        .get(url)
+        .send()
+        .await
         .map_err(|e| format!("Download failed: {e}"))?;
 
-    let bytes = response.bytes().await
+    let bytes = response
+        .bytes()
+        .await
         .map_err(|e| format!("Read response failed: {e}"))?;
 
     // Verify SHA256 if we have a real hash (skip empty placeholder)
@@ -157,11 +174,15 @@ async fn download_and_extract(
         }
         tracing::info!("SHA256 verified for {}", info.archive_name);
     } else {
-        tracing::warn!("SHA256 hash not configured — skipping verification for {}", info.archive_name);
+        tracing::warn!(
+            "SHA256 hash not configured — skipping verification for {}",
+            info.archive_name
+        );
     }
 
     // Write temp file
-    tokio::fs::write(temp_path, &bytes).await
+    tokio::fs::write(temp_path, &bytes)
+        .await
         .map_err(|e| format!("Write temp file failed: {e}"))?;
 
     // Extract monero-wallet-rpc from the bzip2 tarball
@@ -171,14 +192,16 @@ async fn download_and_extract(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        tokio::fs::write(binary_path, &binary).await
+        tokio::fs::write(binary_path, &binary)
+            .await
             .map_err(|e| format!("Write binary failed: {e}"))?;
         std::fs::set_permissions(binary_path, std::fs::Permissions::from_mode(0o755))
             .map_err(|e| format!("Set permissions: {e}"))?;
     }
     #[cfg(not(unix))]
     {
-        tokio::fs::write(binary_path, &binary).await
+        tokio::fs::write(binary_path, &binary)
+            .await
             .map_err(|e| format!("Write binary failed: {e}"))?;
     }
 
@@ -200,7 +223,10 @@ fn extract_tar_bz2_bytes(archive: &[u8], target_name: &str) -> Result<Vec<u8>, S
 
     // Then scan tar entries
     let mut archive = tar::Archive::new(&decompressed[..]);
-    for entry in archive.entries().map_err(|e| format!("Tar read failed: {e}"))? {
+    for entry in archive
+        .entries()
+        .map_err(|e| format!("Tar read failed: {e}"))?
+    {
         let mut entry = entry.map_err(|e| format!("Tar entry: {e}"))?;
         let path = entry.path().map_err(|e| format!("Tar path: {e}"))?;
         if path.ends_with(target_name) {
@@ -229,7 +255,11 @@ mod tests {
     #[test]
     fn test_detect_platform() {
         let platform = detect_platform();
-        assert!(platform.is_ok(), "Platform should be detectable: {:?}", platform.err());
+        assert!(
+            platform.is_ok(),
+            "Platform should be detectable: {:?}",
+            platform.err()
+        );
         let triple = platform.unwrap();
         // We're on x86_64-linux most likely
         assert!(triple.contains("linux") || triple.contains("macos"));
@@ -257,7 +287,10 @@ mod tests {
     #[test]
     fn test_sha256_hex() {
         let hash = sha256(b"hello");
-        assert_eq!(hash, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+        assert_eq!(
+            hash,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
     }
 
     #[test]

@@ -5,8 +5,8 @@ use crate::types::{KeyHandle, KeyType, MnemonicPhrase, MnemonicStrength};
 use ed25519_dalek::SigningKey;
 use hmac::digest::KeyInit;
 use hmac::{Hmac, Mac};
-use rand::rngs::OsRng;
 use rand::TryRngCore;
+use rand::rngs::OsRng;
 use sha2::Sha512;
 use zeroize::Zeroizing;
 
@@ -76,7 +76,10 @@ pub fn generate_mnemonic(strength: MnemonicStrength) -> Result<MnemonicPhrase, C
 }
 
 /// Convert a BIP-39 mnemonic phrase + optional passphrase to a 512-bit seed.
-pub fn mnemonic_to_seed(words: &[String], passphrase: &str) -> Result<Zeroizing<[u8; 64]>, CryptoError> {
+pub fn mnemonic_to_seed(
+    words: &[String],
+    passphrase: &str,
+) -> Result<Zeroizing<[u8; 64]>, CryptoError> {
     use bip39::Mnemonic;
     let phrase = words.join(" ");
     let mnemonic = Mnemonic::parse_normalized(&phrase)
@@ -110,15 +113,21 @@ pub fn derive_bip44_eth_key(
     let xprv = XPrv::new(seed_512).map_err(|e| CryptoError::DerivationError(e.to_string()))?;
     // Manually walk the BIP-44 path: m/44'/60'/0'/0/{index}
     let path_steps = [
-        bip32::ChildNumber::new(44, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(60, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(0, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(0, false).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(index, false).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(44, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(60, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(0, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(0, false)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(index, false)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
     ];
     let mut child = xprv;
     for step in &path_steps {
-        child = child.derive_child(*step)
+        child = child
+            .derive_child(*step)
             .map_err(|e| CryptoError::DerivationError(e.to_string()))?;
     }
     let key_bytes: [u8; 32] = child.private_key().to_bytes().into();
@@ -132,15 +141,21 @@ pub fn derive_bip44_xmr_entropy(seed_512: &[u8; 64], index: u32) -> Result<[u8; 
     use bip32::XPrv;
     let xprv = XPrv::new(seed_512).map_err(|e| CryptoError::DerivationError(e.to_string()))?;
     let path_steps = [
-        bip32::ChildNumber::new(44, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(128, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(0, true).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(0, false).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
-        bip32::ChildNumber::new(index, false).map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(44, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(128, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(0, true)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(0, false)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
+        bip32::ChildNumber::new(index, false)
+            .map_err(|e| CryptoError::DerivationError(e.to_string()))?,
     ];
     let mut child = xprv;
     for step in &path_steps {
-        child = child.derive_child(*step)
+        child = child
+            .derive_child(*step)
             .map_err(|e| CryptoError::DerivationError(e.to_string()))?;
     }
     Ok(child.private_key().to_bytes().into())
@@ -186,7 +201,8 @@ mod tests {
 
     #[test]
     fn mnemon_generates_valid_24_words() {
-        let mnemonic = generate_mnemonic(MnemonicStrength::TwentyFourWords).expect("test invariant");
+        let mnemonic =
+            generate_mnemonic(MnemonicStrength::TwentyFourWords).expect("test invariant");
         assert_eq!(mnemonic.as_words().len(), 24);
         // Verify it can be parsed back
         let restored = mnemonic_from_string(&mnemonic.to_string()).expect("test invariant");
@@ -239,10 +255,7 @@ mod tests {
         let seed = mnemonic_to_seed(mnemonic.as_words(), "").expect("test invariant");
         let key_a = derive_bip44_eth_key(&seed, 0).expect("test invariant");
         let key_b = derive_bip44_eth_key(&seed, 0).expect("test invariant");
-        assert_eq!(
-            key_a.to_bytes().as_slice(),
-            key_b.to_bytes().as_slice()
-        );
+        assert_eq!(key_a.to_bytes().as_slice(), key_b.to_bytes().as_slice());
     }
 
     #[test]
@@ -252,10 +265,7 @@ mod tests {
         let seed = mnemonic_to_seed(mnemonic.as_words(), "").expect("test invariant");
         let key_0 = derive_bip44_eth_key(&seed, 0).expect("test invariant");
         let key_1 = derive_bip44_eth_key(&seed, 1).expect("test invariant");
-        assert_ne!(
-            key_0.to_bytes().as_slice(),
-            key_1.to_bytes().as_slice()
-        );
+        assert_ne!(key_0.to_bytes().as_slice(), key_1.to_bytes().as_slice());
     }
 
     #[test]
@@ -293,7 +303,10 @@ mod tests {
         let mnemonic = bip39::Mnemonic::parse_normalized(phrase).expect("test invariant");
         let seed_bytes = mnemonic.to_seed(passphrase);
         let seed_hex = hex::encode(&seed_bytes);
-        assert_eq!(seed_hex, expected_seed_hex, "BIP-39 seed mismatch with known test vector!");
+        assert_eq!(
+            seed_hex, expected_seed_hex,
+            "BIP-39 seed mismatch with known test vector!"
+        );
 
         let seed_arr: [u8; 64] = seed_bytes.as_slice().try_into().expect("test invariant");
 
@@ -327,10 +340,18 @@ mod tests {
         // Step 4: Verify with `cast wallet address` (reference implementation)
         let key_hex = hex::encode(key_bytes);
         let output = std::process::Command::new("cast")
-            .args(["wallet", "address", "--private-key", &format!("0x{}", key_hex)])
+            .args([
+                "wallet",
+                "address",
+                "--private-key",
+                &format!("0x{}", key_hex),
+            ])
             .output()
             .expect("cast not found — install foundry (foundry.tools)");
-        let cast_addr = String::from_utf8_lossy(&output.stdout).trim().to_string().to_lowercase();
+        let cast_addr = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .to_string()
+            .to_lowercase();
 
         assert_eq!(
             address.to_lowercase(),

@@ -101,9 +101,10 @@ pub async fn check_for_updates(repo: &str) -> Result<Option<UpdateInfo>, UpdateE
 
     match response.status().as_u16() {
         200 => {
-            let release: Release = response.json().await.map_err(|e| {
-                UpdateError::Parse(e.to_string())
-            })?;
+            let release: Release = response
+                .json()
+                .await
+                .map_err(|e| UpdateError::Parse(e.to_string()))?;
 
             let up_to_date = compare_versions(CURRENT_VERSION, &release.tag_name);
 
@@ -118,9 +119,10 @@ pub async fn check_for_updates(repo: &str) -> Result<Option<UpdateInfo>, UpdateE
             let tags_url = format!("https://api.github.com/repos/{repo}/releases?per_page=1");
             let resp = client.get(&tags_url).send().await?;
             if resp.status().as_u16() == 200 {
-                let releases: Vec<Release> = resp.json().await.map_err(|e| {
-                    UpdateError::Parse(e.to_string())
-                })?;
+                let releases: Vec<Release> = resp
+                    .json()
+                    .await
+                    .map_err(|e| UpdateError::Parse(e.to_string()))?;
                 Ok(releases.into_iter().next().map(|release| {
                     let up_to_date = compare_versions(CURRENT_VERSION, &release.tag_name);
                     UpdateInfo {
@@ -152,11 +154,23 @@ fn compare_versions(local: &str, release_tag: &str) -> bool {
     // Simple semantic version comparison: split on '.' and compare numerically
     let local_parts: Vec<u64> = local
         .split('.')
-        .filter_map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .filter_map(|s| {
+            s.chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .ok()
+        })
         .collect();
     let release_parts: Vec<u64> = tag
         .split('.')
-        .filter_map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .filter_map(|s| {
+            s.chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .ok()
+        })
         .collect();
 
     for (l, r) in local_parts.iter().zip(release_parts.iter()) {

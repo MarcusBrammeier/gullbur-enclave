@@ -12,12 +12,12 @@
 //!   → VaultBridge trait → concrete impl (vault-core) → response
 //! ```
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use async_trait::async_trait;
 
-use axum::{Router, routing::post, Json, extract::State, response::IntoResponse, http::StatusCode};
+use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
 
 // ── VaultBridge trait ──────────────────────────────────────
 
@@ -28,15 +28,28 @@ pub trait VaultBridge: Send + Sync {
     /// Get vault status.
     async fn status(&self) -> Result<Value, String>;
     /// Initialize the vault with an optional seed phrase and passphrase.
-    async fn initialize(&self, seed: Option<&str>, passphrase: Option<&str>) -> Result<Value, String>;
+    async fn initialize(
+        &self,
+        seed: Option<&str>,
+        passphrase: Option<&str>,
+    ) -> Result<Value, String>;
     /// Create a wallet account on the given network.
     async fn create_account(&self, network: &str, index: u32) -> Result<Value, String>;
     /// Get balance for an address on a network.
     async fn get_balance(&self, network: &str, address: &str) -> Result<Value, String>;
     /// Sign a transaction.
-    async fn sign_transaction(&self, network: &str, tx_hex: &str, key_id: &str) -> Result<Value, String>;
+    async fn sign_transaction(
+        &self,
+        network: &str,
+        tx_hex: &str,
+        key_id: &str,
+    ) -> Result<Value, String>;
     /// Broadcast a signed transaction.
-    async fn broadcast_transaction(&self, network: &str, signed_tx_hex: &str) -> Result<Value, String>;
+    async fn broadcast_transaction(
+        &self,
+        network: &str,
+        signed_tx_hex: &str,
+    ) -> Result<Value, String>;
     /// List all registered networks.
     async fn list_networks(&self) -> Result<Value, String>;
     /// Validate an address.
@@ -64,7 +77,10 @@ pub struct BridgeAccount {
 // ── HTTP server ───────────────────────────────────────────
 
 /// Start the HTTP JSON-RPC bridge on the given port.
-pub async fn run(bridge: Arc<dyn VaultBridge>, port: u16) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    bridge: Arc<dyn VaultBridge>,
+    port: u16,
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::net::SocketAddr;
 
     let shared = bridge;
@@ -115,7 +131,10 @@ async fn handle_rpc(
         }
         "broadcast_transaction" => {
             let network = params.get("network").and_then(|v| v.as_str()).unwrap_or("");
-            let signed_tx_hex = params.get("signed_tx_hex").and_then(|v| v.as_str()).unwrap_or("");
+            let signed_tx_hex = params
+                .get("signed_tx_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             bridge.broadcast_transaction(network, signed_tx_hex).await
         }
         "list_networks" => bridge.list_networks().await,

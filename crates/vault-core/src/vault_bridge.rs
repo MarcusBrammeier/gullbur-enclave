@@ -1,13 +1,13 @@
 //! VaultBridge trait implementation — exposes vault operations through HTTP JSON-RPC.
 
+use async_trait::async_trait;
+use serde_json::Value;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
-use serde_json::Value;
-use async_trait::async_trait;
 
-use ipc_core::http_bridge::VaultBridge;
 use crate::host::PluginHost;
+use ipc_core::http_bridge::VaultBridge;
 
 pub struct VaultBridgeImpl {
     plugin_host: Arc<RwLock<PluginHost>>,
@@ -21,7 +21,11 @@ impl VaultBridgeImpl {
         initialized: Arc<AtomicBool>,
         seed: Arc<RwLock<Option<zeroize::Zeroizing<Vec<u8>>>>>,
     ) -> Self {
-        Self { plugin_host, initialized, seed }
+        Self {
+            plugin_host,
+            initialized,
+            seed,
+        }
     }
 }
 
@@ -41,7 +45,11 @@ impl VaultBridge for VaultBridgeImpl {
         }))
     }
 
-    async fn initialize(&self, _seed: Option<&str>, _passphrase: Option<&str>) -> Result<Value, String> {
+    async fn initialize(
+        &self,
+        _seed: Option<&str>,
+        _passphrase: Option<&str>,
+    ) -> Result<Value, String> {
         Err("use WebSocket IPC for initialize — HTTP bridge is read-only for initialization".into())
     }
 
@@ -50,7 +58,10 @@ impl VaultBridge for VaultBridgeImpl {
         let seed = seed_guard.as_ref().ok_or("vault not initialized")?.clone();
         drop(seed_guard);
         let host = self.plugin_host.read().await;
-        let account = host.create_account(&seed, index, network).await.map_err(|e| e.to_string())?;
+        let account = host
+            .create_account(&seed, index, network)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(serde_json::json!(account))
     }
 
@@ -63,11 +74,19 @@ impl VaultBridge for VaultBridgeImpl {
             path: None,
             label: None,
         };
-        let balance = host.get_balance(&acc, network).await.map_err(|e| e.to_string())?;
+        let balance = host
+            .get_balance(&acc, network)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(serde_json::json!(balance))
     }
 
-    async fn sign_transaction(&self, network: &str, tx_hex: &str, key_id: &str) -> Result<Value, String> {
+    async fn sign_transaction(
+        &self,
+        network: &str,
+        tx_hex: &str,
+        key_id: &str,
+    ) -> Result<Value, String> {
         let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("hex decode: {e}"))?;
         let key = wallet_plugin::KeyHandle {
             key_id: key_id.to_string(),
@@ -75,14 +94,24 @@ impl VaultBridge for VaultBridgeImpl {
             public_key: vec![],
         };
         let host = self.plugin_host.read().await;
-        let signed = host.sign_transaction(&tx_bytes, &key, network).await.map_err(|e| e.to_string())?;
+        let signed = host
+            .sign_transaction(&tx_bytes, &key, network)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(Value::String(hex::encode(signed)))
     }
 
-    async fn broadcast_transaction(&self, network: &str, signed_tx_hex: &str) -> Result<Value, String> {
+    async fn broadcast_transaction(
+        &self,
+        network: &str,
+        signed_tx_hex: &str,
+    ) -> Result<Value, String> {
         let tx_bytes = hex::decode(signed_tx_hex).map_err(|e| format!("hex decode: {e}"))?;
         let host = self.plugin_host.read().await;
-        let txid = host.broadcast_transaction(&tx_bytes, network).await.map_err(|e| e.to_string())?;
+        let txid = host
+            .broadcast_transaction(&tx_bytes, network)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(Value::String(txid))
     }
 
@@ -98,7 +127,10 @@ impl VaultBridge for VaultBridgeImpl {
 
     async fn validate_address(&self, network: &str, address: &str) -> Result<Value, String> {
         let host = self.plugin_host.read().await;
-        let valid = host.validate_address(address, network).await.map_err(|e| e.to_string())?;
+        let valid = host
+            .validate_address(address, network)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(Value::Bool(valid))
     }
 }

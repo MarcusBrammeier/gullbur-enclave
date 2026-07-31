@@ -11,8 +11,8 @@
 use crypto_core::isolation;
 pub use crypto_core::isolation::EncryptedPayload;
 use serde_json::Value;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct IsolationState {
     pub key_hex: String,

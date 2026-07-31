@@ -81,7 +81,8 @@ mod tests {
         // Use a different key
         let mut wrong_secret = [0u8; 32];
         wrong_secret[0] = 99;
-        let signing_key = k256::ecdsa::SigningKey::from_slice(&wrong_secret).expect("test invariant");
+        let signing_key =
+            k256::ecdsa::SigningKey::from_slice(&wrong_secret).expect("test invariant");
         let verifying_key = k256::ecdsa::VerifyingKey::from(&signing_key);
         let pk_bytes = verifying_key.to_sec1_bytes();
         let result = verify_ecdsa_secp256k1(msg, &sig, &pk_bytes).expect("test invariant");

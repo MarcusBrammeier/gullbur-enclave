@@ -8,7 +8,9 @@ fn main() {
     let seed = b"gullbur-btc-test-jul20-wallet-2";
     let plugin = BtcPlugin::new(None);
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let account = rt.block_on(plugin.create_account(seed, 0, "bitcoin-testnet")).unwrap();
+    let account = rt
+        .block_on(plugin.create_account(seed, 0, "bitcoin-testnet"))
+        .unwrap();
     println!("Address: {}", account.address);
     println!("Path:    {}", account.path.unwrap_or_default());
     println!("Seed hex: {}", hex::encode(seed));

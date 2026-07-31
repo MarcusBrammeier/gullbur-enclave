@@ -109,10 +109,7 @@ impl ApprovalQueue {
 
     /// List all pending approval requests (for the UI to poll).
     pub fn list_pending(&self) -> Vec<ApprovalRequest> {
-        self.pending
-            .values()
-            .map(|(req, _)| req.clone())
-            .collect()
+        self.pending.values().map(|(req, _)| req.clone()).collect()
     }
 
     /// Respond to a pending approval request.
@@ -124,9 +121,7 @@ impl ApprovalQueue {
             let response = if approved {
                 ApprovalResponse::Approved
             } else {
-                ApprovalResponse::Denied(
-                    reason.unwrap_or_else(|| "User denied the request".into()),
-                )
+                ApprovalResponse::Denied(reason.unwrap_or_else(|| "User denied the request".into()))
             };
             // oneshot send can fail if the receiver was dropped (timeout).
             // That's fine — it means the caller gave up waiting.
@@ -226,7 +221,12 @@ mod tests {
     #[test]
     fn test_dropped_receiver() {
         let mut queue = ApprovalQueue::new();
-        let (id, rx) = queue.submit("https://dapp.com", "eth_sendTransaction", "Send", HashMap::new());
+        let (id, rx) = queue.submit(
+            "https://dapp.com",
+            "eth_sendTransaction",
+            "Send",
+            HashMap::new(),
+        );
         drop(rx); // caller gives up
 
         // Clean should remove it

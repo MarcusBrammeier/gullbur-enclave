@@ -7,7 +7,9 @@ fn main() {
     let seed = hex::decode(&seed_hex).expect("seed must be hex");
     let plugin = XmrPlugin::new();
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let account = rt.block_on(plugin.create_account(&seed, 0, "monero-stagenet")).unwrap();
+    let account = rt
+        .block_on(plugin.create_account(&seed, 0, "monero-stagenet"))
+        .unwrap();
     println!("Address: {}", account.address);
     println!("Seed hex: {}", seed_hex);
 }

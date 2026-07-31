@@ -48,10 +48,7 @@ impl SessionKeyModule {
     /// Generates a real ed25519 keypair via crypto-core and stores the
     /// public key in the returned `SessionKey`. The private key is held
     /// by the caller (vault-core) for signing.
-    pub fn create_session(
-        permissions: SessionPermissions,
-        duration_secs: u64,
-    ) -> SessionKey {
+    pub fn create_session(permissions: SessionPermissions, duration_secs: u64) -> SessionKey {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -99,9 +96,10 @@ impl SessionKeyModule {
         // Check value limit.
         if let Ok(tx_val) = tx.value.parse::<u128>()
             && let Ok(max_val) = perms.max_value_per_tx.parse::<u128>()
-                && tx_val > max_val {
-                    return false;
-                }
+            && tx_val > max_val
+        {
+            return false;
+        }
 
         // Check allowed methods (first 4 bytes of calldata).
         if !perms.allowed_methods.is_empty() && tx.data.len() >= 4 {
@@ -154,16 +152,17 @@ mod tests {
             key.key_id
         );
         // Verify public key is non-empty (real ed25519 key generated)
-        assert_eq!(key.public_key.len(), 32, "ed25519 public key must be 32 bytes");
+        assert_eq!(
+            key.public_key.len(),
+            32,
+            "ed25519 public key must be 32 bytes"
+        );
         // Verify expires_at is in the future
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("test invariant")
             .as_secs();
-        assert!(
-            key.expires_at > now,
-            "expires_at should be in the future"
-        );
+        assert!(key.expires_at > now, "expires_at should be in the future");
     }
 
     #[test]

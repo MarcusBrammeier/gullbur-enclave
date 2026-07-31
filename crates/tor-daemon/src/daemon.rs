@@ -1,6 +1,6 @@
 use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{Duration, sleep, timeout};
 use tracing::{info, warn};
 
 use crate::error::TorError;
@@ -99,9 +99,7 @@ impl TorDaemon {
                         self.retry_count = 0;
                         return Err(TorError::MaxRetriesExceeded(self.config.max_retries));
                     }
-                    let backoff = Duration::from_secs(
-                        (1u64 << attempt.saturating_sub(1)).min(32)
-                    );
+                    let backoff = Duration::from_secs((1u64 << attempt.saturating_sub(1)).min(32));
                     warn!(
                         "Tor daemon start failed (attempt {attempt}/{}): {e}. Retrying in {backoff:?}",
                         self.config.max_retries
@@ -132,12 +130,18 @@ impl TorDaemon {
 
         let pid = child.id().unwrap_or(0);
         self.child = Some(child);
-        info!("Tor daemon spawned (pid={pid}), waiting for SOCKS readiness on port {}...", self.config.socks_port);
+        info!(
+            "Tor daemon spawned (pid={pid}), waiting for SOCKS readiness on port {}...",
+            self.config.socks_port
+        );
 
         // Poll SOCKS port for readiness
         self.wait_for_readiness().await?;
 
-        info!("Tor daemon ready — SOCKS proxy available on 127.0.0.1:{}", self.config.socks_port);
+        info!(
+            "Tor daemon ready — SOCKS proxy available on 127.0.0.1:{}",
+            self.config.socks_port
+        );
         Ok(())
     }
 
@@ -149,13 +153,15 @@ impl TorDaemon {
 
         loop {
             if start.elapsed() >= deadline {
-                return Err(TorError::ReadinessTimeout(self.config.readiness_timeout_secs));
+                return Err(TorError::ReadinessTimeout(
+                    self.config.readiness_timeout_secs,
+                ));
             }
 
             match timeout(Duration::from_millis(500), TcpStream::connect(&addr)).await {
                 Ok(Ok(_)) => return Ok(()), // port is open
-                Ok(Err(_)) => {}             // connection refused, retry
-                Err(_) => {}                 // timeout, retry
+                Ok(Err(_)) => {}            // connection refused, retry
+                Err(_) => {}                // timeout, retry
             }
 
             sleep(Duration::from_millis(500)).await;
@@ -165,19 +171,17 @@ impl TorDaemon {
     /// Check whether the arti process is still running.
     pub fn is_running(&mut self) -> bool {
         match &mut self.child {
-            Some(child) => {
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        warn!("Tor daemon exited with status: {status}");
-                        false
-                    }
-                    Ok(None) => true,
-                    Err(e) => {
-                        warn!("Failed to check Tor daemon status: {e}");
-                        false
-                    }
+            Some(child) => match child.try_wait() {
+                Ok(Some(status)) => {
+                    warn!("Tor daemon exited with status: {status}");
+                    false
                 }
-            }
+                Ok(None) => true,
+                Err(e) => {
+                    warn!("Failed to check Tor daemon status: {e}");
+                    false
+                }
+            },
             None => false,
         }
     }
@@ -188,7 +192,10 @@ impl TorDaemon {
             return Ok(());
         }
 
-        warn!("Tor daemon crashed — restarting (attempt {})...", self.retry_count + 1);
+        warn!(
+            "Tor daemon crashed — restarting (attempt {})...",
+            self.retry_count + 1
+        );
         self.child = None;
         Box::pin(self.start()).await
     }
@@ -207,12 +214,8 @@ impl TorDaemon {
             TcpStream::connect(&addr),
         )
         .await
-        .map_err(|_| {
-            TorError::CircuitIsolationFailed("control port connection timed out".into())
-        })?
-        .map_err(|e| {
-            TorError::CircuitIsolationFailed(format!("control port unreachable: {e}"))
-        })?;
+        .map_err(|_| TorError::CircuitIsolationFailed("control port connection timed out".into()))?
+        .map_err(|e| TorError::CircuitIsolationFailed(format!("control port unreachable: {e}")))?;
 
         use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
         let (reader, mut writer) = stream.split();
@@ -240,13 +243,14 @@ impl TorDaemon {
         }
 
         // Signal NEWNYM
-        writer.write_all(b"SIGNAL NEWNYM\r\n").await.map_err(|e| {
-            TorError::CircuitIsolationFailed(format!("failed to send NEWNYM: {e}"))
-        })?;
+        writer
+            .write_all(b"SIGNAL NEWNYM\r\n")
+            .await
+            .map_err(|e| TorError::CircuitIsolationFailed(format!("failed to send NEWNYM: {e}")))?;
         resp.clear();
-        buf.read_line(&mut resp).await.map_err(|e| {
-            TorError::CircuitIsolationFailed(format!("NEWNYM read failed: {e}"))
-        })?;
+        buf.read_line(&mut resp)
+            .await
+            .map_err(|e| TorError::CircuitIsolationFailed(format!("NEWNYM read failed: {e}")))?;
         if !resp.starts_with("250") {
             return Err(TorError::CircuitIsolationFailed(format!(
                 "NEWNYM rejected: {}",
@@ -301,9 +305,10 @@ impl TorDaemon {
 impl Drop for TorDaemon {
     fn drop(&mut self) {
         if self.child.is_some()
-            && let Some(mut child) = self.child.take() {
-                let _ = child.start_kill();
-            }
+            && let Some(mut child) = self.child.take()
+        {
+            let _ = child.start_kill();
+        }
     }
 }
 

@@ -43,7 +43,10 @@ async fn main() {
     let allowed_ids: Vec<String> = if args.allowed_ids.is_empty() {
         vec![]
     } else {
-        args.allowed_ids.split(',').map(|s| s.trim().to_string()).collect()
+        args.allowed_ids
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
     };
 
     tracing::info!(
@@ -142,9 +145,7 @@ async fn main() {
         let id = request_counter;
 
         // Security: validate origin
-        if !allowed_ids.is_empty()
-            && !native_host::validate_origin(&msg.origin, &allowed_ids)
-        {
+        if !allowed_ids.is_empty() && !native_host::validate_origin(&msg.origin, &allowed_ids) {
             tracing::warn!("Rejected origin: {}", msg.origin);
             let response = NativeResponse {
                 id,
@@ -159,7 +160,8 @@ async fn main() {
         }
 
         // Route dApp method to vault IPC method
-        let routed = match router::route(&msg.method, msg.params.unwrap_or(serde_json::Value::Null)) {
+        let routed = match router::route(&msg.method, msg.params.unwrap_or(serde_json::Value::Null))
+        {
             Some(r) => r,
             None => {
                 let response = NativeResponse {

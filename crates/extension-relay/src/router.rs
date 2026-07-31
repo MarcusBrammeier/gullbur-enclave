@@ -63,9 +63,7 @@ pub fn route(method: &str, params: Value) -> Option<RoutedRequest> {
             vault_method: "vault.sign_transaction".into(),
             params,
             requires_approval: true,
-            approval_description: Some(
-                "Confirm transaction in Gullbúr Enclave".into(),
-            ),
+            approval_description: Some("Confirm transaction in Gullbúr Enclave".into()),
         }),
         "personal_sign" => Some(RoutedRequest {
             vault_method: "vault.sign_transaction".into(),
@@ -96,7 +94,9 @@ pub fn route(method: &str, params: Value) -> Option<RoutedRequest> {
             vault_method: "vault_simulateAndSend".into(),
             params,
             requires_approval: true,
-            approval_description: Some("Simulate transaction and send with biometric signature".into()),
+            approval_description: Some(
+                "Simulate transaction and send with biometric signature".into(),
+            ),
         }),
         _ => None, // unsupported method — caller should return error to dApp
     }

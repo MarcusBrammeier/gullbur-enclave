@@ -2,8 +2,8 @@
 //!
 //! Mirrors `apps/cli/src/vault.rs` plugin registration.
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 
@@ -32,11 +32,9 @@ pub async fn spawn_test_server(
 ) -> (String, tokio::task::JoinHandle<()>, Arc<AuthManager>) {
     clean_stale_state();
     let server =
-        ipc_core::server::IpcServer::with_encryption(port, false)
-            .expect("create IpcServer");
+        ipc_core::server::IpcServer::with_encryption(port, false).expect("create IpcServer");
     let token_path = server.auth_token_path().to_path_buf();
-    let auth_token =
-        std::fs::read_to_string(&token_path).expect("read auth token");
+    let auth_token = std::fs::read_to_string(&token_path).expect("read auth token");
 
     let auth_manager = Arc::new(AuthManager::new());
     {
@@ -45,8 +43,7 @@ pub async fn spawn_test_server(
         let seed = Arc::new(RwLock::new(None::<zeroize::Zeroizing<Vec<u8>>>));
         let initialized = Arc::new(AtomicBool::new(false));
         let mn = Arc::new(RwLock::new(None::<String>));
-        let approval_queue =
-            Arc::new(RwLock::new(ApprovalQueue::new()));
+        let approval_queue = Arc::new(RwLock::new(ApprovalQueue::new()));
 
         // Register all 4 plugins
         {
