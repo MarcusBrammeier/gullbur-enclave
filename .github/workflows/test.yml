@@ -35,8 +35,10 @@ jobs:
         run: cargo fmt --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace -- -D warnings
-        continue-on-error: true
+        run: cargo clippy --workspace -- -D warnings -D clippy::unwrap_used
+
+      - name: cargo deny check
+        run: cargo deny check
 
       - name: cargo test (cli-integration)
         run: cargo test -p cli-integration -- --test-threads=1
