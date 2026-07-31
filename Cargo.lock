@@ -791,6 +791,7 @@ name = "cli-integration"
 version = "0.0.1"
 dependencies = [
  "auth-core",
+ "bip39",
  "crypto-core",
  "futures-util",
  "hex",

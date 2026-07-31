@@ -46,9 +46,16 @@ async fn setup_signing_server(
     let r = call(port, &token, "vault.initialize", json!({
         "seed_phrase": &mnemonic
     })).await;
-    assert_ok(&r, "vault.initialize");
+    let result = assert_ok(&r, "vault.initialize");
 
-    // Create ETH account
+    // Extract the seed hex from initialization — the master_key key_id
+    // "bip44-eth-0" is not the seed. Instead, derive the seed locally
+    // from the mnemonic so we can pass it as the signing key_id.
+    let mnemonic_obj = bip39::Mnemonic::parse_normalized(&mnemonic).expect("test invariant");
+    let seed_bytes = mnemonic_obj.to_seed("");
+    let seed_hex = hex::encode(&seed_bytes);
+
+    // Create ETH account (for reference, signing uses the seed directly)
     let r = call(port, &token, "vault.create_account", json!({
         "network": "ethereum",
         "index": 0
@@ -56,7 +63,7 @@ async fn setup_signing_server(
     let result = assert_ok(&r, "vault.create_account");
     let account_id = result["id"].as_str().expect("test invariant").to_string();
 
-    (token, handle, account_id, auth_manager)
+    (token, handle, seed_hex, auth_manager)
 }
 
 #[tokio::test]

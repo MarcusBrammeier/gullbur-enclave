@@ -12,6 +12,7 @@ serde_json = { workspace = true }
 futures-util = ">=0.3,<1"
 rand = { workspace = true }
 hex = { workspace = true }
+bip39 = { workspace = true }
 zeroize = { workspace = true }
 
 vault-core = { path = "../../crates/vault-core", features = ["plugins"] }

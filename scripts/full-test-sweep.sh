@@ -66,7 +66,7 @@ fi
 # ── Layer 6: Branding audit ──────────────────────────────────────
 echo "▸ Layer 6: Branding audit"
 STALE=$(git ls-files | while IFS= read -r f; do
-  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar) continue;; esac
+  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|scripts/full-test-sweep.sh) continue;; esac
   [ -f "$f" ] && grep -ql 'fosscrypto' "$f" 2>/dev/null && echo "$f" || true
 done)
 if [ -z "$STALE" ]; then

@@ -56,7 +56,9 @@ static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| [
 /// following the same BIP-44 path as create_account.
 /// This ensures sign_transaction produces the same address as create_account.
 fn derive_key_from_keyid(key_id: &str) -> Result<k256::ecdsa::SigningKey, PluginError> {
-    let seed_hex = key_id.strip_prefix("0x").unwrap_or(key_id);
+    // Strip optional "@index" suffix added by the IPC handler
+    let seed_hex = key_id.split('@').next().unwrap_or(key_id);
+    let seed_hex = seed_hex.strip_prefix("0x").unwrap_or(seed_hex);
     let seed_bytes = hex::decode(seed_hex)
         .map_err(|e| PluginError::Internal(format!("invalid seed hex: {e}")))?;
     if seed_bytes.len() < 32 {
