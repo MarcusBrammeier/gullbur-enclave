@@ -1,6 +1,6 @@
 ---
 name: Pull Request
-about: Submit changes to FOSS Crypto Core
+about: Submit changes to **Gullbúr Enclave**
 title: ""
 labels: ""
 assignees: ""

@@ -1,6 +1,6 @@
 {
   "name": "com.gullbur.wallet.relay",
-  "description": "FOSS Crypto Wallet — EIP-6963 Native Messaging Host",
+  "description": "Gullbúr Enclave — EIP-6963 Native Messaging Host",
   "path": "/usr/local/bin/gullbur-relay",
   "type": "stdio",
   "allowed_origins": [

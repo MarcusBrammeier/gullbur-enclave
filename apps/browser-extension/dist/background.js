@@ -67,8 +67,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ── Extension lifecycle ───────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[foss-wallet] FOSS Crypto Wallet extension installed");
-  console.log(`[foss-wallet] Native host: ${NATIVE_HOST}`);
+  console.log("[gullbur] Gullbúr Enclave extension installed");
+  console.log(`[gullbur] Native host: ${NATIVE_HOST}`);
 });
 
 // ── Native host connection test ───────────────────────────────────────────

@@ -37,7 +37,7 @@ function injectProvider() {
       const announce = () => {
         const info = {
           uuid: "${generateUUID()}",
-          name: "FOSS Crypto Wallet",
+          name: "Gullbúr Enclave",
           icon: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjMUExQjJFIi8+PHRleHQgeD0iMTYiIHk9IjIyIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSI+8J+SuzwvdGV4dD48L3N2Zz4=",
           rdns: "io.gullbur.wallet",
         };
@@ -51,7 +51,7 @@ function injectProvider() {
 
         // Legacy: set window.ethereum for non-EIP-6963 dApps (MetaMask-compatible)
         const provider = {
-          isFossCrypto: true,
+          isGullbur: true,
           isMetaMask: true,           // Spoof: legacy dApps require this
           chainId: "0x1",
 
@@ -93,7 +93,7 @@ function injectProvider() {
 
         // Channel B: Next-Gen vault_* API for EIP-6963-aware dApps
         const vaultProvider = {
-          isFossCrypto: true,
+          isGullbur: true,
           rdns: "io.gullbur.wallet",
 
           executeBatch: async (transactions) => {

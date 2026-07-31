@@ -1,6 +1,6 @@
 {
   "name": "com.gullbur.wallet.relay",
-  "description": "FOSS Crypto Wallet — Native Messaging Relay (Firefox)",
+  "description": "Gullbúr Enclave — Native Messaging Relay (Firefox)",
   "path": "<BINARY_PATH>",
   "type": "stdio",
   "allowed_extensions": [

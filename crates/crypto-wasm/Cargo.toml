@@ -2,7 +2,7 @@
 name = "crypto-wasm"
 version = "0.1.0"
 edition = "2024"
-description = "WASM compilation target for FOSS Crypto Core AES-256-GCM isolation crypto"
+description = "WASM compilation target for Gullbúr Enclave AES-256-GCM isolation crypto"
 
 [package.metadata.wasm-pack]
 wasm-opt = false

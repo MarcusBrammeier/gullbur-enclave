@@ -1,6 +1,6 @@
 {
   "name": "com.gullbur.wallet.relay",
-  "description": "FOSS Crypto Wallet — Native Messaging Relay (Chrome/Brave/Chromium)",
+  "description": "Gullbúr Enclave — Native Messaging Relay (Chrome/Brave/Chromium)",
   "path": "<BINARY_PATH>",
   "type": "stdio",
   "allowed_origins": [
