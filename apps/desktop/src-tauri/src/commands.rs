@@ -1043,7 +1043,8 @@ pub async fn report_bug(
     ));
 
     // Build the GitHub issue URL
-    let repo = "gullbur/gullbur";
+    // REPLACE_ME: Change YOUR_GITHUB_ORG and YOUR_GITHUB_REPO to your actual GitHub org and repo name
+    let repo = "YOUR_GITHUB_ORG/YOUR_GITHUB_REPO";
     let base_url = format!("https://github.com/{repo}/issues/new");
 
     // Build final URL with URL-encoded body
@@ -1233,7 +1234,7 @@ pub struct UpdateCheckResult {
 
 #[tauri::command]
 pub async fn check_for_updates() -> UpdateCheckResult {
-    match update_checker::check_for_updates("gullbur/gullbur").await {
+    match update_checker::check_for_updates("YOUR_GITHUB_ORG/YOUR_GITHUB_REPO").await {
         Ok(Some(info)) => UpdateCheckResult {
             local_version: info.local_version,
             latest_version: info.release.tag_name.clone(),

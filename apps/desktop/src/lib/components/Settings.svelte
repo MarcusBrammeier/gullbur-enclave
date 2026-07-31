@@ -316,7 +316,8 @@
               await invoke('report_bug', { description: '' });
             } catch (e) {
               // Fallback: open manually
-              const url = 'https://github.com/gullbur/gullbur/issues/new';
+              // REPLACE_ME: Change YOUR_GITHUB_ORG and YOUR_GITHUB_REPO to your actual GitHub org and repo name
+              const url = 'https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO/issues/new';
               window.open(url, '_blank');
             }
           }}

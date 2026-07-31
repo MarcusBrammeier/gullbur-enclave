@@ -138,7 +138,8 @@
       const title = `Debug Report: ${report.version} / ${report.os}`;
 
       // GitHub issue URL with pre-filled body
-      const repo = 'gullbur/gullbur';
+      // REPLACE_ME: Change YOUR_GITHUB_ORG and YOUR_GITHUB_REPO to your actual GitHub org and repo name
+      const repo = 'YOUR_GITHUB_ORG/YOUR_GITHUB_REPO';
       const baseUrl = `https://github.com/${repo}/issues/new`;
       const params = new URLSearchParams({
         title: title,
