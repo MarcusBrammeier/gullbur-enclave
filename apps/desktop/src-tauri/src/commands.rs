@@ -1357,7 +1357,8 @@ pub struct UpdateCheckResult {
 
 #[tauri::command]
 pub async fn check_for_updates() -> UpdateCheckResult {
-    match update_checker::check_for_updates("YOUR_GITHUB_ORG/YOUR_GITHUB_REPO").await { // REPLACE_ME
+    match update_checker::check_for_updates("YOUR_GITHUB_ORG/YOUR_GITHUB_REPO").await {
+        // REPLACE_ME
         Ok(Some(info)) => UpdateCheckResult {
             local_version: info.local_version,
             latest_version: info.release.tag_name.clone(),
