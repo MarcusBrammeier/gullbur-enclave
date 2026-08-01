@@ -2654,6 +2654,7 @@ dependencies = [
  "async-trait",
  "axum",
  "crypto-core",
+ "dirs-next",
  "futures-util",
  "ipc-protocol",
  "rand 0.9.5",
