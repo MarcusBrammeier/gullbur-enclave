@@ -12,7 +12,6 @@
         android:theme="@style/Theme.gullbur_desktop"
         android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:extractNativeLibs="false"
-        android:compressNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
