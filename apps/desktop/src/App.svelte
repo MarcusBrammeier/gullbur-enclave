@@ -7,10 +7,11 @@
   import StatusBar from './lib/components/StatusBar.svelte';
   import AuthPrompt from './lib/components/AuthPrompt.svelte';
   import Settings from './lib/components/Settings.svelte';
-  import Welcome from './lib/components/Welcome.svelte';
+  import OptionsBar from './lib/components/OptionsBar.svelte';
 
   let showSettings = $state(false);
   let errorMessage = $state<string | null>(null);
+  let connecting = $state(false);
 
   // Hydrate theme from localStorage on mount
   $effect(() => {
@@ -23,10 +24,15 @@
 
   // Auto-connect to the vault IPC server on mount
   $effect(() => {
-    connect().catch((e: unknown) => {
-      console.warn('[auto-connect] IPC connection failed:', e);
-      // Status shows "Disconnected" — user can tap Connect to retry
-    });
+    connecting = true;
+    vault.vaultStatus = 'Connecting…';
+    connect()
+      .then(() => { connecting = false; })
+      .catch((e: unknown) => {
+        connecting = false;
+        console.warn('[auto-connect] IPC connection failed:', e);
+        // Status shows "Disconnected" — user can tap Connect to retry
+      });
   });
 
   // Watch theme changes
@@ -76,16 +82,17 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-<Welcome />
-
 <main class="min-h-screen flex flex-col">
   <!-- Header -->
-  <header class="border-b border-gray-800 px-6 py-4">
+  <header class="border-b border-default px-6 py-4">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="text-vault-500 text-2xl">🔐</span>
         <h1 class="text-xl font-bold tracking-tight">Gullbúr Enclave</h1>
       </div>
+      {#if vault.connected}
+        <OptionsBar />
+      {/if}
       <div class="flex items-center gap-4">
         <span class="flex items-center gap-2 text-sm">
           <span
@@ -104,8 +111,8 @@
           </button>
         {/if}
         {#if !vault.connected}
-          <button class="btn-primary text-sm" onclick={connect}>
-            Connect to Vault
+          <button class="btn-primary text-sm" disabled={connecting} onclick={connect}>
+            {connecting ? 'Connecting…' : 'Connect to Vault'}
           </button>
         {:else}
           <button class="btn-secondary text-sm" onclick={disconnect}>
@@ -126,7 +133,7 @@
   </section>
 
   <!-- Footer -->
-  <footer class="border-t border-gray-800 px-6 py-3">
+  <footer class="border-t border-default px-6 py-3">
     <div class="max-w-6xl mx-auto">
       <StatusBar />
     </div>

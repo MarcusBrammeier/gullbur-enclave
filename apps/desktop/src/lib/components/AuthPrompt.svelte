@@ -93,17 +93,17 @@
     aria-modal="true"
     aria-label="Hardware authentication required"
   >
-    <div class="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+    <div class="bg-surface-dim border border-strong rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
       {#if locked}
         <!-- Lockout state -->
         <div class="text-center">
           <div class="text-4xl mb-4">🔒</div>
           <h2 class="text-lg font-semibold text-red-400 mb-2">Security Lockout</h2>
-          <p class="text-sm text-gray-400 mb-4">
+          <p class="text-sm text-secondary mb-4">
             Hardware authentication has been locked due to repeated failures.
             Manual intervention is required.
           </p>
-          <p class="text-xs font-mono text-gray-500 mb-4">{confirmError}</p>
+          <p class="text-xs font-mono text-muted mb-4">{confirmError}</p>
           <button class="btn-secondary text-sm" onclick={cancel}>
             Close
           </button>
@@ -113,18 +113,18 @@
         <div class="text-center mb-6">
           <div class="text-4xl mb-3">🔐</div>
           <h2 class="text-lg font-semibold text-amber-400 mb-1">Hardware Authentication Required</h2>
-          <p class="text-sm text-gray-400">
+          <p class="text-sm text-secondary">
             Touch your YubiKey or use biometrics to authorize this operation.
           </p>
         </div>
 
         <!-- Progress bar -->
         <div class="mb-6">
-          <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+          <div class="flex justify-between text-xs text-muted mb-1.5">
             <span>Auto-lock in</span>
             <span class="font-mono {secondsLeft <= 10 ? 'text-red-400' : ''}">{secondsLeft}s</span>
           </div>
-          <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div class="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
             <div
               class="h-full rounded-full transition-all duration-200 ease-linear {barColor}"
               style="width: {progressPercent}%"
@@ -146,7 +146,7 @@
           <button
             class="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all
               {cooldown
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                ? 'bg-surface-hover text-muted cursor-not-allowed'
                 : 'bg-amber-600 hover:bg-amber-500 text-white'}"
             onclick={confirmHardware}
             disabled={cooldown}
@@ -158,7 +158,7 @@
             {/if}
           </button>
           <button
-            class="px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+            class="px-4 py-2.5 rounded-lg text-sm font-medium bg-surface hover:bg-surface-hover text-primary transition-colors"
             onclick={cancel}
           >
             Cancel

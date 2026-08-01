@@ -5,6 +5,7 @@ use crate::isolation;
 /// touches raw key material. All signing, key derivation, and cryptographic
 /// operations happen exclusively in the Rust memory heap.
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use tauri::Emitter;
@@ -54,16 +55,6 @@ pub struct AccountInfo {
     pub network: String,
     pub address: String,
     pub balance: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TxInfo {
-    pub txid: String,
-    pub from: String,
-    pub to: String,
-    pub amount: String,
-    pub status: String,
-    pub timestamp: Option<u64>,
 }
 
 // ── Command Handlers ──────────────────────────────────────────────────────
@@ -314,7 +305,7 @@ pub async fn get_transaction_history(
     address: String,
     limit: Option<u32>,
     state: State<'_, Arc<RwLock<VaultState>>>,
-) -> Result<Vec<TxInfo>, String> {
+) -> Result<serde_json::Value, String> {
     let vs = state.read().await;
     let vault_guard = vs.vault.read().await;
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
@@ -331,21 +322,26 @@ pub async fn get_transaction_history(
         .get_transaction_history(&account, &network, limit.unwrap_or(10))
         .await
         .map_err(|e| e.to_string())?;
-    Ok(records
+    let tx_list: Vec<serde_json::Value> = records
         .into_iter()
-        .map(|r| TxInfo {
-            txid: r.txid,
-            from: r.from_address.unwrap_or_default(),
-            to: r.to_address.unwrap_or_default(),
-            amount: r.amount,
-            status: match r.status {
-                wallet_plugin::TxStatus::Pending => "pending".into(),
-                wallet_plugin::TxStatus::Confirmed { .. } => "confirmed".into(),
-                wallet_plugin::TxStatus::Failed { .. } => "failed".into(),
-            },
-            timestamp: r.timestamp,
+        .map(|r| {
+            let status = match r.status {
+                wallet_plugin::TxStatus::Pending => "pending",
+                wallet_plugin::TxStatus::Confirmed { .. } => "confirmed",
+                wallet_plugin::TxStatus::Failed { .. } => "failed",
+            };
+            json!({
+                "txid": r.txid,
+                "from": r.from_address.unwrap_or_default(),
+                "to": r.to_address.unwrap_or_default(),
+                "amount": r.amount,
+                "blockHeight": r.block_height,
+                "timestamp": r.timestamp,
+                "status": status,
+            })
         })
-        .collect())
+        .collect();
+    Ok(json!({ "transactions": tx_list }))
 }
 
 // ── Simulation ─────────────────────────────────────────────────
@@ -1163,8 +1159,8 @@ pub async fn report_bug(
     ));
 
     // Build the GitHub issue URL
-    // REPLACE_ME: Change YOUR_GITHUB_ORG and YOUR_GITHUB_REPO to your actual GitHub org and repo name
-    let repo = "YOUR_GITHUB_ORG/YOUR_GITHUB_REPO";
+    // Build the GitHub issue URL
+    let repo = "gullbur/gullbur";
     let base_url = format!("https://github.com/{repo}/issues/new");
 
     // Build final URL with URL-encoded body
@@ -1361,7 +1357,7 @@ pub struct UpdateCheckResult {
 
 #[tauri::command]
 pub async fn check_for_updates() -> UpdateCheckResult {
-    match update_checker::check_for_updates("YOUR_GITHUB_ORG/YOUR_GITHUB_REPO").await {
+    match update_checker::check_for_updates("gullbur/gullbur").await {
         Ok(Some(info)) => UpdateCheckResult {
             local_version: info.local_version,
             latest_version: info.release.tag_name.clone(),

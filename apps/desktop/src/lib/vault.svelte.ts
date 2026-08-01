@@ -12,11 +12,14 @@ import type {
   VaultStatusResponse,
   VaultInitializeResponse,
   VaultGetBalanceResponse,
+  VaultGetTransactionHistoryResponse,
   VaultGenerateMnemonicResponse,
   VaultValidateAddressResponse,
   VaultEstimateFeeResponse,
   VaultSimulateTransferResponse,
+  TxRecord,
 } from './types';
+import { IS_DEMO, VAULT_IPC_PORT } from './constants';
 
 // ── Reactive state (object form — valid for module export in Svelte 5) ─────
 
@@ -34,6 +37,7 @@ export const vault = $state({
   authTimeout: 30,
   authStartedAt: 0,
   theme: 'dark' as 'light' | 'dark' | 'system',
+  showBetaWarning: false,
 });
 
 let client: IpcClient | null = $state(null);
@@ -43,6 +47,17 @@ let client: IpcClient | null = $state(null);
 export const accountCount = () => vault.accounts.length;
 export const networkCount = () => vault.networks.length;
 export const isReady = () => vault.connected && vault.initialized;
+
+/** Look up a network spec by its ID from the vault's network list */
+export function getNetworkSpec(networkId: string): NetworkSpec | undefined {
+  return vault.networks.find((n: NetworkSpec) => n.id === networkId);
+}
+
+/** Display unit for a network (e.g. BTC, ETH, XMR) falls back to ID uppercase */
+export function getNetworkUnit(networkId: string): string {
+  const net = getNetworkSpec(networkId);
+  return net?.unit ?? net?.symbol ?? networkId.toUpperCase();
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -90,15 +105,15 @@ export async function connect(): Promise<void> {
   try {
     // The vault IPC server is auto-launched during app startup.
     // We just connect directly to the running server.
-    let ipcPort = 19876;
-    if ((window as any).__DEMO__) {
+    let ipcPort = VAULT_IPC_PORT;
+    if (IS_DEMO) {
       // Demo mode uses mock — skip real IPC
     }
 
     // 1. Connect the WebSocket client with retry
     let IpcClientClass: new () => IpcClient;
 
-    if ((window as any).__DEMO__) {
+    if (IS_DEMO) {
       const { MockIpcClient } = await import('./MockIpcClient');
       IpcClientClass = MockIpcClient as unknown as new () => IpcClient;
     } else {
@@ -117,7 +132,7 @@ export async function connect(): Promise<void> {
       }
       try {
         client = new IpcClientClass();
-        await client.connect(undefined, ipcPort);
+        await client.connect(ipcPort);
         lastError = undefined;
         break;
       } catch (e) {
@@ -262,6 +277,34 @@ export async function refreshNetworkBalance(network: string): Promise<void> {
   }
 }
 
+/** Fetch transaction history for a specific account. */
+export async function getTransactionHistory(
+  address: string,
+  network: string,
+  limit: number = 50,
+): Promise<TxRecord[]> {
+  const c = await getClient();
+  try {
+    const result = (await c.call('vault.get_transaction_history', {
+      address,
+      network,
+      limit,
+    })) as VaultGetTransactionHistoryResponse;
+    const raw = result.transactions ?? [];
+    const unit = getNetworkUnit(network);
+    return raw.map((tx) => ({
+      ...tx,
+      direction: (tx.from?.toLowerCase() === address.toLowerCase()
+        ? 'sent'
+        : 'received') as 'sent' | 'received',
+      unit: tx.unit ?? unit,
+    }));
+  } catch (e) {
+    vault.error = e instanceof Error ? e.message : String(e);
+    return [];
+  }
+}
+
 /// Clear all accounts for a given network and re-fetch fresh.
 /// Used after creating a new account to ensure it shows up immediately.
 export async function refreshAccounts(network?: string): Promise<void> {
@@ -351,7 +394,7 @@ export async function simulateTransfer(
   vault.error = null;
   try {
     // Tauri invoke path (desktop)
-    if (!(window as any).__DEMO__) {
+    if (!IS_DEMO) {
       const { invoke } = await import('@tauri-apps/api/core');
       const result = await invoke('simulate_transfer', { network, from, to, value }) as VaultSimulateTransferResponse;
       return result;

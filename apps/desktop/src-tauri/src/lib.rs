@@ -144,6 +144,20 @@ pub fn run() {
                 }
             });
 
+            // Force window to configured size on first paint.
+            // Tauri v2 on X11 starts webviews at 10×10 on headless Xvfb;
+            // setup() runs too early so we defer via async_runtime::spawn.
+            if let Some(window) = app.get_webview_window("main") {
+                let win = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                    let _ = win.set_size(tauri::LogicalSize::new(1200.0, 800.0))
+                        .inspect_err(|e| tracing::warn!("set_size: {e}"));
+                    let _ = win.center()
+                        .inspect_err(|e| tracing::warn!("center: {e}"));
+                });
+            }
+
             app.manage(vault_state);
             app.manage(isolation_state);
 

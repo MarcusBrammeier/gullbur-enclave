@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { Account, NetworkSpec, Balance } from '../types';
-  import { vault, createAccount, refreshBalances, refreshNetworkBalance, setSelectedNetwork, getAccountLabel, setAccountLabel } from '../vault.svelte.ts';
+  import type { Account, NetworkSpec } from '../types';
+  import { vault, createAccount, refreshBalances, refreshNetworkBalance, setSelectedNetwork, getAccountLabel, setAccountLabel, getNetworkUnit } from '../vault.svelte.ts';
+  import { truncateAddress, formatBalance, getNetworkBadge } from '../utils';
   import Send from './Send.svelte';
   import Receive from './Receive.svelte';
   import Portfolio from './Portfolio.svelte';
@@ -76,34 +77,6 @@
       : Math.max(...filteredAccounts.map((a: Account) => a.index ?? 0)) + 1
   );
 
-  function truncateAddress(addr: string): string {
-    if (addr.length <= 12) return addr;
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  }
-
-  function formatBalance(balance: Balance | null): string {
-    if (!balance) return '0';
-    const confirmed = parseFloat(balance.confirmed);
-    if (isNaN(confirmed)) return '0';
-    return confirmed.toLocaleString(undefined, { maximumFractionDigits: 8 });
-  }
-
-  function getNetworkUnit(networkId: string): string {
-    const net = vault.networks.find((n: NetworkSpec) => n.id === networkId);
-    return net?.unit ?? net?.symbol ?? '';
-  }
-
-  function getNetworkBadge(networkId: string): { label: string; color: string } {
-    switch (networkId) {
-      case 'bitcoin':  return { label: 'BTC', color: 'bg-orange-600 text-orange-100' };
-      case 'ethereum': return { label: 'ETH', color: 'bg-blue-600 text-blue-100' };
-      case 'monero':   return { label: 'XMR', color: 'bg-orange-500 text-orange-100' };
-      case 'litecoin':
-      case 'litecoin-testnet': return { label: 'LTC', color: 'bg-gray-400 text-gray-900' };
-      default:         return { label: networkId.toUpperCase(), color: 'bg-gray-600 text-gray-100' };
-    }
-  }
-
   function onNetworkSelect(e: Event) {
     const sel = e.target as HTMLSelectElement;
     setSelectedNetwork(sel.value);
@@ -173,12 +146,12 @@
   {/if}
 
   <!-- View Tabs -->
-  <div class="flex gap-1 p-1 bg-gray-800/50 rounded-lg mb-2" role="tablist">
+  <div class="flex gap-1 p-1 bg-surface/50 rounded-lg mb-2" role="tablist">
     <button
       class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors
         {view === 'accounts'
-          ? 'bg-gray-700 text-gray-100 shadow-sm'
-          : 'text-gray-400 hover:text-gray-200'}"
+          ? 'bg-surface-hover text-primary shadow-sm'
+          : 'text-secondary hover:text-primary'}"
       onclick={() => view = 'accounts'}
       role="tab"
       aria-selected={view === 'accounts'}
@@ -188,8 +161,8 @@
     <button
       class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors
         {view === 'portfolio'
-          ? 'bg-gray-700 text-gray-100 shadow-sm'
-          : 'text-gray-400 hover:text-gray-200'}"
+          ? 'bg-surface-hover text-primary shadow-sm'
+          : 'text-secondary hover:text-primary'}"
       onclick={() => view = 'portfolio'}
       role="tab"
       aria-selected={view === 'portfolio'}
@@ -206,14 +179,14 @@
   <div class="card">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">💰 Accounts</h2>
-      <span class="text-xs text-gray-500">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}</span>
+      <span class="text-xs text-muted">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}</span>
     </div>
 
     {#if filteredAccounts.length === 0}
       <div class="text-center py-10">
         <div class="text-4xl mb-3">🪪</div>
-        <p class="text-gray-400 mb-2">No accounts yet.</p>
-        <p class="text-gray-500 text-sm mb-6">Create your first account on {vault.selectedNetwork}.</p>
+        <p class="text-secondary mb-2">No accounts yet — tap "Create Account" to add your first wallet.</p>
+        <p class="text-muted text-sm mb-6">Create your first account on {vault.selectedNetwork}.</p>
         <button class="btn-primary" disabled={!vault.connected || creatingAccount} onclick={handleCreateAccount}>
           {creatingAccount ? '⏳ Creating...' : '+ Create Account'}
         </button>
@@ -222,12 +195,12 @@
       <div class="space-y-3">
         {#each filteredAccounts as account (account.address)}
           {@const badge = getNetworkBadge(account.network)}
-          <div class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 {#if editingLabelAddress === account.address}
                   <input
-                    class="label-input bg-gray-700 border border-vault-500 rounded px-2 py-0.5 text-sm font-mono text-gray-100 w-48 outline-none focus:ring-1 focus:ring-vault-400"
+                    class="label-input bg-surface-hover border border-vault-500 rounded px-2 py-0.5 text-sm font-mono text-primary w-48 outline-none focus:ring-1 focus:ring-vault-400"
                     type="text"
                     placeholder="Account label..."
                     bind:value={editingLabelValue}
@@ -236,7 +209,7 @@
                   />
                 {:else}
                   <button
-                    class="font-mono text-sm text-gray-200 truncate hover:text-vault-400 transition-colors text-left"
+                    class="font-mono text-sm text-primary truncate hover:text-vault-400 transition-colors text-left"
                     onclick={() => startEditing(account)}
                     title={account.address}
                   >
@@ -245,7 +218,7 @@
                 {/if}
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium {badge.color}">{badge.label}</span>
               </div>
-              <div class="text-sm text-gray-400">
+              <div class="text-sm text-secondary">
                 <span class="font-mono text-vault-400">{formatBalance(account.balance)} {getNetworkUnit(account.network)}</span>
               </div>
             </div>
@@ -267,12 +240,12 @@
           {creatingAccount ? '⏳ Creating...' : '+ Create Account'}
         </button>
       <button class="btn-secondary" disabled={!vault.connected} onclick={handleRefresh}>🔄 Refresh</button>
-      <button class="btn-ghost text-sm" disabled={!vault.connected} onclick={handleRefreshAll}>🔄 Refresh All</button>
+      <button class="btn-ghost" disabled={!vault.connected} onclick={handleRefreshAll}>🔄 Refresh All</button>
     </div>
   </div>
 
   <!-- Vault Status -->
-  <div class="text-xs text-gray-600 text-center">Vault: {vault.vaultStatus} {vault.initialized ? '• Initialized' : '• Not initialized'}</div>
+  <div class="text-xs text-muted text-center">Vault: {vault.vaultStatus} {vault.initialized ? '• Initialized' : '• Not initialized'}</div>
 {/if}
 </div>
 

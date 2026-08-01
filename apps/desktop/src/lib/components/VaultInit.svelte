@@ -46,27 +46,12 @@
     }
   }
 
-  function selectWord(word: string, idx: number) {
+  function selectWord(_word: string, idx: number) {
     if (selectedIndexes.includes(idx)) {
       selectedIndexes = selectedIndexes.filter((i) => i !== idx);
     } else {
       selectedIndexes = [...selectedIndexes, idx];
     }
-  }
-
-  function isWordCorrect(pos: number): boolean | null {
-    if (selectedIndexes.length <= pos) return null;
-    return shuffledWords[selectedIndexes[pos]] === wordArray[pos];
-  }
-
-  function getConfirmProgress(): number {
-    return selectedIndexes.length;
-  }
-
-  function getConfirmTotal(): number {
-    // Verify a random subset: first word, last word, and 4 random middle words
-    const total = Math.min(6, wordArray.length);
-    return total;
   }
 
   function proceedToConfirm() {
@@ -174,13 +159,13 @@
 <div class="vault-init-container max-w-lg mx-auto">
   {#if step === 'input'}
     <!-- Step 1: Seed phrase input / Generate -->
-    <div class="bg-vault-900/30 border border-gray-800 rounded-xl p-6">
+    <div class="bg-vault-900/30 border border-default rounded-xl p-6">
       <h2 class="text-lg font-semibold mb-2">Initialize Vault</h2>
-      <p class="text-sm text-gray-400 mb-4">
+      <p class="text-sm text-secondary mb-4">
         Enter your existing seed phrase to restore, or generate a new wallet.
       </p>
 
-      <label class="block text-sm font-medium text-gray-300 mb-1" for="seed-phrase-input">
+      <label class="block text-sm font-medium text-primary mb-1" for="seed-phrase-input">
         Seed Phrase (12 or 24 words)
       </label>
       <textarea
@@ -188,12 +173,12 @@
         bind:value={seedPhrase}
         rows="3"
         placeholder="witch collapse practice feed shame open despair creek road again willow least"
-        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-vault-500 focus:ring-1 focus:ring-vault-500 font-mono text-sm resize-none"
+        class="w-full bg-surface border border-strong rounded-lg px-4 py-3 text-primary placeholder-gray-500 focus:outline-none focus:border-vault-500 focus:ring-1 focus:ring-vault-500 font-mono text-sm resize-none"
         disabled={generating}
       ></textarea>
 
       <div class="mt-3">
-        <label class="block text-sm font-medium text-gray-400 mb-1" for="passphrase-input">
+        <label class="block text-sm font-medium text-secondary mb-1" for="passphrase-input">
           Passphrase (optional — BIP-39 25th word)
         </label>
         <input
@@ -201,16 +186,16 @@
           type="text"
           bind:value={passphrase}
           placeholder="Leave empty for standard seed"
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-vault-500 focus:ring-1 focus:ring-vault-500 text-sm"
+          class="w-full bg-surface border border-strong rounded-lg px-4 py-2.5 text-primary placeholder-gray-500 focus:outline-none focus:border-vault-500 focus:ring-1 focus:ring-vault-500 text-sm"
           disabled={generating}
         />
-        <p class="text-xs text-gray-600 mt-1">A passphrase creates a completely different wallet from the same seed words</p>
+        <p class="text-xs text-muted mt-1">A passphrase creates a completely different wallet from the same seed words</p>
       </div>
 
       <div class="flex items-center gap-3 mt-4">
         <button class="btn-primary text-sm flex-1" onclick={handleGenerate} disabled={generating}>
           {#if generating}
-            <span class="animate-spin inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"></span>
+            <span class="animate-spin inline-block w-4 h-4 border-2 border-strong border-t-transparent rounded-full"></span>
             Generating...
           {:else}
             <span class="text-vault-400">✨</span>
@@ -222,11 +207,11 @@
         </button>
       </div>
 
-      <div class="mt-3 pt-3 border-t border-gray-800">
+      <div class="mt-3 pt-3 border-t border-default">
         <button class="btn-secondary text-sm w-full flex items-center justify-center gap-2" onclick={openVaultFile}>
           📂 Open Existing Vault File…
         </button>
-        <p class="text-xs text-gray-600 mt-1 text-center">Open a previously saved keystore file from anywhere on disk</p>
+        <p class="text-xs text-muted mt-1 text-center">Open a previously saved keystore file from anywhere on disk</p>
       </div>
 
       {#if localError}
@@ -247,8 +232,8 @@
 
       <div class="grid grid-cols-3 gap-2 mb-4">
         {#each wordArray as word, i}
-          <div class="bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200 flex items-center gap-2">
-            <span class="text-xs text-gray-500 w-5 text-right">{i + 1}.</span>
+          <div class="bg-surface rounded-lg px-3 py-2 text-sm font-mono text-primary flex items-center gap-2">
+            <span class="text-xs text-muted w-5 text-right">{i + 1}.</span>
             <span class="break-all">{word}</span>
           </div>
         {/each}
@@ -257,24 +242,24 @@
       <div class="space-y-3">
         <label class="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" bind:checked={understood} class="mt-0.5" />
-          <span class="text-sm text-gray-300">I have written down my seed phrase and stored it securely</span>
+          <span class="text-sm text-primary">I have written down my seed phrase and stored it securely</span>
         </label>
         <button class="w-full py-3 px-6 rounded-xl font-semibold text-sm bg-amber-600 hover:bg-amber-500 text-black transition-colors disabled:opacity-40" disabled={!understood} onclick={proceedToConfirm}>
           Verify My Backup
         </button>
-        <button class="w-full py-2.5 px-6 rounded-xl font-semibold text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors" onclick={handleSkipWarn}>
+        <button class="w-full py-2.5 px-6 rounded-xl font-semibold text-sm bg-surface-hover hover:bg-surface text-primary transition-colors" onclick={handleSkipWarn}>
           Skip Verification (throwaway wallets only)
         </button>
       </div>
 
-      <button class="text-xs text-gray-500 mt-4 underline" onclick={goBackToInput}>Go back</button>
+      <button class="text-xs text-muted mt-4 underline" onclick={goBackToInput}>Go back</button>
     </div>
 
   {:else if step === 'confirm'}
     <!-- Step 3: Verify by selecting words in order -->
     <div class="bg-vault-900/30 border border-vault-700/30 rounded-xl p-6 pb-safe">
       <h2 class="text-lg font-semibold mb-2">Verify Your Backup</h2>
-      <p class="text-sm text-gray-400 mb-4">
+      <p class="text-sm text-secondary mb-4">
         Select the words in the correct order to confirm you've backed up your seed phrase.
       </p>
 
@@ -291,7 +276,7 @@
       <div class="grid grid-cols-3 gap-2 mb-4">
         {#each shuffledWords, idx}
           <button
-            class="px-3 py-2 rounded-lg text-sm font-mono transition-colors {selectedIndexes.includes(idx) ? 'bg-gray-700 text-gray-500 line-through' : 'bg-gray-800 text-gray-200 hover:bg-vault-800 hover:text-vault-300'}"
+            class="px-3 py-2 rounded-lg text-sm font-mono transition-colors {selectedIndexes.includes(idx) ? 'bg-surface-hover text-muted line-through' : 'bg-surface text-primary hover:bg-vault-800 hover:text-vault-300'}"
             onclick={() => selectWord(shuffledWords[idx], idx)}
             disabled={selectedIndexes.includes(idx)}
           >
@@ -301,7 +286,7 @@
       </div>
 
       <div class="flex gap-3">
-        <button class="flex-1 py-3 px-6 rounded-xl font-semibold text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors" onclick={() => { selectedIndexes = []; step = 'backup'; }}>
+        <button class="flex-1 py-3 px-6 rounded-xl font-semibold text-sm bg-surface-hover hover:bg-surface text-primary transition-colors" onclick={() => { selectedIndexes = []; step = 'backup'; }}>
           ← Back
         </button>
         <button class="flex-1 py-3 px-6 rounded-xl font-semibold text-sm bg-vault-600 hover:bg-vault-500 text-white transition-colors disabled:opacity-40" disabled={selectedIndexes.length < wordArray.length || !selectedIndexes.every((_, i) => shuffledWords[selectedIndexes[i]] === wordArray[i])} onclick={handleConfirmComplete}>
@@ -319,7 +304,7 @@
     <div class="bg-vault-900/30 border border-red-800 rounded-xl p-6 text-center">
       <div class="text-4xl mb-3">⚠️</div>
       <h2 class="text-lg font-semibold text-red-400 mb-2">Skip Seed Backup?</h2>
-      <p class="text-sm text-gray-400 mb-4">
+      <p class="text-sm text-secondary mb-4">
         You won't be able to recover this wallet if you lose access.<br>
         Only do this for throwaway wallets and testing.
       </p>
@@ -334,17 +319,17 @@
     </div>
 
   {:else if step === 'initializing'}
-    <div class="bg-vault-900/30 border border-gray-800 rounded-xl p-8 text-center">
+    <div class="bg-vault-900/30 border border-default rounded-xl p-8 text-center">
       <div class="animate-spin inline-block w-10 h-10 border-3 border-vault-500 border-t-transparent rounded-full mb-4"></div>
       <h2 class="text-lg font-semibold mb-1">Initializing Vault</h2>
-      <p class="text-sm text-gray-400">{vault.vaultStatus}</p>
+      <p class="text-sm text-secondary">{vault.vaultStatus}</p>
     </div>
 
   {:else if step === 'error'}
     <div class="bg-vault-900/30 border border-red-800 rounded-xl p-6 text-center">
       <div class="text-4xl mb-3">❌</div>
       <h2 class="text-lg font-semibold text-red-400 mb-1">Initialization Failed</h2>
-      <p class="text-sm text-gray-400 mb-4">{localError || vault.error || 'An unknown error occurred.'}</p>
+      <p class="text-sm text-secondary mb-4">{localError || vault.error || 'An unknown error occurred.'}</p>
       <button class="btn-secondary text-sm" onclick={resetState}>Try Again</button>
     </div>
   {/if}

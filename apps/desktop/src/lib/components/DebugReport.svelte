@@ -163,13 +163,14 @@
   role="dialog"
   aria-modal="true"
   aria-label="Debug Report"
+  tabindex="-1"
   onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[85vh] flex flex-col" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[85vh] flex flex-col" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">🔍 Debug Report</h2>
-      <button class="text-gray-500 hover:text-gray-300 text-xl leading-none" onclick={onclose}>&times;</button>
+      <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
     </div>
 
     {#if !showReport}
@@ -178,7 +179,7 @@
         <div class="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-sm text-blue-300 space-y-2">
           <p>⚠️ <strong>This report is designed to be safe for sharing.</strong></p>
           <p>It includes your wallet addresses, plugin config, and crash data — but <strong>never</strong> your seed phrase, private keys, or balances.</p>
-          <p class="text-gray-400">Review the report below before sharing. You can redact any line you're not comfortable with.</p>
+          <p class="text-secondary">Review the report below before sharing. You can redact any line you're not comfortable with.</p>
         </div>
 
         <button
@@ -196,15 +197,15 @@
     {:else if report}
       <!-- Report view -->
       <div class="flex-1 overflow-y-auto space-y-4">
-        <div class="flex items-center gap-2 text-xs text-gray-500">
-          <span class="px-2 py-0.5 bg-gray-800 rounded">v{report.version}</span>
+        <div class="flex items-center gap-2 text-xs text-muted">
+          <span class="px-2 py-0.5 bg-surface rounded">v{report.version}</span>
           <span>{report.os}/{report.arch}</span>
         </div>
 
         <!-- Redactable items -->
         <div class="space-y-1">
           {#each report.accounts as acct, idx}
-            <label class="flex items-start gap-2 py-1 px-2 rounded hover:bg-gray-800/50 cursor-pointer text-sm">
+            <label class="flex items-start gap-2 py-1 px-2 rounded hover:bg-surface/50 cursor-pointer text-sm">
               <input
                 type="checkbox"
                 class="mt-0.5 accent-vault-500"
@@ -212,7 +213,7 @@
                 onchange={() => toggleRedact(idx)}
               />
               <span class:line-through={redactedItems.has(idx)} class:opacity-40={redactedItems.has(idx)}>
-                <span class="text-gray-400">{acct.network}:</span> <span class="font-mono text-gray-200">{acct.address}</span>
+                <span class="text-secondary">{acct.network}:</span> <span class="font-mono text-primary">{acct.address}</span>
               </span>
             </label>
           {/each}
@@ -223,16 +224,16 @@
           <div class="bg-amber-900/10 border border-amber-700/20 rounded-lg p-3 text-xs">
             <p class="font-medium text-amber-400 mb-2">📋 {report.recent_crashes.length} crash report(s) found</p>
             {#each report.recent_crashes as crash}
-              <pre class="text-gray-400 mt-1 overflow-x-auto">{JSON.stringify(crash, null, 2)}</pre>
+              <pre class="text-secondary mt-1 overflow-x-auto">{JSON.stringify(crash, null, 2)}</pre>
             {/each}
           </div>
         {:else}
-          <p class="text-xs text-gray-500">No crash reports found</p>
+          <p class="text-xs text-muted">No crash reports found</p>
         {/if}
 
         <!-- User comments -->
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Add comments for the developer:</label>
+          <label class="block text-xs text-secondary mb-1">Add comments for the developer:</label>
           <textarea
             class="input-field w-full h-20 text-sm resize-none"
             placeholder="e.g. I was trying to send LTC on testnet when..."
@@ -244,8 +245,8 @@
       <!-- Preview -->
       {#if report.accounts.length > 0 || userComments}
         <details class="mt-3">
-          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">📄 Preview report text</summary>
-          <pre class="mt-2 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-gray-400 max-h-40 overflow-y-auto">{formatReportAsText(true)}</pre>
+          <summary class="text-xs text-muted cursor-pointer hover:text-primary">📄 Preview report text</summary>
+          <pre class="mt-2 bg-surface-elevated border border-default rounded-lg p-3 text-xs text-secondary max-h-40 overflow-y-auto">{formatReportAsText(true)}</pre>
         </details>
       {/if}
 

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { Account, FeeEstimate, Balance } from '../types';
+  import type { Account, FeeEstimate } from '../types';
   import { vault, validateAddress, estimateFee, signTransaction, broadcastTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
+  import { formatBalance, getBalanceFloat } from '../utils';
 
   interface Props {
     account: Account;
@@ -23,7 +24,6 @@
   let amountError = $state('');
   let txid = $state('');
   let resultError = $state('');
-  let signing = $state(false);
   let simulating = $state(false);
   let simResult = $state<{ success: boolean; gasUsed: number; revertReason: string | null } | null>(null);
 
@@ -48,17 +48,6 @@
     const val = parseFloat(amount);
     return !isNaN(val) && val > 0 && amountError === '';
   });
-
-  function formatBalance(balance: Balance | null): string {
-    if (!balance) return '0';
-    return parseFloat(balance.confirmed).toLocaleString(undefined, { maximumFractionDigits: 8 });
-  }
-
-  function getBalanceFloat(balance: Balance | null): number {
-    if (!balance) return 0;
-    const val = parseFloat(balance.confirmed);
-    return isNaN(val) ? 0 : val;
-  }
 
   async function handleValidateAddress() {
     if (!recipientAddress.trim()) {
@@ -141,7 +130,6 @@
 
   async function handleSignAndBroadcast() {
     step = 'signing';
-    signing = true;
     resultError = '';
 
     try {
@@ -159,14 +147,7 @@
     } catch (err) {
       resultError = err instanceof Error ? err.message : 'Transaction failed';
       step = 'result';
-    } finally {
-      signing = false;
     }
-  }
-
-  function getNetworkUnit(networkId: string): string {
-    const map: Record<string, string> = { bitcoin: 'BTC', ethereum: 'ETH', monero: 'XMR' };
-    return map[networkId] ?? networkId.toUpperCase();
   }
 
   function explorerTxUrl(networkId: string, txid: string): string | null {
@@ -214,12 +195,12 @@
     }
   }
 
-  function feeLabelClass(fee: FeeEstimate, isSelected: boolean): string {
+  function feeLabelClass(isSelected: boolean): string {
     let base = 'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ';
     if (isSelected) {
       base += 'border-vault-500 bg-vault-950/30 ';
     } else {
-      base += 'border-gray-700 hover:border-gray-600 ';
+      base += 'border-strong hover:border-hover ';
     }
     return base;
   }
@@ -238,12 +219,12 @@
   tabindex="-1"
 >
   <!-- Modal Card -->
-  <div class="card w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border-gray-700">
+  <div class="card w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border-strong">
     <!-- Header -->
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">💸 Send {networkUnit}</h2>
       <button
-        class="text-gray-500 hover:text-gray-300 transition-colors text-xl leading-none"
+        class="text-muted hover:text-primary transition-colors text-xl leading-none"
         onclick={resetAndClose}
         aria-label="Close"
       >
@@ -252,9 +233,9 @@
     </div>
 
     <!-- From account info -->
-    <div class="bg-gray-800/50 border border-gray-700 rounded-lg p-3 mb-5">
-      <span class="text-xs text-gray-500 block mb-1">From</span>
-      <span class="font-mono text-sm text-gray-300">
+    <div class="bg-surface/50 border border-strong rounded-lg p-3 mb-5">
+      <span class="text-xs text-muted block mb-1">From</span>
+      <span class="font-mono text-sm text-primary">
         {getAccountLabel(account.address) ?? (account.address.length > 12
           ? `${account.address.slice(0, 8)}...${account.address.slice(-6)}`
           : account.address)}
@@ -265,7 +246,7 @@
     {#if step === 'address'}
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-1.5" for="recipient">
+          <label class="block text-sm text-secondary mb-1.5" for="recipient">
             Recipient Address
           </label>
           <input
@@ -279,7 +260,7 @@
             onblur={handleValidateAddress}
           />
           {#if addressValidating}
-            <p class="text-xs text-gray-500 mt-1">Validating...</p>
+            <p class="text-xs text-muted mt-1">Validating...</p>
           {:else if addressValid === true}
             <p class="text-xs text-vault-400 mt-1">✓ Valid address</p>
           {:else if addressError}
@@ -300,7 +281,7 @@
     {:else if step === 'amount'}
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-1.5" for="amount">
+          <label class="block text-sm text-secondary mb-1.5" for="amount">
             Amount ({networkUnit})
           </label>
           <div class="relative">
@@ -314,14 +295,14 @@
               value={amount}
               oninput={handleAmountInput}
             />
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted font-medium">
               {networkUnit}
             </span>
           </div>
           {#if amountError}
             <p class="text-xs text-red-400 mt-1">{amountError}</p>
           {/if}
-          <p class="text-xs text-gray-500 mt-1">
+          <p class="text-xs text-muted mt-1">
             Available: {formatBalance(account.balance)} {networkUnit}
           </p>
         </div>
@@ -347,25 +328,25 @@
     {:else if step === 'fee'}
       <div class="space-y-4">
         <div>
-          <p class="block text-sm text-gray-400 mb-3">
+          <p class="block text-sm text-secondary mb-3">
             Transaction Fee
           </p>
 
           {#if feeLoading}
-            <div class="text-center py-4 text-gray-500 text-sm">
+            <div class="text-center py-4 text-muted text-sm">
               Loading fee estimates...
             </div>
           {:else if feeEstimates.length === 0}
             <div class="text-center py-4">
-              <p class="text-gray-500 text-sm mb-2">No fee estimates available</p>
-              <p class="text-xs text-gray-600">Using default fees</p>
+              <p class="text-muted text-sm mb-2">No fee estimates available</p>
+              <p class="text-xs text-muted">Using default fees</p>
             </div>
           {:else}
             <div class="space-y-2">
               {#each feeEstimates as fee (fee.level)}
                 {@const isSelected = selectedFee === fee.level}
                 <label
-                  class={feeLabelClass(fee, isSelected)}
+                  class={feeLabelClass(isSelected)}
                 >
                   <input
                     type="radio"
@@ -376,14 +357,14 @@
                     class="accent-vault-500"
                   />
                   <div class="flex-1">
-                    <span class="text-sm font-medium capitalize text-gray-200">
+                    <span class="text-sm font-medium capitalize text-primary">
                       {fee.level}
                     </span>
-                    <span class="text-xs text-gray-500 ml-2">
+                    <span class="text-xs text-muted ml-2">
                       {fee.estimatedTime ?? ''}
                     </span>
                   </div>
-                  <span class="font-mono text-sm text-gray-300">
+                  <span class="font-mono text-sm text-primary">
                     {typeof fee.fee === 'number'
                       ? fee.fee.toLocaleString(undefined, { maximumFractionDigits: 8 })
                       : fee.fee}
@@ -413,37 +394,37 @@
     <!-- Step 4: Review -->
     {:else if step === 'review'}
       <div class="space-y-4">
-        <h3 class="text-sm font-semibold text-gray-300">Review Transaction</h3>
+        <h3 class="text-sm font-semibold text-primary">Review Transaction</h3>
 
-        <div class="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
+        <div class="bg-surface/50 border border-strong rounded-lg divide-y">
           <div class="flex justify-between px-4 py-3">
-            <span class="text-sm text-gray-400">From</span>
-            <span class="text-sm font-mono text-gray-300 max-w-[180px] truncate">
+            <span class="text-sm text-secondary">From</span>
+            <span class="text-sm font-mono text-primary max-w-[180px] truncate">
               {account.address.length > 12
                 ? `${account.address.slice(0, 8)}...${account.address.slice(-6)}`
                 : account.address}
             </span>
           </div>
           <div class="flex justify-between px-4 py-3">
-            <span class="text-sm text-gray-400">To</span>
-            <span class="text-sm font-mono text-gray-300 max-w-[180px] truncate">
+            <span class="text-sm text-secondary">To</span>
+            <span class="text-sm font-mono text-primary max-w-[180px] truncate">
               {recipientAddress.length > 12
                 ? `${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}`
                 : recipientAddress}
             </span>
           </div>
           <div class="flex justify-between px-4 py-3">
-            <span class="text-sm text-gray-400">Amount</span>
+            <span class="text-sm text-secondary">Amount</span>
             <span class="text-sm font-mono text-vault-400">
               {parseFloat(amount).toLocaleString(undefined, { maximumFractionDigits: 8 })} {networkUnit}
             </span>
           </div>
           <div class="flex justify-between px-4 py-3">
-            <span class="text-sm text-gray-400">Fee</span>
-            <span class="text-sm font-mono text-gray-300 capitalize">
+            <span class="text-sm text-secondary">Fee</span>
+            <span class="text-sm font-mono text-primary capitalize">
               {selectedFee}
               {#if currentFee}
-                <span class="text-gray-500 ml-1">
+                <span class="text-muted ml-1">
                   ({typeof currentFee.fee === 'number'
                     ? currentFee.fee.toLocaleString(undefined, { maximumFractionDigits: 8 })
                     : currentFee.fee})
@@ -452,25 +433,25 @@
             </span>
           </div>
           <div class="flex justify-between px-4 py-3">
-            <span class="text-sm text-gray-400">Network</span>
-            <span class="text-sm font-mono text-gray-300">{networkUnit}</span>
+            <span class="text-sm text-secondary">Network</span>
+            <span class="text-sm font-mono text-primary">{networkUnit}</span>
           </div>
         </div>
 
         <div class="flex flex-col gap-3">
           {#if simResult}
-            <div class="bg-gray-800/50 border rounded-lg p-3"
+            <div class="bg-surface/50 border rounded-lg p-3"
               class:border-vault-500={simResult.success}
               class:border-red-500={!simResult.success}>
               {#if simulating}
-                <div class="flex items-center gap-2 text-sm text-gray-400">
+                <div class="flex items-center gap-2 text-sm text-secondary">
                   <span class="animate-spin inline-block w-3 h-3 border-2 border-vault-500 border-t-transparent rounded-full"></span>
                   Simulating...
                 </div>
               {:else if simResult.success}
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-vault-400">✅ Simulation OK</span>
-                  <span class="text-gray-400">~{simResult.gasUsed.toLocaleString()} gas</span>
+                  <span class="text-secondary">~{simResult.gasUsed.toLocaleString()} gas</span>
                 </div>
               {:else}
                 <div class="text-sm text-red-400">
@@ -497,8 +478,8 @@
     {:else if step === 'signing'}
       <div class="text-center py-8">
         <div class="animate-spin inline-block w-8 h-8 border-2 border-vault-500 border-t-transparent rounded-full mb-4"></div>
-        <p class="text-gray-300 text-sm">Signing and broadcasting...</p>
-        <p class="text-gray-500 text-xs mt-2">This may take a moment</p>
+        <p class="text-primary text-sm">Signing and broadcasting...</p>
+        <p class="text-muted text-xs mt-2">This may take a moment</p>
       </div>
 
     <!-- Step 6: Result -->
@@ -528,9 +509,9 @@
         {:else}
           <div class="text-4xl mb-3">✅</div>
           <h3 class="text-lg font-semibold text-vault-400 mb-2">Transaction Sent</h3>
-          <div class="bg-gray-800/50 border border-gray-700 rounded-lg p-3 mb-4">
-            <span class="text-xs text-gray-500 block mb-1">Transaction ID</span>
-            <span class="font-mono text-xs text-gray-300 break-all">{txid}</span>
+          <div class="bg-surface/50 border border-strong rounded-lg p-3 mb-4">
+            <span class="text-xs text-muted block mb-1">Transaction ID</span>
+            <span class="font-mono text-xs text-primary break-all">{txid}</span>
           </div>
           {#if txExplorerUrl}
             <a href={txExplorerUrl} target="_blank" rel="noopener noreferrer"
@@ -550,14 +531,14 @@
 
     <!-- Step indicator -->
     {#if step !== 'signing' && step !== 'result'}
-      <div class="flex items-center justify-center gap-1.5 mt-6 pt-4 border-t border-gray-800">
+      <div class="flex items-center justify-center gap-1.5 mt-6 pt-4 border-t border-default">
         {#each ['address', 'amount', 'fee', 'review'] as s}
           {@const idx = ['address', 'amount', 'fee', 'review'].indexOf(step)}
           {@const currIdx = ['address', 'amount', 'fee', 'review'].indexOf(s)}
           <div
             class="w-2 h-2 rounded-full transition-colors"
             class:bg-vault-500={currIdx <= idx}
-            class:bg-gray-700={currIdx > idx}
+            class:bg-surface-hover={currIdx > idx}
           ></div>
         {/each}
       </div>

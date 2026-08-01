@@ -25,7 +25,6 @@ export class IpcClient {
   private ws: WebSocket | null = null;
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-  private authToken: string = "";
   /** Callback for auth errors — called when -32002 is received */
   onAuthRequired?: () => void;
   private sessionKey: string | null = null;
@@ -40,16 +39,7 @@ export class IpcClient {
     } catch { /* console logging is best-effort */ }
   }
 
-  /** Generate a random 32-byte hex token for auth */
-  static generateToken(): string {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  async connect(token?: string, port?: number): Promise<void> {
-    this.authToken = token ?? IpcClient.generateToken();
-
+  async connect(port?: number): Promise<void> {
     // Initialize WASM crypto module — non-fatal on mobile where
     // WASM may not load from the tauri:// asset protocol.
     if (!this.wasmReady) {

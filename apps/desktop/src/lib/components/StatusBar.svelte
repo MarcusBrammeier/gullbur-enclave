@@ -9,10 +9,10 @@
   const dotShadow = $derived(vault.connected ? 'shadow-[0_0_6px_#22c55e]' : 'shadow-[0_0_6px_#ef4444]');
 </script>
 
-<footer class="border-t border-gray-800 px-6 py-3">
+<footer class="border-t border-default px-6 py-3 pb-[env(safe-area-inset-bottom)]">
   <div class="max-w-6xl mx-auto flex flex-col gap-1">
     <UpdateBanner />
-    <div class="flex items-center justify-between text-xs text-gray-500">
+    <div class="flex items-center justify-between text-xs text-muted">
       <!-- Left: version -->
     <span>Gullbúr Enclave Core v0.1.0</span>
 
@@ -21,7 +21,7 @@
       <!-- Connection dot + status -->
       <span class="flex items-center gap-2">
         <span class="inline-block w-2.5 h-2.5 rounded-full {dotColor} {dotShadow}"></span>
-        <span class="text-gray-400">{vault.vaultStatus}</span>
+        <span class="text-secondary">{vault.vaultStatus}</span>
       </span>
 
       <!-- Tor toggle (opt-in privacy) -->

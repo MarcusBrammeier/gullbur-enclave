@@ -3,8 +3,6 @@
   import { invoke } from '@tauri-apps/api/core';
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
-  import { setTheme } from '../vault.svelte.ts';
-
   interface Props {
     onclose: () => void;
   }
@@ -19,7 +17,6 @@
   let torEnabled = $state(vault.torEnabled);
   let testnetOnly = $state(vault.testnetOnly);
   let lockResult = $state<string | null>(null);
-  let saving = $state(false);
   let showSeedConfirm = $state(false);
   let seedPhrase = $state('');
   let seedLoading = $state(false);
@@ -95,74 +92,57 @@
   role="dialog"
   aria-modal="true"
   aria-label="Settings"
+  tabindex="-1"
   onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">⚙️ Settings</h2>
-      <button class="text-gray-500 hover:text-gray-300 text-xl leading-none" onclick={onclose}>&times;</button>
+      <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
     </div>
 
     <div class="space-y-5">
       <!-- Auto-lock -->
       <div>
-        <label class="block text-sm font-medium text-gray-300 mb-1">Auto-Lock Timer</label>
+        <label class="block text-sm font-medium text-primary mb-1" for="auto-lock-range">Auto-Lock Timer</label>
         <div class="flex items-center gap-3">
-          <input type="range" min="0" max="300" step="5" bind:value={autoLockSecs} class="flex-1 accent-vault-500" />
-          <span class="text-sm font-mono text-gray-400 w-16 text-right">{autoLockSecs === 0 ? 'Off' : `${autoLockSecs}s`}</span>
+          <input id="auto-lock-range" type="range" min="0" max="300" step="5" bind:value={autoLockSecs} class="flex-1 accent-vault-500" />
+          <span class="text-sm font-mono text-secondary w-16 text-right">{autoLockSecs === 0 ? 'Off' : `${autoLockSecs}s`}</span>
         </div>
-        <p class="text-xs text-gray-600 mt-1">Vault locks automatically after inactivity (0 = disabled)</p>
+        <p class="text-xs text-muted mt-1">Vault locks automatically after inactivity (0 = disabled)</p>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Tor toggle -->
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-medium text-gray-300">Tor Proxy</p>
-          <p class="text-xs text-gray-500">Route RPC through Tor SOCKS5</p>
+          <p class="text-sm font-medium text-primary">Tor Proxy</p>
+          <p class="text-xs text-muted">Route RPC through Tor SOCKS5</p>
         </div>
         <button
-          class="relative w-11 h-6 rounded-full transition-colors {torEnabled ? 'bg-vault-600' : 'bg-gray-700'}"
+          class="relative w-11 h-6 rounded-full transition-colors {torEnabled ? 'bg-vault-600' : 'bg-surface-hover'}"
           onclick={handleTorToggle}
           role="switch"
           aria-checked={torEnabled}
+          aria-label="Toggle Tor proxy"
         >
           <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {torEnabled ? 'translate-x-5' : ''}"></span>
         </button>
       </div>
 
-      <hr class="border-gray-800" />
-
-      <!-- Theme Selector -->
-      <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">🎨 Theme</p>
-        <div class="flex gap-2">
-          {#each ['dark', 'light', 'system'] as t}
-            <button
-              class="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all
-                {vault.theme === t
-                  ? 'bg-vault-600 text-white shadow-sm'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700/50'}"
-              onclick={() => setTheme(t as 'light' | 'dark' | 'system')}
-            >
-              {t === 'dark' ? '🌙 Dark' : t === 'light' ? '☀️ Light' : '💻 System'}
-            </button>
-          {/each}
-        </div>
-      </div>
-
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Testnet toggle with beta warning -->
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-medium text-gray-300">Testnet-Only Mode</p>
-          <p class="text-xs text-gray-500">{testnetOnly ? 'Only test networks shown' : 'Mainnets and testnets both visible'}</p>
+          <p class="text-sm font-medium text-primary">Testnet-Only Mode</p>
+          <p class="text-xs text-muted">{testnetOnly ? 'Only test networks shown' : 'Mainnets and testnets both visible'}</p>
         </div>
         <button
-          class="relative w-11 h-6 rounded-full transition-colors {testnetOnly ? 'bg-amber-600' : 'bg-gray-700'}"
+          class="relative w-11 h-6 rounded-full transition-colors {testnetOnly ? 'bg-amber-600' : 'bg-surface-hover'}"
+          aria-label="Toggle testnet-only mode"
           onclick={() => {
             if (testnetOnly) {
               // Turning testnet-only OFF — show beta warning
@@ -179,11 +159,11 @@
         </button>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Lock vault -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">Security</p>
+        <p class="text-sm font-medium text-primary mb-2">Security</p>
         {#if lockResult === 'locked'}
           <p class="text-xs text-vault-400 mb-2">✅ Vault locked</p>
         {:else if lockResult === 'error'}
@@ -194,11 +174,11 @@
         </button>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Seed Phrase Re-export -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">📝 Seed Recovery</p>
+        <p class="text-sm font-medium text-primary mb-2">📝 Seed Recovery</p>
         {#if !showSeedConfirm && !seedPhrase}
           <button class="btn-secondary text-sm w-full" disabled={!vault.connected || !vault.initialized} onclick={() => showSeedConfirm = true}>
             Show Seed Phrase
@@ -207,14 +187,14 @@
           <div class="bg-amber-900/20 border border-amber-700/30 rounded-xl p-4 text-xs text-amber-300 space-y-2">
             <p>⚠️ <strong>Your seed phrase gives full access to your wallet.</strong></p>
             <p>Never share it. Never type it into any website. Anyone with these words can steal your funds.</p>
-            <p class="text-gray-400">Only reveal in a private, secure environment.</p>
+            <p class="text-secondary">Only reveal in a private, secure environment.</p>
             <div class="flex gap-2 mt-3">
               <button class="btn-secondary text-xs flex-1" onclick={() => showSeedConfirm = false}>Cancel</button>
               <button class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold py-2 px-3 rounded-lg flex-1" onclick={handleShowSeed}>I Understand — Reveal</button>
             </div>
           </div>
         {:else if seedLoading}
-          <p class="text-xs text-gray-400">Loading seed phrase...</p>
+          <p class="text-xs text-secondary">Loading seed phrase...</p>
         {:else if seedError}
           <p class="text-xs text-red-400">{seedError}</p>
           <button class="btn-secondary text-xs mt-2" onclick={() => { showSeedConfirm = true; seedError = ''; }}>Try Again</button>
@@ -222,7 +202,7 @@
           {#if !seedRevealed}
             <button class="btn-secondary text-sm w-full" onclick={() => seedRevealed = true}>👁️ Click to Reveal</button>
           {:else}
-            <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 font-mono text-xs text-gray-200 leading-relaxed break-all select-all">
+            <div class="bg-surface border border-strong rounded-lg p-3 font-mono text-xs text-primary leading-relaxed break-all select-all">
               {seedPhrase}
             </div>
             <div class="flex gap-2 mt-2">
@@ -237,21 +217,21 @@
         {/if}
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Donate -->
       <div class="text-center">
-        <a href="https://github.com/sponsors/YOUR_USERNAME" target="_blank" rel="noopener"
+        <a href="https://github.com/nousresearch/fosscryptocore" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 text-xs text-vault-400 hover:text-vault-300 transition-colors">
           ❤️ Donate — support open-source development
         </a>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Vault file management -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">💾 Vault File</p>
+        <p class="text-sm font-medium text-primary mb-2">💾 Vault File</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={async () => {
@@ -273,42 +253,42 @@
         >
           📤 Export Current Keystore…
         </button>
-        <p class="text-xs text-gray-600 mt-1">Save your encrypted keystore file to a custom location</p>
+        <p class="text-xs text-muted mt-1">Save your encrypted keystore file to a custom location</p>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Debug Console -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">📟 Debug Console</p>
+        <p class="text-sm font-medium text-primary mb-2">📟 Debug Console</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={() => showConsole = true}
         >
           Open IPC Console
         </button>
-        <p class="text-xs text-gray-600 mt-1">Live log of all JSON-RPC calls — green for success, red for errors</p>
+        <p class="text-xs text-muted mt-1">Live log of all JSON-RPC calls — green for success, red for errors</p>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Debug Report -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">🔍 Debug Report</p>
+        <p class="text-sm font-medium text-primary mb-2">🔍 Debug Report</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={() => showDebugReport = true}
         >
           Generate Debug Report
         </button>
-        <p class="text-xs text-gray-600 mt-1">Creates a privacy-safe report for bug triage — review, redact, and share</p>
+        <p class="text-xs text-muted mt-1">Creates a privacy-safe report for bug triage — review, redact, and share</p>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Bug Reporter -->
       <div>
-        <p class="text-sm font-medium text-gray-300 mb-2">🐛 Beta Feedback</p>
+        <p class="text-sm font-medium text-primary mb-2">🐛 Beta Feedback</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={async () => {
@@ -316,21 +296,20 @@
               await invoke('report_bug', { description: '' });
             } catch (e) {
               // Fallback: open manually
-              // REPLACE_ME: Change YOUR_GITHUB_ORG and YOUR_GITHUB_REPO to your actual GitHub org and repo name
-              const url = 'https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO/issues/new';
+              const url = 'https://github.com/nousresearch/fosscryptocore/issues/new';
               window.open(url, '_blank');
             }
           }}
         >
           Report a Bug
         </button>
-        <p class="text-xs text-gray-600 mt-1">Opens a pre-filled GitHub issue with crash data</p>
+        <p class="text-xs text-muted mt-1">Opens a pre-filled GitHub issue with crash data</p>
       </div>
 
-      <hr class="border-gray-800" />
+      <hr class="border-default" />
 
       <!-- Version -->
-      <div class="text-xs text-gray-600 text-center">
+      <div class="text-xs text-muted text-center">
         v0.1.0-beta
       </div>
     </div>
@@ -348,10 +327,10 @@
   aria-modal="true"
   onclick={() => showConsole = false}
 >
-  <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">📟 IPC Console</h2>
-      <button class="text-gray-500 hover:text-gray-300 text-xl leading-none" onclick={() => showConsole = false}>&times;</button>
+      <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => showConsole = false}>&times;</button>
     </div>
     <div class="flex-1 overflow-hidden">
       <ConsoleLog />
@@ -366,13 +345,15 @@
   class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
   role="alertdialog"
   aria-modal="true"
+  tabindex="-1"
   onclick={() => { if (!pendingTestnetToggle) showTestnetWarning = false; }}
+  onkeydown={(e) => { if (e.key === 'Escape') showTestnetWarning = false; }}
 >
-  <div class="bg-gray-900 border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="text-center space-y-4">
       <div class="text-4xl">⚠️</div>
       <h3 class="text-lg font-semibold text-amber-400">Mainnet Access</h3>
-      <div class="text-sm text-gray-300 space-y-2">
+      <div class="text-sm text-primary space-y-2">
         <p><strong>This is beta software.</strong> Gullbúr Enclave Core v0.1.0 has not been audited and may contain bugs.</p>
         <p>Disabling testnet-only mode will show real mainnet accounts. Only proceed if you understand the risks and are testing with small amounts.</p>
       </div>
@@ -390,7 +371,7 @@
           I Understand — Continue
         </button>
       </div>
-      <p class="text-xs text-gray-500">This warning will appear each time you re-enable mainnets.</p>
+      <p class="text-xs text-muted">This warning will appear each time you re-enable mainnets.</p>
     </div>
   </div>
 </div>

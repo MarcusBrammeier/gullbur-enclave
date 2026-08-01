@@ -1,5 +1,6 @@
 <script lang="ts">
   import { vault, getAccountLabel } from '../vault.svelte.ts';
+  // qrcode has no TS types — runtime import only
 
   interface Props {
     onclose: () => void;
@@ -25,14 +26,13 @@
       mod.toDataURL(currentAccount.address, {
         width: 256,
         margin: 2,
-        color: { dark: '#fbbf24', light: '#000000' },
+        color: { dark: '#fbbf24', light: '#00000000' },
       }).then((url: string) => { qrDataUrl = url; }).catch(() => { qrDataUrl = null; });
     }).catch(() => { qrDataUrl = null; });
   });
 
   function handleNetworkChange() {
-    const sel = (document.getElementById('receive-network-select') as HTMLSelectElement)?.value;
-    if (sel) { selectedNetwork = sel; selectedAccountIdx = 0; }
+    selectedNetwork = (document.getElementById('receive-network-select') as HTMLSelectElement)?.value;
   }
 
   async function copyAddress() {
@@ -59,13 +59,14 @@
   role="dialog"
   aria-modal="true"
   aria-label="Receive funds"
+  tabindex="-1"
   onclick={onclose}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">Receive</h2>
-      <button class="text-gray-500 hover:text-gray-300 text-xl leading-none" onclick={onclose}>&times;</button>
+      <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
     </div>
 
     <!-- Network selector -->
@@ -91,12 +92,12 @@
           {#if qrDataUrl}
             <img src={qrDataUrl} alt="Address QR code" class="w-48 h-48" />
           {:else}
-            <div class="w-48 h-48 flex items-center justify-center text-gray-600 text-sm">Loading QR…</div>
+            <div class="w-48 h-48 flex items-center justify-center text-muted text-sm">Loading QR…</div>
           {/if}
         </div>
 
         <!-- Address -->
-        <div class="w-full bg-gray-800 rounded-lg px-3 py-2 font-mono text-xs text-gray-300 break-all text-center mb-4">
+        <div class="w-full bg-surface rounded-lg px-3 py-2 font-mono text-xs text-primary break-all text-center mb-4">
           {currentAccount.address}
         </div>
 
@@ -109,8 +110,8 @@
       </div>
     {:else}
       <div class="text-center py-8">
-        <p class="text-gray-500 text-sm">No account on {selectedNetwork}.</p>
-        <p class="text-gray-600 text-xs mt-1">Create an account first from the Dashboard.</p>
+        <p class="text-muted text-sm">No account on {selectedNetwork}.</p>
+        <p class="text-muted text-xs mt-1">Create an account first from the Dashboard.</p>
       </div>
     {/if}
   </div>

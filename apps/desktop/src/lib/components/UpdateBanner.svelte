@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { IS_DEMO } from '../constants';
 
   interface UpdateInfo {
     local_version: string;
@@ -17,7 +18,7 @@
 
   onMount(async () => {
     try {
-      if (!(window as any).__DEMO__) {
+      if (!IS_DEMO) {
         const { invoke } = await import('@tauri-apps/api/core');
         const result = await invoke('check_for_updates') as UpdateInfo;
         info = result;

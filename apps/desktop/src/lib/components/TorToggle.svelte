@@ -16,8 +16,8 @@
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const isOn = $derived(vault.torEnabled);
-  const dotColor = $derived(isOn ? 'bg-purple-500' : 'bg-gray-600');
-  const dotShadow = $derived(isOn ? 'shadow-[0_0_6px_#a855f7]' : '');
+  // dotColor unused — TorToggle uses SVG+text classes directly
+  // dotShadow unused — kept for potential future glow effect
   const labelText = $derived(isOn ? 'Tor: On' : 'Tor: Off');
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -50,14 +50,14 @@
 </script>
 
 <button
-  class="flex items-center gap-1.5 {size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 hover:text-gray-300 transition-colors"
+  class="flex items-center gap-1.5 {size === 'sm' ? 'text-xs' : 'text-sm'} text-muted hover:text-primary transition-colors"
   onclick={toggleTor}
   disabled={switching}
   title={isOn ? 'Disable Tor routing' : 'Enable Tor routing'}
 >
   <!-- Tor onion icon -->
   <svg
-    class="w-3.5 h-3.5 {isOn ? 'text-purple-400' : 'text-gray-600'}"
+    class="w-3.5 h-3.5 {isOn ? 'text-purple-400' : 'text-muted'}"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -75,7 +75,7 @@
   {/if}
 
   {#if switching}
-    <span class="animate-spin inline-block w-2.5 h-2.5 border-2 border-gray-400 border-t-transparent rounded-full"></span>
+    <span class="animate-spin inline-block w-2.5 h-2.5 border-2 border-strong border-t-transparent rounded-full"></span>
   {/if}
 </button>
 

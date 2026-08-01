@@ -1,15 +1,14 @@
 /**
  * MockIpcClient — simulates vault-core IPC for the demo UI.
  * Returns realistic fake data for every vault method.
- */
-import type { JsonRpcResponse } from './IpcClient';
+  */
 
-interface PendingCall {
-  resolve: (v: unknown) => void;
-  reject: (e: Error) => void;
-}
+ interface PendingCall {
+   resolve: (v: unknown) => void;
+   reject: (e: Error) => void;
+ }
 
-export class MockIpcClient {
+ export class MockIpcClient {
   private nextId = 1;
   private pending = new Map<number, PendingCall>();
   private connected = false;
@@ -39,7 +38,7 @@ export class MockIpcClient {
     return this.handleMethod(method, params, id);
   }
 
-  private handleMethod(method: string, params: unknown, id: number): unknown {
+  private handleMethod(method: string, params: unknown, _id: number): unknown {
     switch (method) {
       case 'vault.status':
         return {
@@ -49,11 +48,11 @@ export class MockIpcClient {
           tor_enabled: false,
           active_plugins: ['btc', 'evm', 'xmr'],
           networks: [
-            { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'arbitrum', name: 'Arbitrum One', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'polygon', name: 'Polygon', symbol: 'POL', decimals: 18, is_testnet: false },
-            { id: 'sepolia', name: 'Sepolia', symbol: 'ETH', decimals: 18, is_testnet: true },
+            { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'arbitrum', name: 'Arbitrum One', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'polygon', name: 'Polygon', symbol: 'POL', decimals: 18, is_testnet: false, active: true, unit: 'POL' },
+            { id: 'sepolia', name: 'Sepolia', symbol: 'ETH', decimals: 18, is_testnet: true, active: true, unit: 'ETH' },
           ],
           accounts: [
             { id: 'ethereum-0', network: 'ethereum', address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', balance: { confirmed: '3.452', unconfirmed: '0' }, index: 0, path: "m/44'/60'/0'/0/0" },
@@ -72,7 +71,9 @@ export class MockIpcClient {
             id: `${(params as any).network}-${(params as any).index ?? 0}`,
             network: (params as any).network,
             address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-            balance: '0',
+            balance: { confirmed: '0', unconfirmed: '0' },
+            index: (params as any).index ?? 0,
+            path: `m/44'/60'/${(params as any).index ?? 0}'/0/0`,
           },
         };
 
@@ -86,12 +87,54 @@ export class MockIpcClient {
         return { tx_hash: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('') };
 
       case 'vault.get_transaction_history':
-        return [
-          { txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''), from_address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', to_address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', amount: '0.05', fee: '0.002', block_height: 11234567, timestamp: Date.now() / 1000 - 3600, status: 'confirmed' },
-          { txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''), from_address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', to_address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', amount: '0.12', fee: '0.003', block_height: 11234500, timestamp: Date.now() / 1000 - 7200, status: 'confirmed' },
-          { txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''), from_address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', to_address: '0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97', amount: '1.0', fee: '0.005', block_height: 11234400, timestamp: Date.now() / 1000 - 14400, status: 'confirmed' },
-          { txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''), to_address: '0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', amount: '0.5', fee: null, block_height: null, timestamp: Date.now() / 1000 - 300, status: 'pending' },
-        ];
+        return {
+          transactions: [
+            {
+              txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+              to: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+              amount: '0.05',
+              unit: 'ETH',
+              direction: 'sent',
+              status: 'confirmed',
+              blockHeight: 11234567,
+              timestamp: Math.floor(Date.now() / 1000 - 3600),
+            },
+            {
+              txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              from: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+              to: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+              amount: '0.12',
+              unit: 'ETH',
+              direction: 'received',
+              status: 'confirmed',
+              blockHeight: 11234500,
+              timestamp: Math.floor(Date.now() / 1000 - 7200),
+            },
+            {
+              txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+              to: '0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97',
+              amount: '1.0',
+              unit: 'ETH',
+              direction: 'sent',
+              status: 'confirmed',
+              blockHeight: 11234400,
+              timestamp: Math.floor(Date.now() / 1000 - 14400),
+            },
+            {
+              txid: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              from: '',
+              to: '0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B',
+              amount: '0.5',
+              unit: 'ETH',
+              direction: 'received',
+              status: 'pending',
+              blockHeight: undefined,
+              timestamp: Math.floor(Date.now() / 1000 - 300),
+            },
+          ],
+        };
 
       case 'vault.estimate_fee':
         return { fast: '15.2', medium: '12.8', slow: '10.1', unit: 'gwei' };
@@ -102,11 +145,11 @@ export class MockIpcClient {
       case 'vault.list_networks':
         return {
           networks: [
-            { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'arbitrum', name: 'Arbitrum One', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, is_testnet: false },
-            { id: 'polygon', name: 'Polygon', symbol: 'POL', decimals: 18, is_testnet: false },
-            { id: 'sepolia', name: 'Sepolia', symbol: 'ETH', decimals: 18, is_testnet: true },
+            { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'arbitrum', name: 'Arbitrum One', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
+            { id: 'polygon', name: 'Polygon', symbol: 'POL', decimals: 18, is_testnet: false, active: true, unit: 'POL' },
+            { id: 'sepolia', name: 'Sepolia', symbol: 'ETH', decimals: 18, is_testnet: true, active: true, unit: 'ETH' },
           ],
         };
 

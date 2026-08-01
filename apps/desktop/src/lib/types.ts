@@ -125,3 +125,8 @@ export interface VaultSimulateTransferResponse {
 export interface VaultBroadcastTransactionResponse {
   txid: string;
 }
+
+/** Response from vault.get_transaction_history */
+export interface VaultGetTransactionHistoryResponse {
+  transactions: TxRecord[];
+}

@@ -21,9 +21,17 @@ android {
             excludes += setOf(
                 "META-INF/LICENSE*",
                 "META-INF/NOTICE*",
+                "META-INF/*-LICENSE",
+                "META-INF/*-NOTICE",
+                "META-INF/**/LICENSE*",
+                "META-INF/**/NOTICE*",
                 "META-INF/licenses/**",
                 "META-INF/*.version",
                 "META-INF/*.kotlin_module",
+                "META-INF/versions/**",
+                "META-INF/com/android/build/gradle/**",
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
                 "kotlin/**",
             )
         }
@@ -39,6 +47,7 @@ android {
             abiFilters += listOf("arm64-v8a")
         }
     }
+    ndkVersion = "27.1.12297006"
 
     buildTypes {
         getByName("debug") {
@@ -92,3 +101,31 @@ dependencies {
 }
 
 apply(from = "tauri.build.gradle.kts")
+
+// ──────────────────────────────────────────────
+// Post-build: strip .eh_frame sections from native libs
+// With panic=abort, DWARF unwind tables are dead weight (~10% of .so)
+// ──────────────────────────────────────────────
+val stripName = "mergeUniversalReleaseNativeLibs"
+tasks.matching { it.name == stripName }.all {
+    doLast {
+        val ndkDir = android.ndkDirectory
+        val objcopy = file(
+            "$ndkDir/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy"
+        )
+        outputs.files.forEach { outputDir: java.io.File ->
+            outputDir.walkTopDown()
+                .filter { it.name.endsWith(".so") }
+                .forEach { so: java.io.File ->
+                    exec {
+                        commandLine(
+                            objcopy.absolutePath,
+                            "--remove-section=.eh_frame",
+                            "--remove-section=.eh_frame_hdr",
+                            so.absolutePath
+                        )
+                    }
+                }
+        }
+    }
+}
