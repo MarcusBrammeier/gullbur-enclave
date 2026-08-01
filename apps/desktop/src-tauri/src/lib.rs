@@ -151,10 +151,9 @@ pub fn run() {
                 let win = window.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                    let _ = win.set_size(tauri::LogicalSize::new(1200.0, 800.0))
+                    let _ = win
+                        .set_size(tauri::LogicalSize::new(1200.0, 800.0))
                         .inspect_err(|e| tracing::warn!("set_size: {e}"));
-                    let _ = win.center()
-                        .inspect_err(|e| tracing::warn!("center: {e}"));
                 });
             }
 

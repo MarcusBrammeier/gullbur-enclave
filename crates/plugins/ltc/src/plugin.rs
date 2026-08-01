@@ -154,8 +154,8 @@ impl WalletPlugin for LtcPlugin {
         PluginMetadata {
             description: "Litecoin — Scrypt-based cryptocurrency, FPI reference implementation. BIP-84 key derivation, PSBT signing, Esplora-backed queries.",
             author: "Gullbúr Enclave",
-            homepage: "https://github.com/gullbur/gullburcore",
-            repository: "https://github.com/gullbur/gullburcore",
+            homepage: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
+            repository: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
             min_wallet_version: "0.1.0",
             tags: &["litecoin", "ltc", "reference", "scrypt", "bip84"],
         }

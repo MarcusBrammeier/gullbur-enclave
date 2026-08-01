@@ -1,7 +1,7 @@
+use serial_test::serial;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use vault_core::Vault;
-use serial_test::serial;
 
 /// Helper: create a temp HOME and init the vault
 async fn init_vault_in(dir: &std::path::Path) -> Vault {

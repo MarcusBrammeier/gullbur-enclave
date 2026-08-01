@@ -19,7 +19,7 @@
 use ipc_core::handler::MessageHandler;
 use ipc_protocol::RpcError;
 use rand::TryRngCore;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

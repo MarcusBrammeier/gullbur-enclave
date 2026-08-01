@@ -59,7 +59,7 @@ impl IpcServer {
                         let _ = std::fs::create_dir_all(&p);
                         p.to_string_lossy().to_string()
                     })
-                    .ok_or_else(|| std::env::VarError::NotPresent)
+                    .ok_or(std::env::VarError::NotPresent)
             })
             .unwrap_or_else(|_| {
                 // Last resort: current working dir (app-specific on mobile)
