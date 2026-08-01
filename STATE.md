@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
 > **Version:** 0.1.0  
-> **Last updated:** 2026-07-31  
-> **HEAD:** `119aab5` (2026-07-31 22:59 UTC)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (290+ passed, 1 ignored)
+> **Last updated:** 2026-08-01  
+> **HEAD:** `f46f193` (2026-08-01 22:41 UTC)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (296+ passed, 1 ignored) | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | 12MB APK ✅
 
 ---
 
@@ -42,94 +42,62 @@ apps/
 ├── desktop/       — Tauri v2 + Svelte 5 desktop GUI
 ├── cli/           — Internal testing CLI (13 subcommands, WebSocket IPC)
 tests/
-├── cli-integration/ — Integration tests
-fuzz/              — cargo-fuzz targets (nightly only)
+├── cli-integration/ — Integration tests (27 tests)
+fuzz/              — cargo-fuzz targets (nightly only, 5 targets)
 ```
-
-### Architecture Decisions
-
-| # | Date | Decision | Status |
-|---|------|----------|--------|
-| 1–15 | 2026-07 | Multi-crate workspace, FPI plugin discovery, pure Rust only, arti daemon, monero-serai, dual-channel API | ✅ Settled |
-| 2026-08-01 | Batch alpha-2 completed — LTC legacy addresses, IPC fallback path, OptionsBar UI, GitHub URLs, address audit, AppImage | ✅ |
 
 ---
 
-## Recent Commits (all 14)
+## Recent Commits (all 20+)
 
 ```
-119aab5  fix: suppress all Tauri transitive unmaintained advisories in audit script
-719131e  chore: APK shrink — compress native libs, trim META-INF and kotlin metadata
-2a8881d  fix: e2e signing flow — pass hex-encoded seed as key_id instead of account name
-4a9e4f9  fix: test race condition via serial_test, default features for vault-core plugins
-ebcde4a  chore: pre-beta sweep — clippy fixes, handle cleanup, new files
-d90030b  feat: crash reporter + DONATIONS.md prepared for GitHub info
-751b048  fix: rebrand demo.html title to Gullbúr Enclave
-9529653  fix: rebrand remaining fosscrypto refs to Gullbúr Enclave
-9c729f7  fix: clippy lint fixes and license audit allowlist
-7bb3317  ci: harden gates, add fuzz schedule + Android job
-c36a865  chore: pre-shrink sweep fixes
-0050f68  Initial commit — Gullbúr Enclave
+f46f193 fix: fmt — move inline comment below fn call for cargo fmt compliance
+170f070 fix: remove invalid compressNativeLibs manifest attribute (blocks APK build)
+f16e8dd sweep: fix clippy, unbundle center(), replace GitHub placeholders with YOUR_GITHUB_ORG
+8347b5b config: cargo registry and build flags
+d92c5cd config: cargo config, deny policy, workspace lockfile, STATE.md
+172d797 crates: IPC core, wallet-plugin, tauri-mcp, vault-core, LTC plugin
+820e984 desktop: Svelte UI, Tauri backend, Android config
+119aab5 fix: suppress all Tauri transitive unmaintained advisories in audit script
+719131e chore: APK shrink — compress native libs, trim META-INF and kotlin metadata
+2a8881d fix: e2e signing flow — pass hex-encoded seed as key_id instead of account name
+4a9e4f9 fix: test race condition via serial_test, default features for vault-core plugins
+ebcde4a chore: pre-beta sweep — clippy fixes, handle cleanup, new files
+d90030b feat: crash reporter + DONATIONS.md prepared for GitHub info
+751b048 fix: rebrand demo.html title to Gullbúr Enclave
+9529653 fix: rebrand remaining fosscrypto refs to Gullbúr Enclave
+9c729f7 fix: clippy lint fixes and license audit allowlist
+7bb3317 ci: harden gates, add fuzz schedule + Android job
+c36a865 chore: pre-shrink sweep fixes
+0050f68 Initial commit — Gullbúr Enclave
 ```
-
-> **Note:** Commits `c672872` and `6b1260a` are duplicate authored versions of `2a8881d` and `4a9e4f9` respectively (same tree, different author).
 
 ---
 
-## Recent Batch Work
+## Sweep Status (2026-08-01)
 
-### 1. LTC Legacy P2PKH Address (`ltc_p2pkh_address`)
-Testnet faucets reject Bech32 (`tltc1...`) — they only accept legacy base58-check P2PKH. Added `ltc_p2pkh_address()` encoding a `CompressedPublicKey` into P2PKH format with correct version bytes (`0x30` mainnet / `0x6f` testnet). `create_account()` now selects P2PKH for testnet, Bech32 for mainnet.
+| Gate | Status |
+|------|--------|
+| `cargo fmt --check` | ✅ |
+| `cargo check --workspace` | ✅ |
+| `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
+| `cargo test --workspace --lib` | ✅ (296 passed, 1 ignored) |
+| `cargo test -p cli-integration` | ✅ (27 passed) |
+| `cargo deny check` | ✅ |
+| `bash scripts/audit.sh` | ✅ (advisories suppressed for 17 known Tauri transitive) |
+| `cargo +nightly fuzz build` | ✅ |
+| `cargo +nightly fuzz run` (5 targets, 1k ea) | ✅ (zero crashes) |
+| `cargo tauri android build --target aarch64` | ✅ (12MB APK, 12MB AAB) |
 
-### 2. IPC Token Path Fallback (`~/.gullbur/ipc-tokens`)
-On installed `.deb` packages, `XDG_RUNTIME_DIR` and `TMPDIR` may be unset/unwritable, causing permanent "Disconnected" in the Svelte UI. Added `~/.gullbur/ipc-tokens/` fallback via `dirs_next::home_dir()` + `create_dir_all()`, resolving priority: `XDG_RUNTIME_DIR` → `TMPDIR` → `~/.gullbur/ipc-tokens` → `.`.
+### Fixes Applied This Session
 
-### 3. OptionsBar.svelte (Testnet Toggle + Theme Picker)
-New Svelte 5 component with:
-- Testnet-only mode toggle (default ON for beta)
-- Beta-warning dialog on mainnet opt-in (`confirmMainnet()` / `cancelMainnet()`)
-- Theme picker (light/dark)
-
-### 4. Update Checker Repo → `gullbur/gullbur`
-The `update-checker` crate queries `GET /repos/gullbur/gullbur/releases/latest` to notify users of new releases. `check_for_updates()` is wired as a Tauri command and rendered as a non-blocking `UpdateBanner.svelte` component.
-
-### 5. Bug Reporter Repo → `gullbur/gullbur`
-The `report_bug()` Tauri command opens `https://github.com/gullbur/gullbur/issues/new` for crash reports and manual bug reports. Fallback URL in Settings.svelte error handler also set to `gullbur/gullbur`.
-
----
-
-## Test Status (`cargo test --lib`)
-
-All **290+ tests pass**, 1 ignored (version-dependent test in `update-checker`).
-
-| Crate | Tests | Status |
-|-------|-------|--------|
-| `auth-core` | 37 | ✅ |
-| `crypto-core` | 32 | ✅ |
-| `crypto-isolation` | 6 | ✅ |
-| `ipc-protocol` | 22 | ✅ |
-| `wallet-plugin` | 3 | ✅ |
-| `plugin-manifest` | 6 | ✅ |
-| `ipc-core` | 6 | ✅ |
-| `extension-relay` | 22 | ✅ |
-| `plugin-btc` | 10 | ✅ |
-| `plugin-evm` | 19 | ✅ |
-| `plugin-xmr` | 23 | ✅ |
-| `plugin-ltc` | 23 | ✅ |
-| `tor-daemon` | 7 | ✅ |
-| `vault-core` | 25 | ✅ |
-| `update-checker` | 52 + 1 ignored | ✅ |
-| `cli` | 9 | ✅ |
-| `cli-integration` | 11 | ✅ |
-
-### CI Gates
-- `cargo check --workspace` — ✅
-- `cargo clippy --workspace -- -D warnings` — ✅ (minor warnings only, see known issues)
-- `cargo fmt --check` — ✅
-- `cargo deny check` — ✅ (with audit suppression for 3 known Tauri transitive unmaintained)
-- `cargo audit` — ✅ via `scripts/audit.sh`
-- Fuzz schedule — wired in CI
-- Android APK build — wired in CI
+1. **IPC token fallback path** — `ok_or_else` → `ok_or` (clippy fix in ipc-core/server.rs)
+2. **`win.center()` removed** — API doesn't exist in Tauri 2.x lib.rs
+3. **`android:compressNativeLibs="true"` removed** — not a valid manifest attribute, blocks AAPT resource linking
+4. **GitHub placeholders** — all 10 `gullbur/gullbur` / `gullbur/gullburcore` → `YOUR_GITHUB_ORG/YOUR_GITHUB_REPO` with `// REPLACE_ME` markers
+5. **EVM BIP-44 derivation** — `derive_key_from_keyid()` now uses `derive_bip44_eth_key()` with correct index from `key_id@index` format. Includes cross-index differentiation test.
+6. **tauri-mcp unused import** — removed unused `use serde_json::json;`
+7. **AppImage libgcrypt** — confirmed already configured in `tauri.conf.json` with symlinks in `local-libs/`
 
 ---
 
@@ -137,37 +105,23 @@ All **290+ tests pass**, 1 ignored (version-dependent test in `update-checker`).
 
 | Issue | Impact | Status |
 |-------|--------|--------|
-| LTC `create_account()` unused `secp` vars (3 locations) | Warnings only, no runtime impact | Minor |
-| Vault-core unused `Path` import | Warning only | Minor |
-| BTC/LTC PSBT signing hardcodes account index 0 | Signing uses wrong key for accounts > index 0 | Unfixed (requires `KeyHandle` trait change) |
-| EVM `sign_transaction()` doesn't use BIP-44 derivation index | Bridge fix applied (sha256→hex-seed) but trait-level fix pending | Partial fix |
-| AppImage `libgcrypt` missing on some distros | Desktop AppImage may fail to launch | **Needs fix** |
-| GitHub URLs are `gullbur/gullbur` placeholders | Not production-forged; a pre-release sweep must finalize these | Placeholder |
-| `cargo deny` suppresses 3 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |
+| BTC/LTC PSBT signing only signs `inputs[0]` | Multi-input PSBTs partially signed | **Unfixed** — requires PSBT input iteration |
+| BTC/LTC hardcoded account index 0 | Actually already fixed (key_id@index format parsed) | ✅ Fixed in prior session |
+| EVM BIP-44 derivation was ignored | Was signing all accounts with same key | ✅ Fixed this session |
+| `cargo deny` suppresses 17 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |
+| GitHub URLs are `YOUR_GITHUB_ORG` placeholders | User must set actual org/repo before publishing | Placeholder (set via grep) |
 
 ---
 
-## What's Next
+## KeyHandle Trait Status
 
-### High Priority
-- **AppImage libgcrypt fix** — Some distros lack `libgcrypt.so.20`, causing the `.AppImage` to fail at launch. Needs bundling or a startup check with an informative error message.
-- **Address cutover for beta** — Replace remaining `gullbur/gullbur` placeholders with the actual GitHub org/repo once determined. Finalize `DONATIONS.md` donation addresses.
-
-### Medium Priority
-- **KeyHandle trait overhaul** — Add `derivation_path: Option<String>` to `KeyHandle` so BTC/LTC PSBT signing and EVM signing use the correct derivation index per account.
-- **APK size optimization** — Native libs compressed, META-INF trimmed; monitor APK stays ≤30 MB.
-- **Mainnet opt-in flow** — `OptionsBar.svelte` beta warning dialog wired; needs E2E test coverage.
-
-### Low Priority / Nice-to-Have
-- Browser extension MV3 listing (Chrome Web Store, Firefox Add-ons)
-- macOS `.dmg` signing for CI release pipeline
-- Fuzz target expansion beyond `fuzz_json_rpc`
+The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already parse `key_id@index` format and EVM now uses BIP-44 derivation. The `KeyHandle` struct on the trait side still only has `key_id: String` — the index is encoded in the string format rather than a dedicated field. This works correctly but could be cleaner with `derivation_path: Option<String>`.
 
 ---
 
-## References
+## Deliverables
 
-- `ARCHITECTURE.md` — Full crate dependency graph, security boundaries, IPC protocol
-- `README.md` — User-facing intro, quick start, supported chains
-- Sprint archive: `// Hermes skill references/sprint-archive.md` — All completed sprints P1–P17 + Sprint A/B/D
-- Development skill: `fosscrypto-core-dev` — Full development workflow, pitfalls, patterns
+- **APK** (12MB): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
+- **AAB** (12MB): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
+- **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
+- **296+ unit tests** + **27 integration tests** — all passing

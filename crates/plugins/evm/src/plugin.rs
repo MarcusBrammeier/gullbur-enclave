@@ -98,22 +98,44 @@ static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| {
 /// Derive a k256 secret key from a hex seed (stored in key_id)
 /// following the same BIP-44 path as create_account.
 /// This ensures sign_transaction produces the same address as create_account.
+/// key_id format: "64-char-hex-seed@index" (or "0x64-char-hex-seed@index")
 fn derive_key_from_keyid(key_id: &str) -> Result<k256::ecdsa::SigningKey, PluginError> {
-    // Strip optional "@index" suffix added by the IPC handler
-    let seed_hex = key_id.split('@').next().unwrap_or(key_id);
-    let seed_hex = seed_hex.strip_prefix("0x").unwrap_or(seed_hex);
-    let seed_bytes = hex::decode(seed_hex)
+    // Strip optional "0x" prefix
+    let raw = key_id.strip_prefix("0x").unwrap_or(key_id);
+    // Extract seed hex and optional index
+    let (seed_hex, index) = if let Some(at_pos) = raw.find('@') {
+        let seed_part = &raw[..at_pos];
+        let index_part = &raw[at_pos + 1..];
+        let idx: u32 = index_part
+            .parse()
+            .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
+        (seed_part.to_string(), idx)
+    } else {
+        (raw.to_string(), 0u32)
+    };
+    let seed_bytes = hex::decode(&seed_hex)
         .map_err(|e| PluginError::Internal(format!("invalid seed hex: {e}")))?;
-    if seed_bytes.len() < 32 {
-        return Err(PluginError::Internal(
+    // Prefer full BIP-44 derivation (64-byte BIP-39 seed), fallback to raw key bytes
+    if seed_bytes.len() >= 64 {
+        let seed_512: [u8; 64] = {
+            let mut arr = [0u8; 64];
+            arr.copy_from_slice(&seed_bytes[..64]);
+            arr
+        };
+        let secret = crypto_core::keys::derive_bip44_eth_key(&seed_512, index)
+            .map_err(|e| PluginError::Internal(format!("BIP-44 derivation failed: {e}")))?;
+        Ok(k256::ecdsa::SigningKey::from(&secret))
+    } else if seed_bytes.len() >= 32 {
+        let mut key_bytes = [0u8; 32];
+        key_bytes.copy_from_slice(&seed_bytes[..32]);
+        let secret = k256::SecretKey::from_slice(&key_bytes)
+            .map_err(|e| PluginError::Internal(format!("invalid k256 secret key: {e}")))?;
+        Ok(k256::ecdsa::SigningKey::from(&secret))
+    } else {
+        Err(PluginError::Internal(
             "seed too short for key derivation".into(),
-        ));
+        ))
     }
-    let mut key_bytes = [0u8; 32];
-    key_bytes.copy_from_slice(&seed_bytes[..32]);
-    let secret = k256::SecretKey::from_slice(&key_bytes)
-        .map_err(|e| PluginError::Internal(format!("invalid k256 secret key: {e}")))?;
-    Ok(k256::ecdsa::SigningKey::from(&secret))
 }
 
 // ── JSON-RPC helpers ─────────────────────────────────────────────────────────
@@ -759,8 +781,17 @@ mod tests {
         let mut tx_bytes = vec![0x02];
         tx_bytes.extend_from_slice(&list_rlp);
 
+        let seed_64 = {
+            let mut s = [42u8; 64];
+            // Fill the second half with a different pattern so first-32-bytes
+            // fallback would produce different keys
+            for i in 32..64 {
+                s[i] = 42 + (i - 32) as u8;
+            }
+            s
+        };
         let key = KeyHandle {
-            key_id: hex::encode([42u8; 32]), // 32-byte seed as hex
+            key_id: format!("{}@1", hex::encode(seed_64)),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],
         };
@@ -772,6 +803,21 @@ mod tests {
 
         assert_eq!(signed.first(), Some(&0x02));
         assert!(signed.len() > tx_bytes.len());
+
+        // Verify that index 1 produces a different signature than index 0
+        let key0 = KeyHandle {
+            key_id: format!("{}@0", hex::encode(seed_64)),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+        let signed0 = plugin
+            .sign_transaction(&tx_bytes, &key0, "ethereum")
+            .await
+            .expect("sign_transaction should succeed for index 0");
+        assert_ne!(
+            signed, signed0,
+            "different BIP-44 indices must produce different signatures"
+        );
     }
 
     #[tokio::test]

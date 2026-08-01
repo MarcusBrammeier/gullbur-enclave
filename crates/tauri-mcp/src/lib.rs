@@ -4,7 +4,6 @@ use tauri::{
     Manager, Runtime,
     plugin::{Builder, TauriPlugin},
 };
-
 /// Tauri MCP plugin — AI-driven E2E testing tools.
 /// MUST NEVER be compiled into production builds.
 pub struct TauriMcp<R: Runtime> {
