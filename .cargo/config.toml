@@ -3,17 +3,22 @@
 #          i686-linux-android (x86), x86_64-linux-android (x86_64)
 
 [target.aarch64-linux-android]
-linker = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+linker = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+# --no-eh-frame-hdr is compatible with NDK r27 LLVM; remove -fno-unwind-tables flags
+# which were removed in LLVM 19+
+rustflags = [
+    "-C", "link-args=-Wl,--no-eh-frame-hdr",
+]
 
 [target.armv7-linux-androideabi]
-linker = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi35-clang"
+linker = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi35-clang"
 
 [target.i686-linux-android]
-linker = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android35-clang"
+linker = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android35-clang"
 
 [target.x86_64-linux-android]
-linker = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android35-clang"
+linker = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android35-clang"
 
 [env]
-CC_aarch64-linux-android = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
-AR_aarch64-linux-android = "/root/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+CC_aarch64-linux-android = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+AR_aarch64-linux-android = "/opt/android-sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
