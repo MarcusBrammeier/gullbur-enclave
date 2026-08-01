@@ -39,6 +39,7 @@ pub enum TxStatus {
 
 /// A transaction record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TxRecord {
     pub txid: String,
     pub from_address: Option<String>,

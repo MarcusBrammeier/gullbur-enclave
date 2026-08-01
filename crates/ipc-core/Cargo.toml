@@ -9,6 +9,7 @@ repository.workspace = true
 async-trait = { workspace = true }
 axum = "0.8"
 crypto-core = { path = "../crypto-core" }
+dirs-next = "2"
 futures-util = ">=0.3,<1"
 ipc-protocol = { path = "../ipc-protocol" }
 rand = { workspace = true }

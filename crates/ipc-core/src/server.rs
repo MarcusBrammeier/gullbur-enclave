@@ -46,11 +46,21 @@ impl IpcServer {
             .collect();
 
         let token_filename = format!("gullbur-auth-{random_hex}.token");
-        // Use TMPDIR/temp dir, fall back to current dir.
+        // Use TMPDIR/temp dir, fall back to ~/.gullbur/ipc-tokens for installed .deb.
         // On Android we rely on the Tauri setup to set TMPDIR to the app cache dir
         // before calling into this code — see commands.rs launch_ipc_server.
         let base_dir = std::env::var("XDG_RUNTIME_DIR")
             .or_else(|_| std::env::var("TMPDIR"))
+            .or_else(|_| {
+                // Fallback: user home dir .gullbur/ipc-tokens (works on installed .deb)
+                dirs_next::home_dir()
+                    .map(|h| {
+                        let p = h.join(".gullbur").join("ipc-tokens");
+                        let _ = std::fs::create_dir_all(&p);
+                        p.to_string_lossy().to_string()
+                    })
+                    .ok_or_else(|| std::env::VarError::NotPresent)
+            })
             .unwrap_or_else(|_| {
                 // Last resort: current working dir (app-specific on mobile)
                 ".".to_string()

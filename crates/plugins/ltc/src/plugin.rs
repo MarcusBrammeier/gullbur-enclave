@@ -80,6 +80,38 @@ fn ltc_p2wpkh_address(
     Ok(address)
 }
 
+/// Generate a legacy P2PKH (Pay-to-PubKey-Hash) address for Litecoin.
+///
+/// This produces addresses with the legacy prefix:
+/// - Mainnet: `L...` (starting with L or M)
+/// - Testnet: `m...` or `n...`
+///
+/// Many LTC testnet faucets only accept legacy P2PKH addresses (not bech32 `tltc1`),
+/// so this function exists as a fallback when bech32 addresses are rejected.
+fn ltc_p2pkh_address(
+    compressed: &bitcoin::CompressedPublicKey,
+    network: &str,
+) -> Result<String, PluginError> {
+    // Build the address payload: [version_byte] ++ HASH160(compressed_pubkey)
+    let pubkey_hash = compressed.pubkey_hash();
+    let (version_byte, _) = match network {
+        // Litecoin mainnet P2PKH: 0x30 ('L')
+        // Litecoin mainnet P2SH:  0x32 ('M')
+        "litecoin" => (0x30u8, "L"),
+        // Litecoin testnet P2PKH: 0x6f ('m'/'n')
+        // Litecoin testnet P2SH:  0xc4 ('2')
+        "litecoin-testnet" => (0x6fu8, "m"),
+        _ => return Err(PluginError::UnsupportedNetwork(network.into())),
+    };
+
+    let mut payload = Vec::with_capacity(1 + 20);
+    payload.push(version_byte);
+    payload.extend_from_slice(pubkey_hash.as_byte_array());
+
+    let address = bitcoin::base58::encode_check(&payload);
+    Ok(address)
+}
+
 /// Map an LTC network string to a `bitcoin::Network` for BIP-32 / address derivation.
 ///
 /// ⚠️ **Litecoin FPI reference:** This uses Bitcoin's `Network` enum because Litecoin
@@ -162,7 +194,12 @@ impl WalletPlugin for LtcPlugin {
         let compressed = bitcoin::CompressedPublicKey(
             bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &child.private_key),
         );
-        let address_str = ltc_p2wpkh_address(&compressed, network)?;
+        // Use legacy P2PKH address for testnet (most faucets only accept m/n prefix)
+        // and Bech32 segwit for mainnet (modern wallets prefer ltc1).
+        let address_str = match network {
+            "litecoin-testnet" => ltc_p2pkh_address(&compressed, network)?,
+            _ => ltc_p2wpkh_address(&compressed, network)?,
+        };
         Ok(Account {
             id: format!("ltc-{network}-{index}"),
             network: network.into(),

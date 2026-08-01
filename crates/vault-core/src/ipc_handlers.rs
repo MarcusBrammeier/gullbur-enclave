@@ -19,7 +19,7 @@
 use ipc_core::handler::MessageHandler;
 use ipc_protocol::RpcError;
 use rand::TryRngCore;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -505,8 +505,28 @@ pub fn register_vault_handlers(
                     .await
                     .map_err(|e| RpcError::new(-32000, format!("History fetch failed: {e}")))?;
 
-                serde_json::to_value(&records)
-                    .map_err(|e| RpcError::new(-32000, format!("Serialization failed: {e}")))
+                // Map backend TxRecord fields to frontend TxRecord shape
+                let json_records: Vec<Value> = records
+                    .into_iter()
+                    .map(|r| {
+                        let status = match r.status {
+                            wallet_plugin::TxStatus::Pending => "pending",
+                            wallet_plugin::TxStatus::Confirmed { .. } => "confirmed",
+                            wallet_plugin::TxStatus::Failed { .. } => "failed",
+                        };
+                        json!({
+                            "txid": r.txid,
+                            "from": r.from_address.unwrap_or_default(),
+                            "to": r.to_address.unwrap_or_default(),
+                            "amount": r.amount,
+                            "blockHeight": r.block_height,
+                            "timestamp": r.timestamp,
+                            "status": status,
+                        })
+                    })
+                    .collect();
+
+                Ok(json!({ "transactions": json_records }))
             }
         });
     }
