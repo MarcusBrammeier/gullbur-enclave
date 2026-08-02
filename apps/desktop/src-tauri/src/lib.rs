@@ -108,41 +108,10 @@ pub fn run() {
             // Auto-launch IPC server on startup. The launch_ipc_server command
             // handler also checks ipc_handle before re-launching, so a second
             // call from the frontend is safe (no-op if already running).
-            let vs = vault_state.clone();
-            tauri::async_runtime::spawn(async move {
-                let state = vs.read().await;
-                let mut vault_guard = state.vault.write().await;
-                if let Some(ref mut vault) = *vault_guard {
-                    // Try to restore a previously persisted keystore.
-                    // If the keystore exists and decrypts successfully,
-                    // the vault starts already initialized — the user
-                    // can use it without re-entering their mnemonic.
-                    match vault.try_restore().await {
-                        Ok(()) => {
-                            if vault.initialized.load(std::sync::atomic::Ordering::SeqCst) {
-                                tracing::info!("Vault state restored from keystore on disk");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::info!("No persisted keystore to restore ({e}) — fresh start");
-                        }
-                    }
-
-                    match vault.launch(state.ipc_port, None).await {
-                        Ok(()) => {
-                            let mut h = state.ipc_handle.write().await;
-                            *h = vault.take_ipc_handle();
-                            tracing::info!(
-                                "vault-core IPC server launched on 127.0.0.1:{}",
-                                state.ipc_port
-                            );
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to launch vault IPC server: {e}");
-                        }
-                    }
-                }
-            });
+            // NOTE: do NOT spawn the launch here — the frontend calls
+            // invoke('launch_ipc_server') via connect(), and both paths need
+            // vault.write(). Running them concurrently causes a deadlock
+            // on startup, especially on slower devices / Android emulator.
 
             // Force window to configured size on first paint.
             // Tauri v2 on X11 starts webviews at 10×10 on headless Xvfb;

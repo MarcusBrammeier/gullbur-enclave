@@ -115,7 +115,12 @@ export async function connect(): Promise<void> {
     if (!IS_DEMO) {
       const { invoke } = await import('@tauri-apps/api/core');
       try {
-        const port = await invoke<number>('launch_ipc_server');
+        const port = await Promise.race([
+          invoke<number>('launch_ipc_server'),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('launch_ipc_server timed out after 10s')), 10_000)
+          ),
+        ]);
         ipcPort = port;
       } catch (e) {
         vault.vaultStatus = 'IPC server failed to start';

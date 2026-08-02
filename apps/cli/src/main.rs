@@ -85,6 +85,17 @@ enum Commands {
     Status,
 }
 
+/// Translate shorthand network names to canonical IDs expected by vault plugins.
+fn canonical_network(name: &str) -> &str {
+    match name {
+        "btc" => "bitcoin",
+        "xmr" => "monero",
+        "ltc" => "litecoin",
+        "eth" => "ethereum",
+        other => other,
+    }
+}
+
 async fn call(method: &str, params: Value, port: u16) -> Result<Value, String> {
     let url = format!("ws://127.0.0.1:{port}");
     let (ws_stream, _) = connect_async(&url)
@@ -214,10 +225,11 @@ async fn main() {
         }
         Commands::CreateAccount { network, index } => {
             let idx = index.unwrap_or(0);
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.create_account",
-                    serde_json::json!({"network": network, "index": idx}),
+                    serde_json::json!({"network": net, "index": idx}),
                     port,
                 )
                 .await,
@@ -231,10 +243,11 @@ async fn main() {
             );
         }
         Commands::GetBalance { network, address } => {
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.get_balance",
-                    serde_json::json!({"network": network, "address": address}),
+                    serde_json::json!({"network": net, "address": address}),
                     port,
                 )
                 .await,
@@ -248,10 +261,11 @@ async fn main() {
             );
         }
         Commands::ValidateAddress { network, address } => {
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.validate_address",
-                    serde_json::json!({"network": network, "address": address}),
+                    serde_json::json!({"network": net, "address": address}),
                     port,
                 )
                 .await,
@@ -263,10 +277,11 @@ async fn main() {
             to,
             amount,
         } => {
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.estimate_fee",
-                    serde_json::json!({"network": network, "recipient": to, "amount": amount}),
+                    serde_json::json!({"network": net, "recipient": to, "amount": amount}),
                     port,
                 )
                 .await,
@@ -280,10 +295,11 @@ async fn main() {
             amount,
             fee_level,
         } => {
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.sign_transaction",
-                    serde_json::json!({"network": network, "from": from, "to": to, "amount": amount, "feeLevel": fee_level}),
+                    serde_json::json!({"network": net, "from": from, "to": to, "amount": amount, "feeLevel": fee_level}),
                     port,
                 )
                 .await,
@@ -307,10 +323,11 @@ async fn main() {
             limit,
         } => {
             let lim = limit.unwrap_or(10);
+            let net = canonical_network(network);
             print_result(
                 call(
                     "vault.get_transaction_history",
-                    serde_json::json!({"network": network, "address": address, "limit": lim}),
+                    serde_json::json!({"network": net, "address": address, "limit": lim}),
                     port,
                 )
                 .await,
