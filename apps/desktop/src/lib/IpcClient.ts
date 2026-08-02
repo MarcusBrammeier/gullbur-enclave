@@ -31,6 +31,8 @@ export class IpcClient {
   private wasmReady = false;
   private connectResolve: ((value: void) => void) | null = null;
   private connectReject: ((reason: Error) => void) | null = null;
+  /** Timeout (ms) for the WebSocket connection attempt */
+  private static readonly CONNECT_TIMEOUT_MS = 5_000;
 
   /** Log an IPC event to the debug console, if available */
   private log(direction: 'send' | 'receive', method: string | undefined, payload: string, isError: boolean) {
@@ -59,6 +61,15 @@ export class IpcClient {
       const wsPort = port ?? 19876;
       this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
 
+      // Force-reject the promise if the WebSocket doesn't handshake in time
+      const timer = setTimeout(() => {
+        this.ws?.close();
+        this.ws = null;
+        this.connectResolve = null;
+        this.connectReject = null;
+        reject(new Error(`WebSocket connect timed out after ${IpcClient.CONNECT_TIMEOUT_MS}ms`));
+      }, IpcClient.CONNECT_TIMEOUT_MS);
+
       this.ws.onopen = () => {
         // On localhost, skip auth token — the IPC server trusts loopback.
         // The frontend sends a simple "hello" to trigger session key exchange.
@@ -74,6 +85,7 @@ export class IpcClient {
           if (msg.type === "session_key" && msg.key) {
             this.sessionKey = msg.key;
             this.log('receive', 'session_key', 'key exchanged', false);
+            clearTimeout(timer);
             const resolve = this.connectResolve;
             this.connectResolve = null;
             this.connectReject = null;
@@ -119,6 +131,7 @@ export class IpcClient {
       };
 
       this.ws.onerror = () => {
+        clearTimeout(timer);
         const reject = this.connectReject;
         this.connectResolve = null;
         this.connectReject = null;
@@ -126,6 +139,7 @@ export class IpcClient {
       };
 
       this.ws.onclose = () => {
+        clearTimeout(timer);
         for (const [, p] of this.pending) {
           p.reject(new Error("Connection closed"));
         }

@@ -37,10 +37,16 @@
     if (!phrase) { localError = 'Enter a seed phrase or generate a new one.'; return; }
     localError = null;
     step = 'initializing';
+    const timeout = setTimeout(() => {
+      step = 'error';
+      localError = 'Initialization timed out — is the IPC server running?';
+    }, 15_000);
     try {
       await connect();
       await initialize(phrase, passphrase.trim());
+      clearTimeout(timeout);
     } catch (e) {
+      clearTimeout(timeout);
       step = 'error';
       localError = e instanceof Error ? e.message : String(e);
     }
@@ -69,14 +75,21 @@
   function handleConfirmComplete() {
     if (selectedIndexes.length < wordArray.length) return;
     step = 'initializing';
+    const timeout = setTimeout(() => {
+      step = 'error';
+      localError = 'Initialization timed out — is the IPC server running?';
+    }, 15_000);
     connect().then(() => {
       initialize(generatedMnemonic, passphrase.trim()).then(() => {
+        clearTimeout(timeout);
         // App.svelte handles transition to Dashboard via vault.initialized
       }).catch((e) => {
+        clearTimeout(timeout);
         step = 'error';
         localError = e instanceof Error ? e.message : String(e);
       });
     }).catch((e) => {
+      clearTimeout(timeout);
       step = 'error';
       localError = e instanceof Error ? e.message : String(e);
     });
@@ -88,14 +101,21 @@
 
   function handleSkipToInit() {
     step = 'initializing';
+    const timeout = setTimeout(() => {
+      step = 'error';
+      localError = 'Initialization timed out — is the IPC server running?';
+    }, 15_000);
     connect().then(() => {
       initialize(generatedMnemonic, passphrase.trim()).then(() => {
+        clearTimeout(timeout);
         // App.svelte handles transition to Dashboard via vault.initialized
       }).catch((e) => {
+        clearTimeout(timeout);
         step = 'error';
         localError = e instanceof Error ? e.message : String(e);
       });
     }).catch((e) => {
+      clearTimeout(timeout);
       step = 'error';
       localError = e instanceof Error ? e.message : String(e);
     });

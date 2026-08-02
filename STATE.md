@@ -105,7 +105,7 @@ c36a865 chore: pre-shrink sweep fixes
 
 | Issue | Impact | Status |
 |-------|--------|--------|
-| BTC/LTC PSBT signing only signs `inputs[0]` | Multi-input PSBTs partially signed | **Unfixed** — requires PSBT input iteration |
+| BTC/LTC PSBT signing only signs `inputs[0]` | Was only signing first input — multi-input PSBTs partially signed | ✅ Fixed this session — loop over all inputs |
 | BTC/LTC hardcoded account index 0 | Actually already fixed (key_id@index format parsed) | ✅ Fixed in prior session |
 | EVM BIP-44 derivation was ignored | Was signing all accounts with same key | ✅ Fixed this session |
 | `cargo deny` suppresses 17 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |

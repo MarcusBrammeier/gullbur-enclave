@@ -100,7 +100,7 @@ export async function connect(): Promise<void> {
   }
 
   vault.error = null;
-  vault.vaultStatus = 'Connecting…';
+  vault.vaultStatus = 'Starting IPC server…';
 
   try {
     // The vault IPC server is auto-launched during app startup.
@@ -110,7 +110,21 @@ export async function connect(): Promise<void> {
       // Demo mode uses mock — skip real IPC
     }
 
-    // 1. Connect the WebSocket client with retry
+    // 1. Ensure the IPC server is actually listening by invoking the
+    //    Tauri command. Returns the port or errors immediately.
+    if (!IS_DEMO) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      try {
+        const port = await invoke<number>('launch_ipc_server');
+        ipcPort = port;
+      } catch (e) {
+        vault.vaultStatus = 'IPC server failed to start';
+        vault.error = e instanceof Error ? e.message : String(e);
+        throw new Error(`IPC server launch failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    // 2. Connect the WebSocket client with retry
     let IpcClientClass: new () => IpcClient;
 
     if (IS_DEMO) {
@@ -124,11 +138,11 @@ export async function connect(): Promise<void> {
     // Retry the WebSocket connection with exponential backoff — the IPC server
     // on Android may not be listening immediately after launch_ipc_server returns.
     let lastError: unknown;
-    const maxAttempts = 10;
+    const maxAttempts = 5;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
         vault.vaultStatus = `Connecting… (attempt ${attempt + 1}/${maxAttempts})`;
-        await new Promise(r => setTimeout(r, 200 * Math.pow(1.5, attempt)));
+        await new Promise(r => setTimeout(r, 100 * Math.pow(2, attempt)));
       }
       try {
         client = new IpcClientClass();
