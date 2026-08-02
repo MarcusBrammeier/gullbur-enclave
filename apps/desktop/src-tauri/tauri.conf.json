@@ -48,8 +48,8 @@
       "appimage": {
         "bundleMediaFramework": true,
         "files": {
-          "local-libs/libgcrypt.so.20": "usr/lib/libgcrypt.so.20",
-          "local-libs/libgpg-error.so.0": "usr/lib/libgpg-error.so.0"
+          "usr/lib/libgcrypt.so.20": "local-libs/libgcrypt.so.20",
+          "usr/lib/libgpg-error.so.0": "local-libs/libgpg-error.so.0"
         }
       }
     }
