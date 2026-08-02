@@ -222,10 +222,6 @@ impl WalletPlugin for LtcPlugin {
         if psbt.inputs.is_empty() {
             return Err(PluginError::Internal("PSBT has no inputs".into()));
         }
-        let utxo = psbt.inputs[0]
-            .witness_utxo
-            .as_ref()
-            .ok_or_else(|| PluginError::Internal("PSBT missing witness UTXO".into()))?;
         // Decode seed from key_id (format: "hex_seed@index" or "0xhex_seed@index")
         let (seed_hex, acct_index): (String, u32) = {
             let raw = key.key_id.strip_prefix("0x").unwrap_or(&key.key_id);
@@ -258,23 +254,36 @@ impl WalletPlugin for LtcPlugin {
         );
         let bitcoin_pubkey: bitcoin::PublicKey = compressed_pubkey.into();
         let secret_bytes = child.private_key.secret_bytes();
+
+        // Shared signing context (same account key for all inputs)
         let sighash_type = bitcoin::sighash::EcdsaSighashType::All;
         let mut sighasher = SighashCache::new(&psbt.unsigned_tx);
-        let sighash = sighasher
-            .p2wpkh_signature_hash(0, &utxo.script_pubkey, utxo.value, sighash_type)
-            .map_err(|e| PluginError::Internal(format!("sighash: {e}")))?;
         let secp_signer = bitcoin::secp256k1::Secp256k1::signing_only();
         let secret_key = bitcoin::secp256k1::SecretKey::from_slice(&secret_bytes)
             .map_err(|e| PluginError::Internal(format!("invalid key: {e}")))?;
-        let msg = bitcoin::secp256k1::Message::from_digest(*sighash.as_ref());
-        let secp_sig = secp_signer.sign_ecdsa(&msg, &secret_key);
-        let mut sig_bytes = secp_sig.serialize_der().to_vec();
-        sig_bytes.push(sighash_type.to_u32() as u8);
-        let bitcoin_sig = bitcoin::ecdsa::Signature::from_slice(&sig_bytes)
-            .map_err(|e| PluginError::Internal(format!("sig conversion: {e}")))?;
-        psbt.inputs[0]
-            .partial_sigs
-            .insert(bitcoin_pubkey, bitcoin_sig);
+
+        // Sign EVERY input that has a witness UTXO
+        for i in 0..psbt.inputs.len() {
+            let utxo = psbt.inputs[i].witness_utxo.as_ref().ok_or_else(|| {
+                PluginError::Internal(format!("PSBT input {i} missing witness UTXO"))
+            })?;
+
+            // Compute BIP-143 sighash for this input at its proper index
+            let sighash = sighasher
+                .p2wpkh_signature_hash(i, &utxo.script_pubkey, utxo.value, sighash_type)
+                .map_err(|e| PluginError::Internal(format!("sighash: {e}")))?;
+
+            // Sign with bitcoin's secp256k1 (handles low-S normalization)
+            let msg = bitcoin::secp256k1::Message::from_digest(*sighash.as_ref());
+            let secp_sig = secp_signer.sign_ecdsa(&msg, &secret_key);
+            let mut sig_bytes = secp_sig.serialize_der().to_vec();
+            sig_bytes.push(sighash_type.to_u32() as u8);
+            let bitcoin_sig = bitcoin::ecdsa::Signature::from_slice(&sig_bytes)
+                .map_err(|e| PluginError::Internal(format!("sig conversion: {e}")))?;
+            psbt.inputs[i]
+                .partial_sigs
+                .insert(bitcoin_pubkey, bitcoin_sig);
+        }
         Ok(psbt.serialize())
     }
 
