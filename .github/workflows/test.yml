@@ -47,6 +47,21 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      # The workspace check compiles guilbur-desktop (a Tauri app), which
+      # requires the Svelte frontend to be built first (frontendDist: ../dist).
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Build frontend (dist/)
+        run: |
+          cd apps/desktop
+          npm ci
+          npm run build
+
       - name: cargo check
         run: cargo check --workspace
 
@@ -60,7 +75,9 @@ jobs:
         run: cargo clippy --workspace --lib -- -D clippy::unwrap_used -A warnings
 
       - name: cargo deny check
-        run: cargo deny check
+        run: |
+          cargo install cargo-deny --locked
+          cargo deny check
 
       - name: cargo test (cli-integration)
         run: cargo test -p cli-integration -- --test-threads=1
