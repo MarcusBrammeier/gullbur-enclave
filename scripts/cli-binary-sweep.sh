@@ -54,7 +54,7 @@ fuser -k "$PORT/tcp" 2>/dev/null || true
 sleep 1
 
 # ── 1. Launch IPC server ──────────────────────────────────────────
-echo "▸ [1/11] Launching IPC server..."
+echo "▸ [1/12] Launching IPC server..."
 "$CLI" --port "$PORT" launch &
 LAUNCH_PID=$!
 echo "$LAUNCH_PID" > /tmp/gullbur-sweep-pid-$PORT
@@ -83,8 +83,21 @@ if ! ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
     exit 1
 fi
 
+# ── 1b. Live WS handshake + RPC probe ─────────────────────────────
+# Closes the old testing hole: previously we only verified the port was
+# *listening* (/proc/net/tcp). This proves the ACTUAL IPC handshake works
+# (hello → session_key → JSON-RPC) against the real running binary.
+echo "▸ [1b/12] Live WebSocket handshake + RPC..."
+if python3 "$ROOT/scripts/ws-handshake-probe.py" "$PORT" "vault.generate_mnemonic" 2>&1 \
+    | tee /tmp/gullbur-sweep-handshake-$$.log | grep -q "PASS"; then
+    pass "Live WS handshake + RPC verified on :$PORT"
+else
+    fail "Live WS handshake + RPC FAILED (see log)"
+fi
+rm -f /tmp/gullbur-sweep-handshake-$$.log
+
 # ── 2. Generate mnemonic ──────────────────────────────────────────
-echo "▸ [2/11] Generating mnemonic..."
+echo "▸ [2/12] Generating mnemonic..."
 MNEMONIC_OUTPUT=$("$CLI" --port "$PORT" generate-mnemonic 2>&1)
 MNEMONIC=$(echo "$MNEMONIC_OUTPUT" | python3 -c "
 import sys, json
@@ -102,7 +115,7 @@ else
 fi
 
 # ── 3. Initialize vault ────────────────────────────────────────────
-echo "▸ [3/11] Initializing vault..."
+echo "▸ [3/12] Initializing vault..."
 INIT_OUTPUT=$("$CLI" --port "$PORT" init "$MNEMONIC" 2>&1)
 if echo "$INIT_OUTPUT" | python3 -c "
 import sys, json
@@ -116,7 +129,7 @@ else
 fi
 
 # ── 4. Status after init ──────────────────────────────────────────────
-echo "▸ [4/11] Status after init..."
+echo "▸ [4/12] Status after init..."
 STATUS_OUTPUT=$("$CLI" --port "$PORT" status 2>&1)
 if echo "$STATUS_OUTPUT" | python3 -c "
 import sys, json
@@ -131,7 +144,7 @@ else
 fi
 
 # ── 5. Create BTC account ─────────────────────────────────────────────
-echo "▸ [5/11] Creating BTC account..."
+echo "▸ [5/12] Creating BTC account..."
 BTC_ACCT=$("$CLI" --port "$PORT" create-account btc 2>&1)
 BTC_ADDR=$(echo "$BTC_ACCT" | python3 -c "
 import sys, json
@@ -145,7 +158,7 @@ else
 fi
 
 # ── 6. Create ETH account ─────────────────────────────────────────────
-echo "▸ [6/11] Creating ETH account..."
+echo "▸ [6/12] Creating ETH account..."
 ETH_ACCT=$("$CLI" --port "$PORT" create-account eth 2>&1)
 ETH_ADDR=$(echo "$ETH_ACCT" | python3 -c "
 import sys, json
@@ -159,7 +172,7 @@ else
 fi
 
 # ── 7. Create XMR + LTC accounts ──────────────────────────────────────
-echo "▸ [7/11] Creating XMR and LTC accounts..."
+echo "▸ [7/12] Creating XMR and LTC accounts..."
 
 XMR_ACCT=$("$CLI" --port "$PORT" create-account xmr 2>&1)
 XMR_ADDR=$(echo "$XMR_ACCT" | python3 -c "
@@ -186,7 +199,7 @@ else
 fi
 
 # ── 8. List accounts ──────────────────────────────────────────────────
-echo "▸ [8/11] Listing accounts..."
+echo "▸ [8/12] Listing accounts..."
 ACCTS=$("$CLI" --port "$PORT" list-accounts 2>&1)
 ACCT_COUNT=$(echo "$ACCTS" | python3 -c "
 import sys, json
@@ -200,7 +213,7 @@ else
 fi
 
 # ── 9. Get balances (routing only — may error on testnet) ─────────────
-echo "▸ [9/11] Checking balances (routing)..."
+echo "▸ [9/12] Checking balances (routing)..."
 BTC_BAL=$("$CLI" --port "$PORT" get-balance btc "$BTC_ADDR" 2>&1)
 if echo "$BTC_BAL" | python3 -c "
 import sys, json
@@ -227,7 +240,7 @@ else
 fi
 
 # ── 10. Lock vault ────────────────────────────────────────────────────
-echo "▸ [10/11] Locking vault..."
+echo "▸ [10/12] Locking vault..."
 LOCK_OUT=$("$CLI" --port "$PORT" lock 2>&1)
 if echo "$LOCK_OUT" | python3 -c "
 import sys, json
@@ -253,7 +266,7 @@ else
 fi
 
 # ── 11. Status after lock ────────────────────────────────────────────
-echo "▸ [11/11] Status after lock..."
+echo "▸ [11/12] Status after lock..."
 STATUS_LOCK=$("$CLI" --port "$PORT" status 2>&1)
 if echo "$STATUS_LOCK" | python3 -c "
 import sys, json

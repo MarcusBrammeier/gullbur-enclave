@@ -157,6 +157,20 @@ for i in $(seq 1 8); do
 done
 check "IPC server on :19876" $IPC_READY
 
+# Verify the ACTUAL IPC handshake succeeds (not just that the port listens).
+# adb forward tunnels a local port to the device's 127.0.0.1:19876 so we can
+# drive a real hello → session_key → JSON-RPC exchange against the on-device
+# Rust engine — the exact protocol the Svelte WebView uses.
+$ADB forward tcp:19876 tcp:19876 2>/dev/null || true
+sleep 1
+if $IPC_READY && python3 "$ROOT/scripts/ws-handshake-probe.py" 19876 "vault.generate_mnemonic" 2>&1 \
+    | grep -q "PASS"; then
+  check "Live WS handshake + RPC on-device" true
+else
+  check "Live WS handshake + RPC on-device" false
+fi
+$ADB forward --remove tcp:19876 2>/dev/null || true
+
 # Verify native lib loaded
 NATIVE_LOG=$($ADB logcat -d 2>/dev/null | grep "nativeloader.*gullbur_desktop_lib" || true)
 echo "$NATIVE_LOG" | grep -q "ok" 2>/dev/null && check "Native lib loaded" true || check "Native lib loaded" false

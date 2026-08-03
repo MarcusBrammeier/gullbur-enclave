@@ -40,8 +40,8 @@ fi
 echo "▸ Layer 3: Integration tests"
 if [ -d tests/cli-integration ]; then
   INTEGRATION_OUTPUT=$(cargo test -p cli-integration 2>&1 || true)
-  # Use tail -1 to skip doc-test "0 passed" header, get actual integration result
-  echo "$INTEGRATION_OUTPUT" | grep "^test result:" | tail -1
+  # Skip doc-test headers and final zero-line, show actual integration result
+  echo "$INTEGRATION_OUTPUT" | grep "^test result:" | grep -v "0 passed; 0 failed" | tail -1
   if echo "$INTEGRATION_OUTPUT" | grep -q "FAILED"; then
     pass "CLI integration (1 known pre-existing failure)"
   else
@@ -55,6 +55,21 @@ fi
 echo "▸ Layer 4: Persistence tests"
 cargo test --test account_persistence -- --test-threads=1 2>&1 | grep "^test result:" | head -1 && pass "Account persistence" || fail "Account persistence"
 
+# ── Layer 4b: IPC e2e handshake tests ────────────────────────────
+# e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle verify the
+# actual WebSocket handshake (hello → session_key → JSON-RPC) — the exact
+# protocol the Svelte frontend uses.
+echo "▸ Layer 4b: IPC e2e handshake tests"
+for T in e2e_ipc_flow e2e_disconnect_reconnect e2e_full_lifecycle; do
+  OUT=$(cargo test --test "$T" -p vault-core --features plugins -- --test-threads=1 2>&1 || true)
+  if echo "$OUT" | grep -q "test result: ok"; then
+    R=$(echo "$OUT" | grep "^test result:" | head -1)
+    pass "IPC e2e $T — $R"
+  else
+    fail "IPC e2e $T FAILED"
+  fi
+done
+
 # ── Layer 5: Fuzz build ──────────────────────────────────────────
 echo "▸ Layer 5: Fuzz targets compile"
 if command -v cargo &> /dev/null && cargo +nightly fuzz build --fuzz-dir fuzz 2>&1 | tail -1 | grep -q "Finished"; then
@@ -66,7 +81,7 @@ fi
 # ── Layer 6: Branding audit ──────────────────────────────────────
 echo "▸ Layer 6: Branding audit"
 STALE=$(git ls-files | while IFS= read -r f; do
-  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|STATE.md|scripts/full-test-sweep.sh) continue;; esac
+  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|STATE.md|scripts/full-test-sweep.sh|scripts/android-sweep.sh) continue;; esac
   [ -f "$f" ] && grep -ql 'fosscrypto' "$f" 2>/dev/null && echo "$f" || true
 done)
 if [ -z "$STALE" ]; then

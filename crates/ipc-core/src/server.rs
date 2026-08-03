@@ -159,7 +159,13 @@ impl IpcServer {
                             let token_str = token.to_string().trim().to_string();
                             // Accept auth token OR hello handshake from localhost (127.0.0.1, ::1)
                             let is_loopback = peer.ip().is_loopback();
-                            let is_hello = token_str == "{\"type\":\"hello\"}";
+                            // Parse hello structurally (JSON) so whitespace/field-order
+                            // variations from any client are accepted, not just the exact
+                            // compact string the Svelte frontend happens to emit.
+                            let is_hello = serde_json::from_str::<serde_json::Value>(&token_str)
+                                .ok()
+                                .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(|s| s == "hello"))
+                                .unwrap_or(false);
                             if token_str == auth_token {
                                 // Authenticated with token — proceed
                             } else if is_loopback && is_hello {
@@ -406,5 +412,38 @@ mod tests {
         }
         // After drop, token file should be removed
         assert!(!path.exists(), "Token file should be removed after drop");
+    }
+
+    /// The hello handshake check must be structural (JSON), not a brittle exact
+    /// string match — so a client that emits whitespace (e.g. `{"type": "hello"}`
+    /// from Python's json.dumps) is trusted on loopback just like the compact form.
+    #[test]
+    fn test_hello_is_structural_json() {
+        // Same predicate logic as the auth branch in run().
+        fn is_hello(token_str: &str) -> bool {
+            serde_json::from_str::<serde_json::Value>(token_str)
+                .ok()
+                .and_then(|v| {
+                    v.get("type")
+                        .and_then(|t| t.as_str())
+                        .map(|s| s == "hello")
+                })
+                .unwrap_or(false)
+        }
+
+        // Compact (what Svelte's JSON.stringify emits)
+        assert!(is_hello(r#"{"type":"hello"}"#), "compact hello accepted");
+        // Whitespace (what Python json.dumps emits) — must ALSO be accepted
+        assert!(is_hello(r#"{"type": "hello"}"#), "whitespace hello accepted");
+        // Field order variation
+        assert!(is_hello(r#"{"foo":1,"type":"hello"}"#), "field order hello accepted");
+        // Not-a-hello / malformed must be rejected
+        assert!(!is_hello(r#"{"type":"hi"}"#), "wrong type rejected");
+        assert!(!is_hello("not json"), "non-json rejected");
+        assert!(!is_hello(&auth_like()), "auth token is not hello");
+    }
+
+    fn auth_like() -> String {
+        (0..64).map(|_| 'a').collect()
     }
 }

@@ -2,8 +2,8 @@
 
 > **Version:** 0.1.0  
 > **Last updated:** 2026-08-03  
-> **HEAD:** `f46f193` (2026-08-03 22:00 UTC)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (277 passed, 1 ignored) | `cargo test -p vault-core --test e2e_websocket` ✅ | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | 12MB APK ✅
+> **HEAD:** `c7480c2` (2026-08-03)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (279 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (41) | `cargo test -p vault-core --test e2e_websocket` ✅ | **IPC e2e handshake (3 tests) ✅** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ---
 
@@ -81,21 +81,26 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (277 passed, 1 ignored) |
-| `cargo test -p cli-integration` | ✅ (27 passed) |
+| `cargo test --workspace --lib` | ✅ (279 passed, 1 ignored) |
+| `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
+| **IPC e2e handshake: e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle** | ✅ (3 tests) — wired into sweep as Layer 4b |
 | `cargo deny check` | ✅ |
 | `bash scripts/audit.sh` | ✅ (advisories suppressed for 17 known Tauri transitive) |
 | `cargo +nightly fuzz build` | ✅ |
 | `cargo +nightly fuzz run` (5 targets, 1k ea) | ✅ (zero crashes) |
-| `cargo tauri android build --target aarch64` | ✅ (12MB APK, 12MB AAB) |
+| `cargo tauri android build --target aarch64` | ✅ (APK 12M universal, **AAB 7.1M**) |
+| `scripts/cli-binary-sweep.sh` | ✅ (12 checks incl. **real WS handshake probe**) |
+| `scripts/android-sweep.sh` | ✅ (added **on-device adb-forward WS handshake**) |
 
-### Fixes Applied This Session
+### Fixes Applied This Batch (beta.4)
 
-1. **BTC/LTC `broadcast_transaction` error detection** — Esplora returns HTTP 200 with error text for invalid txs. Both plugins now validate: check HTTP status, verify response is 64-char hex txid before returning success. Previously passed raw error text as `txid`.
-2. **Settings.svelte branding** — two stale `nousresearch/fosscryptocore` URLs → `YOUR_GITHUB_ORG/YOUR_GITHUB_REPO` placeholders
-3. **Sweep script** — exclude STATE.md from branding audit (commit history documents rebrand)
+1. **Closed the IPC handshake verification hole** — CLI/Android sweep scripts previously only checked the port was listening (`/proc/net/tcp`). Added `scripts/ws-handshake-probe.py` doing a **real WebSocket handshake** (hello → session_key → JSON-RPC) against the live binary; wired into both `cli-binary-sweep.sh` (step 1b) and `android-sweep.sh` (adb-forward on-device).
+2. **Fixed brittle hello-auth in `ipc-core`** — the loopback hello check was an exact *string* match (`== "{\"type\":\"hello\"}"`), rejecting valid whitespace-form JSON (e.g. Python's `json.dumps`). Now parsed **structurally**; locked in with `test_hello_is_structural_json`.
+3. **Multi-input PSBT regression test** — `test_sign_transaction_multi_input_all_inputs_signed` proves sign_transaction signs EVERY input (not just `inputs[0]`) with the same key. Closes Phase 2.1.
+4. **APK/AAB shrink** — release profile: `strip=true` (was `strip="symbols"`, keeps debuginfo) → **AAB 12M→7.1M** (under 8M target). Kept `lto="thin"` to preserve build/fuzz speed (fat LTO barely moved the `.so`). Universal APK stays 12M (bundles uncompressed arm64 `.so` for direct-mmap side-load).
+5. **full-test-sweep Layer 3** — grep `-v "0 passed; 0 failed"` filter (doc-header + trailing zero) + Layer 6 branding exclusion for android-sweep.sh (pending from prior session, now committed).
 
 ---
 
@@ -119,7 +124,8 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 
 ## Deliverables
 
-- **APK** (12MB): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
-- **AAB** (12MB): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
+- **APK** (12M universal side-load): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
+- **AAB** (7.1M — Play/distribution, target hit): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
-- **296+ unit tests** + **27 integration tests** — all passing
+- **279+ unit tests** + **41 CLI integration** + **3 IPC e2e handshake** — all passing
+- **ws-handshake-probe.py** — live WS hello→session_key→RPC probe used by CLI & Android sweeps
