@@ -80,8 +80,8 @@ impl WalletPlugin for BtcPlugin {
         PluginMetadata {
             description: "Bitcoin — P2WPKH (SegWit v0) via BIP-84, PSBT signing, Esplora-backed balance & history",
             author: "Gullbúr Enclave",
-            homepage: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
-            repository: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
+            homepage: "https://github.com/MarcusBrammeier/gullbur-enclave",
+            repository: "https://github.com/MarcusBrammeier/gullbur-enclave",
             min_wallet_version: "0.1.0",
             tags: &["bitcoin", "btc", "segwit", "bip84", "psbt"],
         }

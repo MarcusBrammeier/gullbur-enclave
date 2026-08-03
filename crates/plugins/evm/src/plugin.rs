@@ -353,8 +353,8 @@ impl WalletPlugin for EvmPlugin {
         PluginMetadata {
             description: "Ethereum Virtual Machine — EIP-1559 (type-2) tx signing, balance via eth_getBalance, 7+ L2s",
             author: "Gullbúr Enclave",
-            homepage: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
-            repository: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
+            homepage: "https://github.com/MarcusBrammeier/gullbur-enclave",
+            repository: "https://github.com/MarcusBrammeier/gullbur-enclave",
             min_wallet_version: "0.1.0",
             tags: &[
                 "evm", "ethereum", "arbitrum", "optimism", "base", "polygon", "bnb", "eip1559",

@@ -420,8 +420,8 @@ impl WalletPlugin for XmrPlugin {
         PluginMetadata {
             description: "Monero — private fungible cryptocurrency. CLSAG ring signatures, BIP-44 key derivation, daemon RPC integration",
             author: "Gullbúr Enclave",
-            homepage: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
-            repository: "https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO",
+            homepage: "https://github.com/MarcusBrammeier/gullbur-enclave",
+            repository: "https://github.com/MarcusBrammeier/gullbur-enclave",
             min_wallet_version: "0.1.0",
             tags: &["monero", "xmr", "clsag", "private", "fungible"],
         }

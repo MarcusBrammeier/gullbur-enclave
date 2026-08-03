@@ -53,7 +53,7 @@ fuzz/              — cargo-fuzz targets (nightly only, 5 targets)
 ```
 f46f193 fix: fmt — move inline comment below fn call for cargo fmt compliance
 170f070 fix: remove invalid compressNativeLibs manifest attribute (blocks APK build)
-f16e8dd sweep: fix clippy, unbundle center(), replace GitHub placeholders with YOUR_GITHUB_ORG
+f16e8dd sweep: fix clippy, unbundle center(), replace GitHub placeholders with MarcusBrammeier
 8347b5b config: cargo registry and build flags
 d92c5cd config: cargo config, deny policy, workspace lockfile, STATE.md
 172d797 crates: IPC core, wallet-plugin, tauri-mcp, vault-core, LTC plugin
@@ -112,7 +112,7 @@ c36a865 chore: pre-shrink sweep fixes
 | BTC/LTC hardcoded account index 0 | Actually already fixed (key_id@index format parsed) | ✅ Fixed in prior session |
 | EVM BIP-44 derivation was ignored | Was signing all accounts with same key | ✅ Fixed this session |
 | `cargo deny` suppresses 17 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |
-| GitHub URLs are `YOUR_GITHUB_ORG` placeholders | User must set actual org/repo before publishing | Placeholder (set via grep) |
+| GitHub URLs are `MarcusBrammeier` placeholders | User must set actual org/repo before publishing | Placeholder (set via grep) |
 
 ---
 

@@ -8,7 +8,7 @@
 //! ```rust,ignore
 //! use update_checker::check_for_updates;
 //!
-//! let result = check_for_updates("YOUR_GITHUB_ORG/YOUR_GITHUB_REPO").await;
+//! let result = check_for_updates("MarcusBrammeier/gullbur-enclave").await;
 //! match result {
 //!     Ok(Some(release)) => println!("New version: {}", release.tag_name),
 //!     Ok(None) => println!("Up to date"),
@@ -83,7 +83,7 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Check the GitHub releases API for a newer version.
 ///
-/// `repo` should be in the format `"owner/repo"`, e.g. `"YOUR_GITHUB_ORG/YOUR_GITHUB_REPO"`.
+/// `repo` should be in the format `"owner/repo"`, e.g. `"MarcusBrammeier/gullbur-enclave"`.
 ///
 /// Returns:
 /// - `Ok(Some(UpdateInfo))` — a newer release exists or info on current release
