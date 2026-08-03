@@ -203,6 +203,7 @@ dependencies = [
  "async-trait",
  "crypto-core",
  "hex",
+ "rand 0.9.5",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -5889,6 +5890,7 @@ checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 name = "tor-daemon"
 version = "0.1.0"
 dependencies = [
+ "reqwest 0.12.28",
  "serde",
  "thiserror 2.0.18",
  "tokio",

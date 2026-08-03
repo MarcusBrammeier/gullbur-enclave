@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod biometric;
+pub mod biometric_policy;
 pub mod biometry;
 pub mod error;
 pub mod fido2;
@@ -9,6 +10,7 @@ pub mod traits;
 
 pub use auth::{AuthManager, AuthStatus};
 pub use biometric::{BiometricAuth, BiometricStub};
+pub use biometric_policy::{BiometricOutcome, BiometricPolicy};
 pub use biometry::BiometricEngine;
 pub use biometry::mock::MockEngine;
 pub use biometry::tauri::TauriBiometryEngine;

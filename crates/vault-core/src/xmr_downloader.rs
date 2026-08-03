@@ -38,7 +38,7 @@ static KNOWN_HASHES: LazyLock<[PlatformHash; 4]> = LazyLock::new(|| {
             archive_name: "monero-linux-x64-v0.18.5.1.tar.bz2",
             archive_url: "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.5.1.tar.bz2",
             binary_name: "monero-wallet-rpc",
-            sha256: "", // FIXME: set real hash after first download
+            sha256: "22a7dda7b0cb699fdd6b7674c3b4a4465b337cc98a54983523b759e1e7cc9958",
         },
         PlatformHash {
             triple: "aarch64-linux-android",

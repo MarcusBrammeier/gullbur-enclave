@@ -39,6 +39,30 @@ impl Default for VaultState {
     }
 }
 
+impl VaultState {
+    /// Builder: inject a real biometric engine (desktop Touch ID / Android
+    /// BiometricPrompt). Defaults to `MockEngine`. Mirrors the `Vault`
+    /// key-provider seam so Android wires a Tauri-plugin-backed engine here.
+    // #[allow(dead_code)] — consumed by the Android Tauri setup (not the desktop
+    // build path, so the Rust compiler flags it unused here).
+    #[allow(dead_code)]
+    pub fn with_biometric_engine(mut self, engine: Arc<dyn auth_core::BiometricEngine>) -> Self {
+        self.biometric_engine = engine;
+        self
+    }
+
+    /// Builder: inject a real FIDO2 authenticator (YubiKey / Android FIDO2).
+    /// Defaults to `MockFido2Authenticator`.
+    #[allow(dead_code)]
+    pub fn with_fido2_authenticator(
+        mut self,
+        auth: Arc<dyn auth_core::Fido2Authenticator>,
+    ) -> Self {
+        self.fido2_authenticator = auth;
+        self
+    }
+}
+
 // ── Response types ────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -983,7 +1007,11 @@ pub async fn confirm_hardware(
             .verify(auth_core::AuthStatus::BiometricUnlocked)
         {
             Ok(()) => {
-                // Success — reset failure counter
+                // Success — reset failure counter via the tested policy.
+                let policy = auth_core::BiometricPolicy::new();
+                let (outcome, _) =
+                    policy.classify(Ok(()), vs.biometric_failures.load(Ordering::Acquire));
+                debug_assert_eq!(outcome, auth_core::BiometricOutcome::Success);
                 vs.biometric_failures
                     .store(0, std::sync::atomic::Ordering::Release);
                 let vault_guard = vs.vault.read().await;
@@ -997,7 +1025,8 @@ pub async fn confirm_hardware(
                 return Ok(true);
             }
             Err(auth_core::AuthError::NotSupported) => {
-                // Engine can't handle this — fall back to SoftwareAuth
+                // Engine can't handle this — fall back to SoftwareAuth.
+                // NotSupported does NOT count as a user denial (policy rule).
                 vs.native_biometry_enabled
                     .store(false, std::sync::atomic::Ordering::Release);
                 tracing::warn!(
@@ -1005,17 +1034,24 @@ pub async fn confirm_hardware(
                 );
             }
             Err(auth_core::AuthError::PermissionDenied) => {
-                let failures = vs
-                    .biometric_failures
-                    .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
-                    + 1;
-                tracing::warn!("[auth] Biometric denied ({failures}/5)");
-                if failures >= 5 {
-                    vs.native_biometry_enabled
-                        .store(false, std::sync::atomic::Ordering::Release);
-                    return Err("Biometric authentication failed 5 times. Falling back to manual confirmation.".into());
+                // Route the failure through the tested lockout policy.
+                let policy = auth_core::BiometricPolicy::new();
+                let prev = vs.biometric_failures.load(Ordering::Acquire);
+                let (outcome, count) =
+                    policy.classify(Err(auth_core::AuthError::PermissionDenied), prev);
+                vs.biometric_failures
+                    .store(count, std::sync::atomic::Ordering::Release);
+                match outcome {
+                    auth_core::BiometricOutcome::LockedOut => {
+                        vs.native_biometry_enabled
+                            .store(false, std::sync::atomic::Ordering::Release);
+                        return Err("Biometric authentication failed 5 times. Falling back to manual confirmation.".into());
+                    }
+                    _ => {
+                        tracing::warn!("[auth] Biometric denied ({count}/5)");
+                        return Err("Biometric authentication denied".into());
+                    }
                 }
-                return Err("Biometric authentication denied".into());
             }
             Err(auth_core::AuthError::BiometricFailed(msg)) => {
                 tracing::error!("[auth] Biometric error: {msg}");

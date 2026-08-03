@@ -464,16 +464,15 @@ mod tests {
 
         let encrypted = vault.encrypted_seed.read().await.clone().expect("sealed");
         // Decrypt with the injected provider's fixed key — must round-trip.
-        let decrypted = keystore_core::vault::decrypt_with_password(
-            &[0x99; 32],
-            &encrypted,
-            b"vault-seed",
-        )
-        .expect("provider key must decrypt the sealed seed");
-        let payload: serde_json::Value =
-            serde_json::from_slice(&decrypted).expect("payload json");
+        let decrypted =
+            keystore_core::vault::decrypt_with_password(&[0x99; 32], &encrypted, b"vault-seed")
+                .expect("provider key must decrypt the sealed seed");
+        let payload: serde_json::Value = serde_json::from_slice(&decrypted).expect("payload json");
         assert!(
-            payload["mnemonic"].as_str().map(|s| s.len() > 0).unwrap_or(false),
+            payload["mnemonic"]
+                .as_str()
+                .map(|s| s.len() > 0)
+                .unwrap_or(false),
             "sealed seed restores the mnemonic"
         );
     }
