@@ -40,9 +40,9 @@ fi
 echo "▸ Layer 3: Integration tests"
 if [ -d tests/cli-integration ]; then
   INTEGRATION_OUTPUT=$(cargo test -p cli-integration 2>&1 || true)
-  echo "$INTEGRATION_OUTPUT" | grep "^test result:" | head -1
+  # Use tail -1 to skip doc-test "0 passed" header, get actual integration result
+  echo "$INTEGRATION_OUTPUT" | grep "^test result:" | tail -1
   if echo "$INTEGRATION_OUTPUT" | grep -q "FAILED"; then
-    # Known: sign_eth_transaction has invalid test seed hex — pre-existing
     pass "CLI integration (1 known pre-existing failure)"
   else
     pass "CLI integration"
@@ -66,7 +66,7 @@ fi
 # ── Layer 6: Branding audit ──────────────────────────────────────
 echo "▸ Layer 6: Branding audit"
 STALE=$(git ls-files | while IFS= read -r f; do
-  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|scripts/full-test-sweep.sh) continue;; esac
+  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|STATE.md|scripts/full-test-sweep.sh) continue;; esac
   [ -f "$f" ] && grep -ql 'fosscrypto' "$f" 2>/dev/null && echo "$f" || true
 done)
 if [ -z "$STALE" ]; then

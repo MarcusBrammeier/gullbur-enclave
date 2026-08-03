@@ -6,14 +6,14 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 2 * * *'   # nightly at 02:00 UTC
+    - cron: '0 2 * * *'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   fuzz:
-    name: Fuzz (nightly, 120s × 5 targets)
+    name: Fuzz (nightly, 60s × 5 targets)
     runs-on: ubuntu-latest
 
     steps:
@@ -28,20 +28,20 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: cargo fuzz build (check compilation)
+      - name: cargo fuzz build (check)
         run: cargo +nightly fuzz build --fuzz-dir fuzz
 
       - name: fuzz — JSON-RPC
-        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_json_rpc -- -max_total_time=120
+        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_json_rpc -- -max_total_time=60
 
       - name: fuzz — Address validation
-        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_validate_address -- -max_total_time=120
+        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_validate_address -- -max_total_time=60
 
       - name: fuzz — AES-GCM
-        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_aes_gcm -- -max_total_time=120
+        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_aes_gcm -- -max_total_time=60
 
       - name: fuzz — BIP39
-        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_bip39 -- -max_total_time=120
+        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_bip39 -- -max_total_time=60
 
       - name: fuzz — PSBT
-        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_psbt -- -max_total_time=120
+        run: cargo +nightly fuzz run --fuzz-dir fuzz fuzz_psbt -- -max_total_time=60

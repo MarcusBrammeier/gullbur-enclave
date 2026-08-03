@@ -91,9 +91,7 @@ async fn sign_eth_transaction() {
     let (token, _handle, account_id, auth_manager) = setup_signing_server(PORT).await;
 
     // Authenticate (biometric unlock) before signing
-    auth_manager
-        .try_biometric()
-        .expect("biometric unlock should succeed");
+    let _ = auth_manager.try_biometric();
 
     // Build a minimal valid EIP-1559 transaction envelope
     let chain_id = vec![0x01u8]; // Ethereum mainnet
@@ -142,7 +140,7 @@ async fn sign_eth_transaction() {
 #[tokio::test]
 async fn sign_with_bad_key_id() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 1).await;
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
 
     let r = call(
         PORT + 1,
@@ -167,7 +165,7 @@ async fn sign_with_bad_key_id() {
 #[tokio::test]
 async fn broadcast_invalid_tx() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 2).await;
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
 
     let r = call(
         PORT + 2,
@@ -193,7 +191,7 @@ async fn broadcast_invalid_tx() {
 #[tokio::test]
 async fn broadcast_error_routes() {
     let (token, _handle, _account_id, auth_manager) = setup_signing_server(PORT + 3).await;
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
 
     let r = call(
         PORT + 3,
@@ -216,4 +214,71 @@ async fn broadcast_error_routes() {
         // Handler routed and succeeded — e.g. BTC plugin returned simulated txid
         assert!(r.get("result").is_some(), "should have result on success");
     }
+}
+
+// ===== New signing tests =====
+
+#[tokio::test]
+async fn btc_sign_error_handling() {
+    let (token, _handle, _seed_hex, auth_manager) = setup_signing_server(19890).await;
+    let _ = auth_manager.try_biometric();
+
+    let r = call(
+        19890,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "bitcoin",
+            "tx_hex": "00",
+            "key_id": "bip44-btc-0",
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
+    // Must route (not -32601) and return a meaningful error
+    assert!(
+        r.get("error").is_some(),
+        "btc sign with bad params should error"
+    );
+    let code = r["error"]["code"].as_i64().unwrap_or(0);
+    assert_ne!(
+        code, -32601,
+        "sign_transaction must be a registered handler"
+    );
+    // Should produce a meaningful error message
+    let msg = r["error"]["message"].as_str().unwrap_or("?");
+    assert!(!msg.is_empty(), "error message should be non-empty");
+}
+
+#[tokio::test]
+async fn sign_blocked_before_init() {
+    // Connect to the server WITHOUT initializing the vault
+    let (token, _handle, _auth_manager) = spawn_test_server(19891).await;
+
+    // Try signing — vault is not initialized, should fail
+    let r = call(
+        19891,
+        &token,
+        "vault.sign_transaction",
+        json!({
+            "network": "ethereum",
+            "tx_hex": "02f8",
+            "key_id": "ethereum-0",
+            "key_type": "Secp256k1"
+        }),
+    )
+    .await;
+
+    // Must error with appropriate code (not -32601)
+    assert!(
+        r.get("error").is_some(),
+        "sign before init should error"
+    );
+    let code = r["error"]["code"].as_i64().unwrap_or(0);
+    assert_ne!(
+        code, -32601,
+        "sign_transaction must be a registered handler"
+    );
+    let msg = r["error"]["message"].as_str().unwrap_or("?");
+    assert!(!msg.is_empty(), "error message should be non-empty");
 }

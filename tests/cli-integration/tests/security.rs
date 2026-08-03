@@ -42,8 +42,9 @@ async fn setup_locking_server(
 async fn lock_vault() {
     let (token, _handle, auth_manager) = setup_locking_server(PORT).await;
 
-    // Unlock first so there's something to lock
-    auth_manager.try_biometric().expect("biometric unlock");
+    // Unlock first so there's something to lock.
+    // init now auto-unlocks the vault, so this may already be unlocked.
+    let _ = auth_manager.try_biometric();
 
     // Lock via RPC
     let r = call(PORT, &token, "vault.lock", json!({})).await;
@@ -56,7 +57,7 @@ async fn operations_blocked_after_lock() {
     let (token, _handle, auth_manager) = setup_locking_server(PORT + 1).await;
 
     // Unlock, then lock
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
     let r = call(PORT + 1, &token, "vault.lock", json!({})).await;
     assert_ok(&r, "vault.lock");
 
@@ -108,7 +109,7 @@ async fn operations_blocked_after_lock() {
 async fn status_after_lock() {
     let (token, _handle, auth_manager) = setup_locking_server(PORT + 2).await;
 
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
     let r = call(PORT + 2, &token, "vault.lock", json!({})).await;
     assert_ok(&r, "vault.lock");
 
@@ -128,7 +129,7 @@ async fn re_init_after_lock() {
     // current architecture — this test verifies the error is correct.
     let (token, _handle, auth_manager) = setup_locking_server(PORT + 3).await;
 
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
     let r = call(PORT + 3, &token, "vault.lock", json!({})).await;
     assert_ok(&r, "vault.lock");
 
@@ -152,7 +153,7 @@ async fn unlock_flow() {
     let (token, _handle, auth_manager) = setup_locking_server(PORT + 4).await;
 
     // Lock first
-    auth_manager.try_biometric().expect("biometric unlock");
+    let _ = auth_manager.try_biometric();
     let r = call(PORT + 4, &token, "vault.lock", json!({})).await;
     assert_ok(&r, "vault.lock");
 
@@ -203,4 +204,58 @@ async fn unlock_flow() {
         // Actually succeeded — great
         assert!(r.get("result").is_some(), "should have a result");
     }
+}
+
+// ── Lock → unlock → accounts preserved test ───────────────────
+// Verifies that after lock+unlock, all previously created accounts
+// still exist with the same addresses.
+
+const LOCK_UNLOCK_PORT: u16 = 19830;
+
+#[tokio::test]
+async fn lock_unlock_accounts_preserved() {
+    use std::collections::HashSet;
+
+    let (token, handle, auth_manager) = {
+        let (token, handle, am) = spawn_test_server(LOCK_UNLOCK_PORT).await;
+        let r = call(LOCK_UNLOCK_PORT, &token, "vault.generate_mnemonic", json!({})).await;
+        let m = assert_ok(&r, "generate")["mnemonic"].as_str().expect("invariant").to_string();
+        let r = call(LOCK_UNLOCK_PORT, &token, "vault.initialize", json!({"seed_phrase": m})).await;
+        assert_ok(&r, "initialize");
+        (token, handle, am)
+    };
+
+    // Create one account per network
+    let mut pre_addrs: HashSet<(String, String)> = HashSet::new();
+    for (net, idx) in &[("bitcoin", 0u64), ("ethereum", 0u64), ("litecoin", 0u64)] {
+        let r = call(LOCK_UNLOCK_PORT, &token, "vault.create_account",
+            json!({"network": net, "index": idx})).await;
+        let result = assert_ok(&r, &format!("create {net}"));
+        let addr = result["address"].as_str().expect("invariant").to_string();
+        pre_addrs.insert((net.to_string(), addr));
+    }
+
+    // Lock
+    let _ = auth_manager.try_biometric();
+    let r = call(LOCK_UNLOCK_PORT, &token, "vault.lock", json!({})).await;
+    assert_ok(&r, "lock");
+    assert_eq!(r["result"]["locked"], true);
+
+    // Unlock
+    auth_manager.try_biometric().expect("unlock should succeed");
+
+    // List accounts — should have all pre-lock accounts
+    let r = call(LOCK_UNLOCK_PORT, &token, "vault.list_accounts", json!({})).await;
+    let accounts = assert_ok(&r, "list_accounts after unlock").as_array().expect("invariant");
+
+    let mut found = 0u32;
+    for acct in accounts {
+        let net = acct["network"].as_str().unwrap_or("");
+        let addr = acct["address"].as_str().unwrap_or("");
+        if pre_addrs.contains(&(net.to_string(), addr.to_string())) {
+            found += 1;
+        }
+    }
+    assert_eq!(found, 3, "all 3 pre-lock accounts should be present after unlock");
+    drop(handle);
 }

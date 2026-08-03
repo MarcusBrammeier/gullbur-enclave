@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
 > **Version:** 0.1.0  
-> **Last updated:** 2026-08-01  
-> **HEAD:** `f46f193` (2026-08-01 22:41 UTC)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (296+ passed, 1 ignored) | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | 12MB APK ✅
+> **Last updated:** 2026-08-03  
+> **HEAD:** `f46f193` (2026-08-03 22:00 UTC)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (277 passed, 1 ignored) | `cargo test -p vault-core --test e2e_websocket` ✅ | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | 12MB APK ✅
 
 ---
 
@@ -74,15 +74,17 @@ c36a865 chore: pre-shrink sweep fixes
 
 ---
 
-## Sweep Status (2026-08-01)
+## Sweep Status (2026-08-03)
 
 | Gate | Status |
 |------|--------|
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (296 passed, 1 ignored) |
+| `cargo test --workspace --lib` | ✅ (277 passed, 1 ignored) |
 | `cargo test -p cli-integration` | ✅ (27 passed) |
+| `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
+| `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
 | `cargo deny check` | ✅ |
 | `bash scripts/audit.sh` | ✅ (advisories suppressed for 17 known Tauri transitive) |
 | `cargo +nightly fuzz build` | ✅ |
@@ -91,13 +93,9 @@ c36a865 chore: pre-shrink sweep fixes
 
 ### Fixes Applied This Session
 
-1. **IPC token fallback path** — `ok_or_else` → `ok_or` (clippy fix in ipc-core/server.rs)
-2. **`win.center()` removed** — API doesn't exist in Tauri 2.x lib.rs
-3. **`android:compressNativeLibs="true"` removed** — not a valid manifest attribute, blocks AAPT resource linking
-4. **GitHub placeholders** — all 10 `gullbur/gullbur` / `gullbur/gullburcore` → `YOUR_GITHUB_ORG/YOUR_GITHUB_REPO` with `// REPLACE_ME` markers
-5. **EVM BIP-44 derivation** — `derive_key_from_keyid()` now uses `derive_bip44_eth_key()` with correct index from `key_id@index` format. Includes cross-index differentiation test.
-6. **tauri-mcp unused import** — removed unused `use serde_json::json;`
-7. **AppImage libgcrypt** — confirmed already configured in `tauri.conf.json` with symlinks in `local-libs/`
+1. **BTC/LTC `broadcast_transaction` error detection** — Esplora returns HTTP 200 with error text for invalid txs. Both plugins now validate: check HTTP status, verify response is 64-char hex txid before returning success. Previously passed raw error text as `txid`.
+2. **Settings.svelte branding** — two stale `nousresearch/fosscryptocore` URLs → `YOUR_GITHUB_ORG/YOUR_GITHUB_REPO` placeholders
+3. **Sweep script** — exclude STATE.md from branding audit (commit history documents rebrand)
 
 ---
 

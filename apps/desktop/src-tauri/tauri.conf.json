@@ -24,10 +24,7 @@
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:* content:; font-src 'self' data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'none'",
       "pattern": {
-        "use": "isolation",
-        "options": {
-          "dir": "hooks"
-        }
+        "use": "brownfield"
       }
     }
   },

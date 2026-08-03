@@ -267,11 +267,18 @@ impl WalletPlugin for BtcPlugin {
             .send()
             .await
             .map_err(|e| PluginError::BroadcastFailed(format!("HTTP request failed: {e}")))?;
-        let txid = resp
+        let status = resp.status();
+        let body = resp
             .text()
             .await
             .map_err(|e| PluginError::BroadcastFailed(format!("Failed to read response: {e}")))?;
-        Ok(txid.trim().to_string())
+        let txid = body.trim();
+        // Esplora returns HTTP 200 with error text for invalid txs.
+        // A valid txid is a 64-char hex string.
+        if !status.is_success() || txid.len() != 64 || txid.chars().any(|c| !c.is_ascii_hexdigit()) {
+            return Err(PluginError::BroadcastFailed(txid.to_string()));
+        }
+        Ok(txid.to_string())
     }
 
     async fn get_balance(&self, account: &Account, network: &str) -> Result<Balance, PluginError> {

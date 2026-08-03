@@ -169,3 +169,55 @@ async fn status_post_init() {
         "networks non-empty"
     );
 }
+
+// ── Deterministic seed restoration test ──────────────────────────────
+// Proves that initializing two separate servers with the same BIP-39
+// seed phrase produces identical addresses.
+
+const DET_PORT: u16 = 19840;
+
+#[tokio::test]
+async fn deterministic_seed_restoration() {
+    let seed = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art";
+
+    // Session A: init with known seed, create accounts
+    let (addrs_a, _) = {
+        let (token, handle, _am) = spawn_test_server(DET_PORT).await;
+        let r = call(DET_PORT, &token, "vault.initialize",
+            serde_json::json!({"seed_phrase": seed})).await;
+        assert_ok(&r, "vault.initialize (A)");
+
+        let b = assert_ok(&call(DET_PORT, &token, "vault.create_account",
+            serde_json::json!({"network":"bitcoin","index":0})).await, "btc A")["address"].clone();
+        let e = assert_ok(&call(DET_PORT, &token, "vault.create_account",
+            serde_json::json!({"network":"ethereum","index":0})).await, "eth A")["address"].clone();
+        let l = assert_ok(&call(DET_PORT, &token, "vault.create_account",
+            serde_json::json!({"network":"litecoin","index":0})).await, "ltc A")["address"].clone();
+        let x = assert_ok(&call(DET_PORT, &token, "vault.create_account",
+            serde_json::json!({"network":"monero","index":0})).await, "xmr A")["address"].clone();
+        (serde_json::json!({"btc":b,"eth":e,"ltc":l,"xmr":x}), handle)
+    };
+
+    // Session B: new server port, SAME seed
+    let (addrs_b, _) = {
+        let (token, handle, _am) = spawn_test_server(DET_PORT + 1).await;
+        let r = call(DET_PORT + 1, &token, "vault.initialize",
+            serde_json::json!({"seed_phrase": seed})).await;
+        assert_ok(&r, "vault.initialize (B)");
+
+        let b = assert_ok(&call(DET_PORT + 1, &token, "vault.create_account",
+            serde_json::json!({"network":"bitcoin","index":0})).await, "btc B")["address"].clone();
+        let e = assert_ok(&call(DET_PORT + 1, &token, "vault.create_account",
+            serde_json::json!({"network":"ethereum","index":0})).await, "eth B")["address"].clone();
+        let l = assert_ok(&call(DET_PORT + 1, &token, "vault.create_account",
+            serde_json::json!({"network":"litecoin","index":0})).await, "ltc B")["address"].clone();
+        let x = assert_ok(&call(DET_PORT + 1, &token, "vault.create_account",
+            serde_json::json!({"network":"monero","index":0})).await, "xmr B")["address"].clone();
+        (serde_json::json!({"btc":b,"eth":e,"ltc":l,"xmr":x}), handle)
+    };
+
+    assert_eq!(addrs_a["btc"], addrs_b["btc"], "BTC must match from same seed");
+    assert_eq!(addrs_a["eth"], addrs_b["eth"], "ETH must match from same seed");
+    assert_eq!(addrs_a["ltc"], addrs_b["ltc"], "LTC must match from same seed");
+    assert_eq!(addrs_a["xmr"], addrs_b["xmr"], "XMR must match from same seed");
+}

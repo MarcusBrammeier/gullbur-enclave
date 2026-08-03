@@ -10,10 +10,10 @@ name = "gullbur_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = ">=2,<3", features = ["isolation"] }
+tauri-build = { version = ">=2,<3", features = [] }
 
 [dependencies]
-tauri = { version = ">=2.5,<3", features = ["isolation"] }
+tauri = { version = ">=2.5,<3", features = [] }
 tauri-plugin-biometric = { version = ">=2,<3" }
 tauri-plugin-shell = { version = ">=2,<3" }
 tauri-plugin-dialog = { version = ">=2,<3" }

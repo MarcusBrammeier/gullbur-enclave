@@ -221,7 +221,7 @@
 
       <!-- Donate -->
       <div class="text-center">
-        <a href="https://github.com/nousresearch/fosscryptocore" target="_blank" rel="noopener"
+        <a href="https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 text-xs text-vault-400 hover:text-vault-300 transition-colors">
           ❤️ Donate — support open-source development
         </a>
@@ -296,7 +296,7 @@
               await invoke('report_bug', { description: '' });
             } catch (e) {
               // Fallback: open manually
-              const url = 'https://github.com/nousresearch/fosscryptocore/issues/new';
+              const url = 'https://github.com/YOUR_GITHUB_ORG/YOUR_GITHUB_REPO/issues/new';
               window.open(url, '_blank');
             }
           }}

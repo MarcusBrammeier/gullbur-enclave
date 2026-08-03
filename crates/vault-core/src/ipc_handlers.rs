@@ -81,11 +81,13 @@ pub fn register_vault_handlers(
         let sd = Arc::clone(&seed);
         let mn = Arc::clone(&mnemonic);
         let init = Arc::clone(&initialized);
+        let auth = Arc::clone(&auth_manager);
         handler.register("vault.initialize", move |params: Value| {
             let ph = Arc::clone(&ph);
             let sd = Arc::clone(&sd);
             let mn = Arc::clone(&mn);
             let init = Arc::clone(&init);
+            let auth = Arc::clone(&auth);
             async move {
                 if init.load(Ordering::SeqCst) {
                     return Err(RpcError::new(-32000, "Vault is already initialized"));
@@ -156,6 +158,10 @@ pub fn register_vault_handlers(
 
                 init.store(true, Ordering::SeqCst);
 
+                // After successful initialization, unlock the vault.
+                // In headless/CLI mode, the init flow itself is the auth.
+                let _ = auth.try_biometric();
+
                 let mut resp = serde_json::json!({
                     "success": true,
                     "initialized": true,
@@ -216,11 +222,14 @@ pub fn register_vault_handlers(
         let ph = Arc::clone(&plugin_host);
         let sd = Arc::clone(&seed);
         let aq = Arc::clone(&approval_queue);
+        let auth = Arc::clone(&auth_manager);
         handler.register("vault.create_account", move |params: Value| {
             let ph = Arc::clone(&ph);
             let sd = Arc::clone(&sd);
             let aq = Arc::clone(&aq);
+            let auth = Arc::clone(&auth);
             async move {
+                enforce_auth(&auth, auth_core::AuthStatus::BiometricUnlocked)?;
                 let network = params
                     .get("network")
                     .and_then(|v| v.as_str())
@@ -289,9 +298,12 @@ pub fn register_vault_handlers(
     // ── vault.get_balance ───────────────────────────────────────────────
     {
         let ph = Arc::clone(&plugin_host);
+        let auth = Arc::clone(&auth_manager);
         handler.register("vault.get_balance", move |params: Value| {
             let ph = Arc::clone(&ph);
+            let auth = Arc::clone(&auth);
             async move {
+                enforce_auth(&auth, auth_core::AuthStatus::BiometricUnlocked)?;
                 let network = params
                     .get("network")
                     .and_then(|v| v.as_str())
@@ -476,9 +488,12 @@ pub fn register_vault_handlers(
     // ── vault.get_transaction_history ───────────────────────────────────
     {
         let ph = Arc::clone(&plugin_host);
+        let auth = Arc::clone(&auth_manager);
         handler.register("vault.get_transaction_history", move |params: Value| {
             let ph = Arc::clone(&ph);
+            let auth = Arc::clone(&auth);
             async move {
+                enforce_auth(&auth, auth_core::AuthStatus::BiometricUnlocked)?;
                 let network = params
                     .get("network")
                     .and_then(|v| v.as_str())

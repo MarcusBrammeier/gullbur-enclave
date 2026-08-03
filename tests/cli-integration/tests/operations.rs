@@ -152,3 +152,102 @@ async fn list_plugins() {
     assert!(ids.contains(&"xmr"), "expected xmr plugin, got: {ids:?}");
     assert!(ids.contains(&"ltc"), "expected ltc plugin, got: {ids:?}");
 }
+
+// ── Per-network operations tests ────────────────────────────────────
+
+const OP_PORT: u16 = 19870;
+
+async fn setup_op_server(port: u16) -> (String, tokio::task::JoinHandle<()>) {
+    let (token, handle, _am) = spawn_test_server(port).await;
+    let r = call(port, &token, "vault.generate_mnemonic", serde_json::json!({})).await;
+    let mnemonic = assert_ok(&r, "vault.generate_mnemonic")["mnemonic"].as_str().expect("invariant").to_string();
+    let r = call(port, &token, "vault.initialize", serde_json::json!({"seed_phrase": mnemonic})).await;
+    assert_ok(&r, "vault.initialize");
+    (token, handle)
+}
+
+#[tokio::test]
+async fn get_balance_btc() {
+    let (token, _handle) = setup_op_server(OP_PORT).await;
+    let r = call(OP_PORT, &token, "vault.create_account",
+        serde_json::json!({"network": "bitcoin", "index": 0})).await;
+    let addr = assert_ok(&r, "create btc")["address"].as_str().expect("invariant").to_string();
+    let r = call(OP_PORT, &token, "vault.get_balance",
+        serde_json::json!({"network": "bitcoin", "address": &addr})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "get_balance BTC must route");
+    }
+}
+
+#[tokio::test]
+async fn get_balance_xmr() {
+    let (token, _handle) = setup_op_server(OP_PORT + 1).await;
+    let r = call(OP_PORT + 1, &token, "vault.create_account",
+        serde_json::json!({"network": "monero", "index": 0})).await;
+    let addr = assert_ok(&r, "create xmr")["address"].as_str().expect("invariant").to_string();
+    let r = call(OP_PORT + 1, &token, "vault.get_balance",
+        serde_json::json!({"network": "monero", "address": &addr})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "get_balance XMR must route");
+    }
+}
+
+#[tokio::test]
+async fn get_balance_ltc() {
+    let (token, _handle) = setup_op_server(OP_PORT + 2).await;
+    let r = call(OP_PORT + 2, &token, "vault.create_account",
+        serde_json::json!({"network": "litecoin", "index": 0})).await;
+    let addr = assert_ok(&r, "create ltc")["address"].as_str().expect("invariant").to_string();
+    let r = call(OP_PORT + 2, &token, "vault.get_balance",
+        serde_json::json!({"network": "litecoin", "address": &addr})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "get_balance LTC must route");
+    }
+}
+
+#[tokio::test]
+async fn estimate_fee_eth() {
+    let (token, _handle) = setup_op_server(OP_PORT + 3).await;
+    let r = call(OP_PORT + 3, &token, "vault.estimate_fee",
+        serde_json::json!({"network": "ethereum", "recipient": "0x1234567890123456789012345678901234567890", "amount": "0.001"})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "estimate_fee ETH must route");
+    }
+}
+
+#[tokio::test]
+async fn estimate_fee_ltc() {
+    let (token, _handle) = setup_op_server(OP_PORT + 4).await;
+    let r = call(OP_PORT + 4, &token, "vault.estimate_fee",
+        serde_json::json!({"network": "litecoin", "recipient": "ltc1qtest", "amount": "0.001"})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "estimate_fee LTC must route");
+    }
+}
+
+#[tokio::test]
+async fn tx_history_btc() {
+    let (token, _handle) = setup_op_server(OP_PORT + 5).await;
+    let r = call(OP_PORT + 5, &token, "vault.get_transaction_history",
+        serde_json::json!({"network": "bitcoin", "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "limit": 5})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "tx_history BTC must route");
+    }
+}
+
+#[tokio::test]
+async fn tx_history_ltc() {
+    let (token, _handle) = setup_op_server(OP_PORT + 6).await;
+    let r = call(OP_PORT + 6, &token, "vault.get_transaction_history",
+        serde_json::json!({"network": "litecoin", "address": "ltc1qtest", "limit": 5})).await;
+    if let Some(err) = r.get("error") {
+        let code = err["code"].as_i64().unwrap_or(0);
+        assert_ne!(code, -32601, "tx_history LTC must route");
+    }
+}

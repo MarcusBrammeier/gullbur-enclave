@@ -235,3 +235,125 @@ async fn validate_invalid_address() {
         }
     }
 }
+
+// ===== New account tests =====
+
+#[tokio::test]
+async fn multi_index_derivation() {
+    let (token, _handle) = setup_server(19850).await;
+
+    let mut addresses: Vec<String> = Vec::new();
+    for i in 0u64..3 {
+        let r = call(
+            19850,
+            &token,
+            "vault.create_account",
+            serde_json::json!({
+                "network": "bitcoin",
+                "index": i
+            }),
+        )
+        .await;
+        let result = assert_ok(&r, &format!("create_account (btc index {i})"));
+        let addr = result["address"]
+            .as_str()
+            .expect("test invariant")
+            .to_string();
+        assert!(
+            addr.starts_with("bc1") || addr.starts_with("tb1"),
+            "BTC address should start with bc1/tb1, got: {addr}"
+        );
+        assert!(
+            !addresses.contains(&addr),
+            "address for index {i} collides with earlier index"
+        );
+        addresses.push(addr);
+    }
+    assert_eq!(addresses.len(), 3, "expected 3 unique BTC addresses");
+}
+
+#[tokio::test]
+async fn multi_accounts_per_network() {
+    let (token, _handle) = setup_server(19851).await;
+
+    // Create 2 BTC + 2 ETH accounts
+    for i in 0u64..2 {
+        let r = call(
+            19851,
+            &token,
+            "vault.create_account",
+            serde_json::json!({
+                "network": "bitcoin",
+                "index": i
+            }),
+        )
+        .await;
+        assert_ok(&r, &format!("create_account (btc index {i})"));
+
+        let r = call(
+            19851,
+            &token,
+            "vault.create_account",
+            serde_json::json!({
+                "network": "ethereum",
+                "index": i
+            }),
+        )
+        .await;
+        assert_ok(&r, &format!("create_account (eth index {i})"));
+    }
+
+    let r = call(
+        19851,
+        &token,
+        "vault.list_accounts",
+        serde_json::json!({}),
+    )
+    .await;
+    let result = assert_ok(&r, "vault.list_accounts");
+    let accounts = result.as_array().expect("test invariant");
+    assert_eq!(
+        accounts.len(),
+        4,
+        "expected 4 accounts, got {}",
+        accounts.len()
+    );
+
+    let mut addresses: Vec<&str> = Vec::new();
+    for acct in accounts {
+        let net = acct["network"].as_str().expect("test invariant");
+        let addr = acct["address"].as_str().expect("test invariant");
+        assert!(
+            net == "bitcoin" || net == "ethereum",
+            "unexpected network: {net}"
+        );
+        assert!(!addr.is_empty(), "address should not be empty");
+        assert!(!addresses.contains(&addr), "duplicate address: {addr}");
+        addresses.push(addr);
+    }
+}
+
+#[tokio::test]
+async fn ltc_address_format() {
+    let (token, _handle) = setup_server(19852).await;
+
+    let r = call(
+        19852,
+        &token,
+        "vault.create_account",
+        serde_json::json!({
+            "network": "litecoin",
+            "index": 0
+        }),
+    )
+    .await;
+    let result = assert_ok(&r, "vault.create_account (litecoin)");
+    let address = result["address"].as_str().expect("test invariant");
+    assert!(
+        address.starts_with("ltc1")
+            || address.starts_with("L")
+            || address.starts_with("M")
+            || address.starts_with("tb1"),
+        "LTC address should start with ltc1/L/M/tb1, got: {address}"
+    );
+}
