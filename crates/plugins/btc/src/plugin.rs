@@ -275,7 +275,8 @@ impl WalletPlugin for BtcPlugin {
         let txid = body.trim();
         // Esplora returns HTTP 200 with error text for invalid txs.
         // A valid txid is a 64-char hex string.
-        if !status.is_success() || txid.len() != 64 || txid.chars().any(|c| !c.is_ascii_hexdigit()) {
+        if !status.is_success() || txid.len() != 64 || txid.chars().any(|c| !c.is_ascii_hexdigit())
+        {
             return Err(PluginError::BroadcastFailed(txid.to_string()));
         }
         Ok(txid.to_string())
@@ -618,19 +619,13 @@ mod tests {
             lock_time: LockTime::ZERO,
             input: vec![
                 TxIn {
-                    previous_output: OutPoint::new(
-                        bitcoin::Txid::from_byte_array([1u8; 32]),
-                        0,
-                    ),
+                    previous_output: OutPoint::new(bitcoin::Txid::from_byte_array([1u8; 32]), 0),
                     script_sig: ScriptBuf::new(),
                     sequence: Sequence::MAX,
                     witness: Witness::new(),
                 },
                 TxIn {
-                    previous_output: OutPoint::new(
-                        bitcoin::Txid::from_byte_array([2u8; 32]),
-                        1,
-                    ),
+                    previous_output: OutPoint::new(bitcoin::Txid::from_byte_array([2u8; 32]), 1),
                     script_sig: ScriptBuf::new(),
                     sequence: Sequence::MAX,
                     witness: Witness::new(),

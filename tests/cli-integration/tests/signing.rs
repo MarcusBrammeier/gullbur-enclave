@@ -270,10 +270,7 @@ async fn sign_blocked_before_init() {
     .await;
 
     // Must error with appropriate code (not -32601)
-    assert!(
-        r.get("error").is_some(),
-        "sign before init should error"
-    );
+    assert!(r.get("error").is_some(), "sign before init should error");
     let code = r["error"]["code"].as_i64().unwrap_or(0);
     assert_ne!(
         code, -32601,

@@ -16,3 +16,4 @@ zeroize = { workspace = true }
 thiserror = { workspace = true }
 keyring = { workspace = true }
 rand = { workspace = true }
+dirs-next = "2"

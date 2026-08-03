@@ -46,19 +46,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-use rand::TryRngCore;
-use rand::rngs::OsRng;
-
 pub use error::VaultError;
 
 /// Persisted seed path relative to ~/.gullbur/
 const SEED_FILE: &str = "keystore";
-/// Random per-device key used to encrypt the keystore.
-/// Stored alongside the keystore in the same private directory.
-/// Having both files in the same sandboxed directory means an attacker
-/// already had full filesystem access — but this prevents the keystore
-/// from being decrypted by a different app or a duplicate of just one file.
-const KEY_FILE: &str = "keystore.key";
 
 /// The central vault engine — single entry point for all operations.
 pub struct Vault {
@@ -82,6 +73,10 @@ pub struct Vault {
     pub auth_manager: Arc<auth_core::AuthManager>,
     /// Optional monero-wallet-rpc URL for real balance queries
     xmr_wallet_rpc_url: Option<String>,
+    /// Source of the per-device key used to seal the persisted seed.
+    /// Defaults to `FileDeviceKeyProvider` (desktop); Android injects a
+    /// hardware KeyStore-backed provider via `with_key_provider`.
+    key_provider: Box<dyn keystore_core::DeviceKeyProvider>,
 }
 
 impl Vault {
@@ -98,7 +93,24 @@ impl Vault {
             tor_enabled: Arc::new(AtomicBool::new(false)),
             auth_manager: Arc::new(auth_core::AuthManager::new()),
             xmr_wallet_rpc_url: None,
+            key_provider: Box::new(keystore_core::FileDeviceKeyProvider::default_home()),
         }
+    }
+
+    /// Builder: inject an alternate device-key provider (used by Android to
+    /// source the seed-wrapping key from the hardware KeyStore).
+    pub fn with_key_provider(
+        mut self,
+        provider: Box<dyn keystore_core::DeviceKeyProvider>,
+    ) -> Self {
+        self.key_provider = provider;
+        tracing::info!("Vault using device-key backend: {}", self.backend_name());
+        self
+    }
+
+    /// Name of the active device-key backend (diagnostics).
+    pub fn backend_name(&self) -> &'static str {
+        self.key_provider.backend_name()
     }
 
     /// Initialize the vault with a seed phrase (or generate a new BIP-39 wallet if empty).
@@ -146,7 +158,10 @@ impl Vault {
         });
         let keystore_bytes = serde_json::to_vec(&keystore_payload)
             .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
-        let vault_key = Self::load_or_generate_key();
+        let vault_key = self
+            .key_provider
+            .get_or_create_key()
+            .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
         let encrypted =
             keystore_core::vault::encrypt_with_password(&vault_key, &keystore_bytes, b"vault-seed")
                 .map_err(|e| VaultError::KeystoreError(e.to_string()))?;
@@ -252,38 +267,12 @@ impl Vault {
         }
     }
 
-    /// Load the per-device keystore key, or generate and persist a new one.
-    fn load_or_generate_key() -> [u8; 32] {
-        let key_path = dirs_next::home_dir()
-            .unwrap_or_default()
-            .join(".gullbur")
-            .join(KEY_FILE);
-        if key_path.exists()
-            && let Ok(raw) = std::fs::read(&key_path)
-            && raw.len() == 32
-        {
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&raw);
-            return key;
-        }
-        // Generate fresh random key and persist it
-        let mut key = [0u8; 32];
-        OsRng.try_fill_bytes(key.as_mut()).ok();
-        if let Some(home) = dirs_next::home_dir() {
-            let data_dir = home.join(".gullbur");
-            let _ = std::fs::create_dir_all(&data_dir);
-            let _ = std::fs::write(data_dir.join(KEY_FILE), key);
-            // Restrict permissions on Unix
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(
-                    data_dir.join(KEY_FILE),
-                    std::fs::Permissions::from_mode(0o600),
-                );
-            }
-        }
-        key
+    /// Load the per-device keystore key via the injected `DeviceKeyProvider`
+    /// (desktop: file-backed; Android: hardware KeyStore).
+    fn device_key(&self) -> Result<[u8; 32], VaultError> {
+        self.key_provider
+            .get_or_create_key()
+            .map_err(|e| VaultError::KeystoreError(e.to_string()))
     }
 
     /// Attempt to restore vault state from a persisted keystore on disk.
@@ -301,7 +290,7 @@ impl Vault {
             None => return Ok(()),
         };
 
-        let vault_key = Self::load_or_generate_key();
+        let vault_key = self.device_key()?;
         let decrypted =
             keystore_core::vault::decrypt_with_password(&vault_key, &encrypted, b"vault-seed")
                 .map_err(|e| {
@@ -436,5 +425,56 @@ mod tests {
         let vault = Vault::new();
         let result = vault.create_account("bitcoin", 0).await;
         assert!(result.is_err());
+    }
+
+    /// A deterministic DeviceKeyProvider — stands in for an Android KeyStore
+    /// backend and proves the injected provider is actually used for sealing.
+    #[derive(Debug)]
+    struct TestKeyProvider;
+
+    impl keystore_core::DeviceKeyProvider for TestKeyProvider {
+        fn backend_name(&self) -> &'static str {
+            "test-keystore"
+        }
+        fn get_or_create_key(&self) -> Result<[u8; 32], keystore_core::KeystoreError> {
+            Ok([0x99; 32])
+        }
+    }
+
+    #[tokio::test]
+    async fn vault_uses_injected_key_provider() {
+        // Default backend on desktop is file-backed.
+        let vault = Vault::new();
+        assert_eq!(vault.backend_name(), "file");
+
+        // Inject a KeyStore-style provider — the vault must now report it.
+        let vault = Vault::new().with_key_provider(Box::new(TestKeyProvider));
+        assert_eq!(vault.backend_name(), "test-keystore");
+
+        // End-to-end: initialize with the injected provider seals a keystore
+        // that decrypts back to the same seed via the SAME provider.
+        let phrase =
+            crypto_core::keys::generate_mnemonic(crypto_core::MnemonicStrength::TwelveWords)
+                .expect("test invariant");
+        let mut vault = Vault::new().with_key_provider(Box::new(TestKeyProvider));
+        vault
+            .initialize(&phrase.to_string(), "")
+            .await
+            .expect("test invariant");
+
+        let encrypted = vault.encrypted_seed.read().await.clone().expect("sealed");
+        // Decrypt with the injected provider's fixed key — must round-trip.
+        let decrypted = keystore_core::vault::decrypt_with_password(
+            &[0x99; 32],
+            &encrypted,
+            b"vault-seed",
+        )
+        .expect("provider key must decrypt the sealed seed");
+        let payload: serde_json::Value =
+            serde_json::from_slice(&decrypted).expect("payload json");
+        assert!(
+            payload["mnemonic"].as_str().map(|s| s.len() > 0).unwrap_or(false),
+            "sealed seed restores the mnemonic"
+        );
     }
 }

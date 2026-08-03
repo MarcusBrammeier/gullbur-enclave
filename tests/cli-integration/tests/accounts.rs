@@ -303,13 +303,7 @@ async fn multi_accounts_per_network() {
         assert_ok(&r, &format!("create_account (eth index {i})"));
     }
 
-    let r = call(
-        19851,
-        &token,
-        "vault.list_accounts",
-        serde_json::json!({}),
-    )
-    .await;
+    let r = call(19851, &token, "vault.list_accounts", serde_json::json!({})).await;
     let result = assert_ok(&r, "vault.list_accounts");
     let accounts = result.as_array().expect("test invariant");
     assert_eq!(

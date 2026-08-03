@@ -26,4 +26,7 @@ pub enum KeystoreError {
 
     #[error("invalid ciphertext")]
     InvalidCiphertext,
+
+    #[error("internal error: {0}")]
+    Internal(String),
 }

@@ -218,9 +218,24 @@ async fn lock_unlock_accounts_preserved() {
 
     let (token, handle, auth_manager) = {
         let (token, handle, am) = spawn_test_server(LOCK_UNLOCK_PORT).await;
-        let r = call(LOCK_UNLOCK_PORT, &token, "vault.generate_mnemonic", json!({})).await;
-        let m = assert_ok(&r, "generate")["mnemonic"].as_str().expect("invariant").to_string();
-        let r = call(LOCK_UNLOCK_PORT, &token, "vault.initialize", json!({"seed_phrase": m})).await;
+        let r = call(
+            LOCK_UNLOCK_PORT,
+            &token,
+            "vault.generate_mnemonic",
+            json!({}),
+        )
+        .await;
+        let m = assert_ok(&r, "generate")["mnemonic"]
+            .as_str()
+            .expect("invariant")
+            .to_string();
+        let r = call(
+            LOCK_UNLOCK_PORT,
+            &token,
+            "vault.initialize",
+            json!({"seed_phrase": m}),
+        )
+        .await;
         assert_ok(&r, "initialize");
         (token, handle, am)
     };
@@ -228,8 +243,13 @@ async fn lock_unlock_accounts_preserved() {
     // Create one account per network
     let mut pre_addrs: HashSet<(String, String)> = HashSet::new();
     for (net, idx) in &[("bitcoin", 0u64), ("ethereum", 0u64), ("litecoin", 0u64)] {
-        let r = call(LOCK_UNLOCK_PORT, &token, "vault.create_account",
-            json!({"network": net, "index": idx})).await;
+        let r = call(
+            LOCK_UNLOCK_PORT,
+            &token,
+            "vault.create_account",
+            json!({"network": net, "index": idx}),
+        )
+        .await;
         let result = assert_ok(&r, &format!("create {net}"));
         let addr = result["address"].as_str().expect("invariant").to_string();
         pre_addrs.insert((net.to_string(), addr));
@@ -246,7 +266,9 @@ async fn lock_unlock_accounts_preserved() {
 
     // List accounts — should have all pre-lock accounts
     let r = call(LOCK_UNLOCK_PORT, &token, "vault.list_accounts", json!({})).await;
-    let accounts = assert_ok(&r, "list_accounts after unlock").as_array().expect("invariant");
+    let accounts = assert_ok(&r, "list_accounts after unlock")
+        .as_array()
+        .expect("invariant");
 
     let mut found = 0u32;
     for acct in accounts {
@@ -256,6 +278,9 @@ async fn lock_unlock_accounts_preserved() {
             found += 1;
         }
     }
-    assert_eq!(found, 3, "all 3 pre-lock accounts should be present after unlock");
+    assert_eq!(
+        found, 3,
+        "all 3 pre-lock accounts should be present after unlock"
+    );
     drop(handle);
 }

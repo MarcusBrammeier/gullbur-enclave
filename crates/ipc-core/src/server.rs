@@ -164,7 +164,9 @@ impl IpcServer {
                             // compact string the Svelte frontend happens to emit.
                             let is_hello = serde_json::from_str::<serde_json::Value>(&token_str)
                                 .ok()
-                                .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(|s| s == "hello"))
+                                .and_then(|v| {
+                                    v.get("type").and_then(|t| t.as_str()).map(|s| s == "hello")
+                                })
                                 .unwrap_or(false);
                             if token_str == auth_token {
                                 // Authenticated with token — proceed
@@ -423,20 +425,22 @@ mod tests {
         fn is_hello(token_str: &str) -> bool {
             serde_json::from_str::<serde_json::Value>(token_str)
                 .ok()
-                .and_then(|v| {
-                    v.get("type")
-                        .and_then(|t| t.as_str())
-                        .map(|s| s == "hello")
-                })
+                .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(|s| s == "hello"))
                 .unwrap_or(false)
         }
 
         // Compact (what Svelte's JSON.stringify emits)
         assert!(is_hello(r#"{"type":"hello"}"#), "compact hello accepted");
         // Whitespace (what Python json.dumps emits) — must ALSO be accepted
-        assert!(is_hello(r#"{"type": "hello"}"#), "whitespace hello accepted");
+        assert!(
+            is_hello(r#"{"type": "hello"}"#),
+            "whitespace hello accepted"
+        );
         // Field order variation
-        assert!(is_hello(r#"{"foo":1,"type":"hello"}"#), "field order hello accepted");
+        assert!(
+            is_hello(r#"{"foo":1,"type":"hello"}"#),
+            "field order hello accepted"
+        );
         // Not-a-hello / malformed must be rejected
         assert!(!is_hello(r#"{"type":"hi"}"#), "wrong type rejected");
         assert!(!is_hello("not json"), "non-json rejected");
