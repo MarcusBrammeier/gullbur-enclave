@@ -18,6 +18,15 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend (dist/)
+        run: |
+          cd apps/desktop
+          npm ci
+          npm run build
       - name: cargo deny check
         run: cargo deny check
       - name: cargo clippy

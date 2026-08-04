@@ -1,6 +1,7 @@
 # Gullbúr Enclave — Audit Readiness Report
 > Generated: 2026-08-03
 > Branch: main, HEAD: d30af65
+> Doc-coverage section added: 2026-08-04 (HEAD a3a5829)
 
 ## Unsafe Blocks
 - Non-test blocks: 1 (workspace lint: `unsafe_code = "warn"`)
@@ -44,3 +45,35 @@
 6. **Zero non-test unsafe blocks.** The workspace lint `unsafe_code = "warn"` enforces this. All `unsafe` is in test-only code (filesystem setup for account persistence tests).
 
 7. **Supply chain.** All 668 cached crate dependencies are scanned weekly via `cargo audit`. `cargo deny` checks bans, licenses, and sources on every CI run. Known suppressed advisories are Tauri transitive deps only.
+
+## Doc Coverage (API surface readiness)
+
+Public API items (`pub fn/struct/enum/trait/mod/type/const/static`) vs. doc-comment lines (`///`, `//!`) per crate, generated 2026-08-04. This is a proxy for how much of the public API an auditor can understand from inline docs alone.
+
+| Crate | pub items | doc lines | Signal |
+|-------|-----------|-----------|--------|
+| `vault-core` | 59 | 391 | ✅ strong |
+| `auth-core` | 56 | 254 | ✅ strong |
+| `ipc-protocol` | 31 | 72 | ✅ adequate |
+| `xmr` (plugin) | 14 | 66 | ✅ adequate |
+| `ltc` (plugin) | 3 | 30 | ✅ adequate |
+| `ipc-core` | 18 | 44 | ⚠️ thin |
+| `wallet-plugin` | 15 | 29 | ⚠️ thin |
+| `crypto-wasm` | 3 | 27 | ⚠️ thin |
+| `update-checker` | 5 | 50 | ✅ adequate |
+| `keystore-core` | 25 | 66 | ✅ adequate |
+| `extension-relay` | 21 | 72 | ✅ adequate |
+| `tor-daemon` | 11 | 27 | ⚠️ thin |
+| `plugin-manifest` | 10 | 20 | ⚠️ thin |
+| `crypto-core` | 35 | 39 | ⚠️ **thin for size** |
+| `crypto-isolation` | 9 | 15 | ⚠️ thin |
+| `evm` (plugin) | 7 | 11 | ⚠️ thin |
+| `tauri-mcp` | 2 | 3 | ⚠️ thin |
+| `btc` (plugin) | 4 | **0** | ❌ **none** |
+
+**Gaps to close before third-party audit:**
+1. **`btc` plugin — 0 doc lines.** Smallest surface (4 pub items) but it's the primary Bitcoin plugin (PSBT, sighash, broadcast). Add `///` docs to its public methods.
+2. **`crypto-core`** — 35 pub items, only 39 doc lines (~1.1 lines/item). This is the cryptographic core; auditors will read it first. Needs the most attention.
+3. **`evm`, `crypto-isolation`, `plugin-manifest`, `tor-daemon`, `tauri-mcp`, `wallet-plugin`, `ipc-core`** — acceptable-to-thin; round out doc comments on all public items (a `#![warn(missing_docs)]` dry-run is the fastest way to enumerate them).
+
+Enforcement note: the workspace does NOT currently gate on `missing_docs`. For audit, consider a one-off `RUSTFLAGS="-D warnings" RUSTDOCFLAGS="-D warnings"` check or temporarily add `#![warn(missing_docs)]` to the core crates to enumerate every undocumented public item, then decide whether to keep the lint.

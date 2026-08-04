@@ -547,7 +547,6 @@ mod tests {
     fn test_ltc_p2wpkh_mainnet() {
         // Known test vector: Bitcoin test pubkey → Litecoin mainnet address
         // Using a known compressed pubkey to verify proper checksum
-        let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
             &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
                 .unwrap(),
@@ -569,7 +568,6 @@ mod tests {
 
     #[test]
     fn test_ltc_p2wpkh_testnet() {
-        let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
             &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
                 .unwrap(),
@@ -590,7 +588,6 @@ mod tests {
 
     #[test]
     fn test_ltc_p2wpkh_unsupported_network() {
-        let secp = bitcoin::secp256k1::Secp256k1::new();
         let pk = bitcoin::secp256k1::PublicKey::from_slice(
             &hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
                 .unwrap(),
