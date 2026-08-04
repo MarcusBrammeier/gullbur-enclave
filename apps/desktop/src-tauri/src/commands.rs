@@ -1393,7 +1393,8 @@ pub struct UpdateCheckResult {
 
 #[tauri::command]
 pub async fn check_for_updates() -> UpdateCheckResult {
-    match update_checker::check_for_updates("MarcusBrammeier/gullbur-enclave").await {
+    let token = std::env::var("GULLBUR_UPDATE_TOKEN").ok();
+    match update_checker::check_for_updates("MarcusBrammeier/gullbur-enclave", token.as_deref()).await {
         // REPLACE_ME
         Ok(Some(info)) => UpdateCheckResult {
             local_version: info.local_version,

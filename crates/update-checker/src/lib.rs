@@ -84,12 +84,14 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Check the GitHub releases API for a newer version.
 ///
 /// `repo` should be in the format `"owner/repo"`, e.g. `"MarcusBrammeier/gullbur-enclave"`.
+/// `token` is an optional GitHub personal access token. Required when the repo is
+/// private (GitHub REST API returns 401/404 for unauthenticated requests on private repos).
 ///
 /// Returns:
 /// - `Ok(Some(UpdateInfo))` — a newer release exists or info on current release
 /// - `Ok(None)` — no releases found
 /// - `Err(UpdateError)` — the check failed
-pub async fn check_for_updates(repo: &str) -> Result<Option<UpdateInfo>, UpdateError> {
+pub async fn check_for_updates(repo: &str, token: Option<&str>) -> Result<Option<UpdateInfo>, UpdateError> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
 
     let client = reqwest::Client::builder()
@@ -97,7 +99,11 @@ pub async fn check_for_updates(repo: &str) -> Result<Option<UpdateInfo>, UpdateE
         .timeout(std::time::Duration::from_secs(15))
         .build()?;
 
-    let response = client.get(&url).send().await?;
+    let mut req = client.get(&url);
+    if let Some(t) = token {
+        req = req.header("Authorization", format!("Bearer {t}"));
+    }
+    let response = req.send().await?;
 
     match response.status().as_u16() {
         200 => {
