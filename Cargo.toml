@@ -26,7 +26,9 @@ resolver = "2"
 [workspace.package]
 version = "0.0.7"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+# SOURCE-AVAILABLE during beta/testing (BSL-1.1); converts to Apache-2.0 at
+# v1.0. Do NOT relicense to a permissive license before the Change Date.
+license = "BUSL-1.1"
 repository = "https://github.com/MarcusBrammeier/gullbur-enclave"
 
 [workspace.dependencies]

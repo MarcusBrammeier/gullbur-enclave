@@ -59,8 +59,8 @@ cargo test --test account_persistence -- --test-threads=1 2>&1 | grep "^test res
 # e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle verify the
 # actual WebSocket handshake (hello → session_key → JSON-RPC) — the exact
 # protocol the Svelte frontend uses.
-echo "▸ Layer 4b: IPC e2e handshake tests"
-for T in e2e_ipc_flow e2e_disconnect_reconnect e2e_full_lifecycle; do
+echo "▸ Layer 4b: IPC e2e handshake + engine security tests"
+for T in e2e_ipc_flow e2e_disconnect_reconnect e2e_full_lifecycle e2e_ipc_encrypted engine_security; do
   OUT=$(cargo test --test "$T" -p vault-core --features plugins -- --test-threads=1 2>&1 || true)
   if echo "$OUT" | grep -q "test result: ok"; then
     R=$(echo "$OUT" | grep "^test result:" | head -1)

@@ -41,6 +41,22 @@ public tree. The public repo is scrubbed and staged independently at v0.1 Beta.
 4. **Scrub anything internal** from what enters a public commit: `STATE.md`,
    internal scripts, roadmap/plan docs, `.env`, signing keystore, test wallets.
 
+## License
+
+- **Pre-beta (private):** BSL-1.1 chosen, not yet published.
+- **v0.1 Beta → public:** released under **BSL-1.1** (source-available). This
+  deliberately blocks forking/porting/embedding until validated.
+- **v1.0:** auto-converts to **Apache-2.0** (fully FOSS) via the license
+  Change Date.
+
+## Headless test variant (internal only)
+
+`gullbur-cli --features headless` launches the vault engine on an IPC port with
+**no GUI**. This is the *headless test harness* used for Linux automation and is
+a **Pro/Enterprise** feature — it is NOT part of the public FOSS repo/tree.
+
+---
+
 ## What the public Diagnostics panel includes (review-first)
 
 - Status bar + engine-process view (state, version, plugins, accounts)

@@ -46,11 +46,15 @@ allow = [
     "CDLA-Permissive-2.0",
     "bzip2-1.0.6",
     "NCSA",
+    "BUSL-1.1",
 ]
 confidence-threshold = 0.5
 
 [licenses.private]
-ignore = false
+# Workspace crates are our own source (not third-party deps). Their license
+# (BUSL-1.1 during beta) is intentional and not checked — deny only gates
+# third-party dependency licenses.
+ignore = true
 registries = []
 
 [bans]

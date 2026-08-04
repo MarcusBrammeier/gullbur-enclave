@@ -1,10 +1,27 @@
 # Gullbúr Enclave
 
-A **modular, open-source** multi-chain cryptocurrency wallet — built in Rust with zero unsafe code.
+A **source-available** multi-chain cryptocurrency wallet — built in Rust with zero unsafe code. **Becomes fully open-source (FOSS) at v1.0.**
 
 **Self-custody. Private. Multi-Chain.** Bitcoin, Ethereum, Monero, and Litecoin — one vault, your keys, your control.
 
-[Download the latest release](https://github.com/gullbur/gullbur/releases) · [Report a bug](https://github.com/gullbur/gullbur/issues/new)
+[Download the latest release](https://github.com/MarcusBrammeier/gullbur-enclave/releases) · [Report a bug](https://github.com/MarcusBrammeier/gullbur-enclave/issues/new)
+
+---
+
+## ⚠️ Licensing: Source-Available during Beta, FOSS at 1.0
+
+While this project is in beta and under testing, it is released under the
+**Business Source License 1.1 (BSL-1.1)** — *source-available, not open-source*.
+
+**Why:** The engines and designs are still being tested and validated. To
+prevent premature forking or porting before the project is confirmed to work,
+the source is fully visible for evaluation, review, testing, and bug reporting —
+but you may not fork, port, embed, or commercialize it until the Change Date.
+
+**Commitment to Open Source:** The Licensor intends for the project to be a fully
+open-source (FOSS) project as soon as it is ready — see the [LICENSE](LICENSE)
+which converts to **Apache License 2.0** at the Change Date (target: the v1.0
+release). Read the license for the exact terms.
 
 ---
 
@@ -65,17 +82,13 @@ Gullbúr Enclave is a multi-chain cryptocurrency wallet that runs multiple block
 
 ## Quick Start
 
+> The headless CLI (`gullbur-cli`) is a **Pro/Enterprise** power-user feature and
+> is intentionally **not** part of the public FOSS build. Public users use the
+> desktop GUI (Linux / macOS) or the Android app.
+
 ```bash
-# Build the headless CLI
-cargo build --release -p gullbur-cli --features headless
-
-# Launch the vault server
-./target/release/gullbur-cli launch
-
-# In another terminal:
-./target/release/gullbur-cli init "your seed phrase"
-./target/release/gullbur-cli create-account bitcoin-testnet 0
-./target/release/gullbur-cli get-balance bitcoin-testnet tb1...
+# Build + run the app
+cargo build --release -p gullbur-desktop
 ```
 
 ## Development
@@ -95,15 +108,17 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 
 ## License
 
-MIT OR Apache-2.0
+**Business Source License 1.1 (BSL-1.1)** — source-available during beta/testing.
+Converts to **Apache License 2.0** at the Change Date (target: v1.0 release).
+See [LICENSE](LICENSE) for full terms.
 
 ## Donate
 
 Support the development of Gullbúr Enclave:
 
-- **GitHub Sponsors**: [github.com/sponsors/YOUR_USERNAME](https://github.com/sponsors/YOUR_USERNAME)
-- **Bitcoin**: `bc1q...`
-- **Ethereum**: `0x...`
-- **Monero**: `4...`
+- **GitHub Sponsors**: [github.com/sponsors/MarcusBrammeier](https://github.com/sponsors/MarcusBrammeier)
+- **Bitcoin**: *(address set at v0.1 public release)*
+- **Ethereum**: *(address set at v0.1 public release)*
+- **Monero**: *(address set at v0.1 public release)*
 
 All donations go toward security audits, developer hardware, and open-source sustainability.
