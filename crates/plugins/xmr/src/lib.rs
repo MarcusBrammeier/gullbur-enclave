@@ -622,16 +622,107 @@ impl WalletPlugin for XmrPlugin {
     }
 
     async fn validate_address(&self, addr: &str, network: &str) -> Result<bool, PluginError> {
-        // Monero addresses are base58 strings of 95 or 106 characters
-        let valid_len = addr.len() == 95 || addr.len() == 106;
-        let prefix_ok = match network {
-            "monero" => matches!(addr.chars().next(), Some('4' | '8' | 'A' | 'B')),
-            "monero-stagenet" => matches!(addr.chars().next(), Some('5' | '7' | '9')),
-            "monero-testnet" => matches!(addr.chars().next(), Some('9' | 'A' | 'B')),
-            _ => true,
+        // A valid Monero address decodes to: network_byte || spend_key(32) || view_key(32)
+        // followed by a 4-byte keccak256 checksum. We verify the checksum, not just the
+        // length/prefix, so corrupted or garbage addresses are rejected.
+        let Some(decoded) = base58_decode_bytes(addr) else {
+            return Ok(false);
         };
-        Ok(valid_len && addr.chars().all(|c| c.is_alphanumeric()) && prefix_ok)
+        // Standard address: 1 + 32 + 32 + 4 = 69 bytes → 95 chars.
+        // Integrated/sub-address carry an extra 8-byte field: 69/77 payload.
+        if decoded.len() != 69 && decoded.len() != 77 {
+            return Ok(false);
+        }
+
+        // Split off the 4-byte checksum
+        let (payload, checksum) = decoded.split_at(decoded.len() - 4);
+
+        // Verify network byte matches the requested network
+        let net_ok = match network {
+            "monero" => matches!(payload[0], 18 | 42 | 65 | 66), // mainnet 0x12,0x2a,0x41,0x42
+            "monero-stagenet" => matches!(payload[0], 24 | 54 | 26), // stagenet
+            "monero-testnet" => matches!(payload[0], 53 | 54 | 55), // testnet
+            _ => false,
+        };
+        if !net_ok {
+            return Ok(false);
+        }
+
+        // Verify keccak256(payload)[..4] == checksum
+        use sha3::Digest;
+        let mut hasher = sha3::Keccak256::new();
+        hasher.update(payload);
+        let digest: [u8; 32] = hasher.finalize().into();
+        Ok(&digest[..4] == checksum)
     }
+}
+
+/// Decode a Monero-style base58 string (block-based, matching `base58_encode`).
+/// Returns `None` on invalid characters, empty input, or a malformed block length.
+///
+/// Mirrors `base58_encode`: leading `'1'` chars map to leading zero bytes, then the
+/// significant data is grouped into 11-char blocks (each → 8 bytes) with a final
+/// 2–10-char block (each → 1–7 bytes) per Monero's block table.
+fn base58_decode_bytes(s: &str) -> Option<Vec<u8>> {
+    const ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    if s.is_empty() {
+        return None;
+    }
+    let bytes: Vec<u8> = s.bytes().collect();
+    if bytes.iter().any(|&b| !ALPHABET.contains(&b)) {
+        return None;
+    }
+    fn digit(c: u8) -> u64 {
+        match c {
+            b'1'..=b'9' => (c - b'1') as u64,
+            b'A'..=b'H' => (c - b'A' + 9) as u64,
+            b'J'..=b'N' => (c - b'J' + 17) as u64,
+            b'P'..=b'Z' => (c - b'P' + 22) as u64,
+            b'a'..=b'k' => (c - b'a' + 33) as u64,
+            b'm'..=b'z' => (c - b'm' + 44) as u64,
+            _ => u64::MAX, // 'O','I','l' are the excluded four — unreachable after alphabet check
+        }
+    }
+
+    // Leading '1' chars → leading zero bytes
+    let leading_ones = bytes.iter().take_while(|&&b| b == b'1').count();
+
+    let mut out: Vec<u8> = vec![0u8; leading_ones];
+    let significant = &bytes[leading_ones..];
+
+    // Process full 11-char blocks → 8 bytes each
+    let mut i = 0;
+    while significant.len() - i >= 11 {
+        let block = &significant[i..i + 11];
+        let mut value: u64 = 0;
+        for &c in block {
+            value = value.wrapping_mul(58).wrapping_add(digit(c));
+        }
+        out.extend_from_slice(&value.to_be_bytes());
+        i += 11;
+    }
+
+    // Final partial block (2,3,5,6,7,8,10 chars → 1,2,3,4,5,6,7 bytes)
+    let rem = significant.len() - i;
+    if rem > 0 {
+        // The only valid remainder lengths are those produced by the encoder.
+        if ![2usize, 3, 5, 6, 7, 8, 10].contains(&rem) {
+            return None;
+        }
+        let block = &significant[i..];
+        let mut value: u64 = 0;
+        for &c in block {
+            value = value.wrapping_mul(58).wrapping_add(digit(c));
+        }
+        let nbytes = match rem {
+            2 => 1, 3 => 2, 5 => 3, 6 => 4, 7 => 5, 8 => 6, 10 => 7, _ => unreachable!(),
+        };
+        let be = value.to_be_bytes();
+        out.extend_from_slice(&be[8 - nbytes..]);
+    }
+
+    Some(out)
 }
 
 // ── Wallet-RPC helpers (standalone impl block) ──────────────────────
@@ -1129,33 +1220,68 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_validate_mainnet_address() {
+    #[tokio::test]
+    async fn test_validate_mainnet_address() {
         let plugin = XmrPlugin::new();
-        // Mainnet address: 95 chars starting with '4'
-        let addr = format!("4{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero"))
+        // Generate a REAL mainnet address (valid keccak checksum) via create_account
+        let account = plugin
+            .create_account(&[0x11u8; 64], 0, "monero")
+            .await
             .expect("test invariant");
-        assert!(result, "mainnet address starting with '4' should be valid");
+        let result = plugin
+            .validate_address(&account.address, "monero")
+            .await
+            .expect("test invariant");
+        assert!(result, "real mainnet address should validate");
     }
 
-    #[test]
-    fn test_validate_stagenet_address() {
+    #[tokio::test]
+    async fn test_validate_stagenet_address() {
         let plugin = XmrPlugin::new();
-        let addr = format!("5{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero-stagenet"))
+        let account = plugin
+            .create_account(&[0x22u8; 64], 0, "monero-stagenet")
+            .await
             .expect("test invariant");
-        assert!(result, "stagenet address starting with '5' should be valid");
+        let result = plugin
+            .validate_address(&account.address, "monero-stagenet")
+            .await
+            .expect("test invariant");
+        assert!(result, "real stagenet address should validate");
     }
 
-    #[test]
-    fn test_validate_address_wrong_network_rejected() {
+    #[tokio::test]
+    async fn test_validate_address_wrong_network_rejected() {
         let plugin = XmrPlugin::new();
-        // Stagenet address on mainnet should fail
-        let addr = format!("5{:0>94}", "");
-        let result = futures::executor::block_on(plugin.validate_address(&addr, "monero"))
+        // A real mainnet address must be rejected on stagenet
+        let account = plugin
+            .create_account(&[0x33u8; 64], 0, "monero")
+            .await
             .expect("test invariant");
-        assert!(!result, "stagenet prefix should be rejected on mainnet");
+        let result = plugin
+            .validate_address(&account.address, "monero-stagenet")
+            .await
+            .expect("test invariant");
+        assert!(!result, "mainnet address should be rejected on stagenet");
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_bad_checksum_rejected() {
+        let plugin = XmrPlugin::new();
+        // Corrupt a real address's checksum (flip a trailing char) → must be rejected.
+        // This is the false-positive case: a garbage '4...' string used to pass.
+        let account = plugin
+            .create_account(&[0x44u8; 64], 0, "monero")
+            .await
+            .expect("test invariant");
+        let mut chars: Vec<char> = account.address.chars().collect();
+        let last = *chars.last().unwrap();
+        *chars.last_mut().unwrap() = if last == 'A' { 'B' } else { 'A' };
+        let corrupted: String = chars.into_iter().collect();
+        let result = plugin
+            .validate_address(&corrupted, "monero")
+            .await
+            .expect("test invariant");
+        assert!(!result, "corrupted-checksum address should be rejected");
     }
 
     #[test]

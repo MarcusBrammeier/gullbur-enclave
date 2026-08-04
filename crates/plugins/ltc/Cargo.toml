@@ -9,6 +9,7 @@ description = "Litecoin plugin — FPI reference implementation (Scrypt-based, L
 [dependencies]
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
+base58ck = { workspace = true }
 crypto-core = { path = "../../crypto-core" }
 bech32 = { version = ">=0.11,<0.12" }
 hex = { workspace = true }

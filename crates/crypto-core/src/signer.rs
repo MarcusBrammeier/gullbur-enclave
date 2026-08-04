@@ -4,6 +4,10 @@
 use crate::error::CryptoError;
 use crate::hash;
 
+/// Sign `message` with ECDSA over secp256k1 using a raw 32-byte secret key.
+///
+/// The message is hashed with SHA-256 before signing. Returns the DER-encoded
+/// ECDSA signature bytes.
 pub fn sign_ecdsa_secp256k1(message: &[u8], secret: &[u8; 32]) -> Result<Vec<u8>, CryptoError> {
     use k256::ecdsa::signature::Signer;
     let signing_key = k256::ecdsa::SigningKey::from_slice(secret)
@@ -13,6 +17,10 @@ pub fn sign_ecdsa_secp256k1(message: &[u8], secret: &[u8; 32]) -> Result<Vec<u8>
     Ok(sig.to_vec())
 }
 
+/// Sign a pre-computed 32-byte message hash with ECDSA over secp256k1 (k256).
+///
+/// Takes a `k256::SecretKey` and returns DER-encoded signature bytes. The caller
+/// is responsible for hashing the message beforehand.
 pub fn sign_ecdsa_k256(
     message_hash: &[u8; 32],
     secret: &k256::SecretKey,
@@ -23,6 +31,10 @@ pub fn sign_ecdsa_k256(
     Ok(sig.to_vec())
 }
 
+/// Sign `message` with BIP-340 Schnorr over secp256k1 using a raw 32-byte secret key.
+///
+/// The message is hashed with SHA-256 before signing. Returns the 64-byte Schnorr
+/// signature (32-byte `r` || 32-byte `s`).
 pub fn sign_schnorr(message: &[u8], secret: &[u8; 32]) -> Result<Vec<u8>, CryptoError> {
     use k256::schnorr::signature::Signer;
     let signing_key = k256::schnorr::SigningKey::from_slice(secret)
@@ -32,6 +44,11 @@ pub fn sign_schnorr(message: &[u8], secret: &[u8; 32]) -> Result<Vec<u8>, Crypto
     Ok(sig.to_bytes().to_vec())
 }
 
+/// Verify an ECDSA signature over secp256k1 against a SEC1-encoded public key.
+///
+/// The message is hashed with SHA-256 before verification (matching
+/// [`sign_ecdsa_secp256k1`]). Returns `Ok(true)` if the signature is valid,
+/// `Ok(false)` if it is not, and `Err` on malformed input.
 pub fn verify_ecdsa_secp256k1(
     message: &[u8],
     signature: &[u8],

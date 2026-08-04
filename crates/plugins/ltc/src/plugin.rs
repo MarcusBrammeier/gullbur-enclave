@@ -408,30 +408,34 @@ impl WalletPlugin for LtcPlugin {
     async fn validate_address(&self, addr: &str, network: &str) -> Result<bool, PluginError> {
         match network {
             "litecoin" => {
-                // Try bech32 checksum validation via segwit decode
-                #[allow(clippy::collapsible_if)]
+                // Bech32 segwit (ltc1...): decode validates the checksum.
                 if let Ok((hrp, _, _)) = bech32::segwit::decode(addr) {
                     if hrp.as_str() == "ltc" {
                         return Ok(true);
                     }
                 }
-                // Fall back to legacy P2PKH/P2SH prefix check
-                Ok(addr.starts_with("L") || addr.starts_with("M") || addr.starts_with("ltc1"))
+                // Legacy P2PKH/P2SH (L/M...): require a valid base58check checksum,
+                // not just the prefix. This rejects corrupted/garbage addresses.
+                if base58ck::decode_check(addr).is_ok() {
+                    return Ok(addr.starts_with('L') || addr.starts_with('M'));
+                }
+                Ok(false)
             }
             "litecoin-testnet" => {
-                // Try bech32 checksum validation via segwit decode
-                #[allow(clippy::collapsible_if)]
+                // Bech32 segwit (tltc1...): decode validates the checksum.
                 if let Ok((hrp, _, _)) = bech32::segwit::decode(addr) {
                     if hrp.as_str() == "tltc" {
                         return Ok(true);
                     }
                 }
-                // Fall back to legacy P2PKH/P2SH prefix check
-                Ok(addr.starts_with("m")
-                    || addr.starts_with("n")
-                    || addr.starts_with("tltc1")
-                    || addr.starts_with("Q")
-                    || addr.starts_with("T"))
+                // Legacy P2PKH/P2SH (m/n/Q/T...): require a valid base58check checksum.
+                if base58ck::decode_check(addr).is_ok() {
+                    return Ok(addr.starts_with('m')
+                        || addr.starts_with('n')
+                        || addr.starts_with('Q')
+                        || addr.starts_with('T'));
+                }
+                Ok(false)
             }
             _ => Ok(false),
         }
@@ -462,8 +466,12 @@ mod tests {
     #[test]
     fn test_validate_ltc1_address() {
         let plugin = LtcPlugin::new();
-        let result = futures::executor::block_on(plugin.validate_address("ltc1q...", "litecoin"))
-            .expect("test invariant");
+        // Valid LTC mainnet bech32 segwit (real checksum), starts with 'ltc1'
+        let result = futures::executor::block_on(plugin.validate_address(
+            "ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy",
+            "litecoin",
+        ))
+        .expect("test invariant");
         assert!(result);
     }
 
@@ -601,35 +609,79 @@ mod tests {
     #[test]
     fn test_validate_address_mainnet_legacy() {
         let plugin = LtcPlugin::new();
+        // Valid LTC mainnet P2PKH (starts with 'L', correct base58check checksum)
+        let r = futures::executor::block_on(plugin.validate_address(
+            "LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34",
+            "litecoin",
+        ))
+        .expect("test invariant");
+        assert!(r);
+    }
+
+    #[test]
+    fn test_validate_address_mainnet_legacy_rejects_bad_checksum() {
+        let plugin = LtcPlugin::new();
+        // Same prefix and length, but corrupted base58check checksum → must reject.
+        // This is the false-positive case: a garbage 'L...' string used to pass.
         let r = futures::executor::block_on(plugin.validate_address("Labc123", "litecoin"))
             .expect("test invariant");
-        assert!(r);
+        assert!(!r);
     }
 
     #[test]
     fn test_validate_address_mainnet_bech32() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("ltc1qabc123", "litecoin"))
-            .expect("test invariant");
+        // Valid LTC mainnet bech32 segwit, starts with 'ltc1'
+        let r = futures::executor::block_on(plugin.validate_address(
+            "ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy",
+            "litecoin",
+        ))
+        .expect("test invariant");
         assert!(r);
     }
 
     #[test]
     fn test_validate_address_testnet_bech32() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(
-            plugin.validate_address("tltc1qabc123", "litecoin-testnet"),
-        )
+        // Valid LTC testnet bech32 segwit, starts with 'tltc1'
+        let r = futures::executor::block_on(plugin.validate_address(
+            "tltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysnxzku7w",
+            "litecoin-testnet",
+        ))
         .expect("test invariant");
         assert!(r);
     }
 
     #[test]
+    fn test_validate_address_testnet_legacy() {
+        let plugin = LtcPlugin::new();
+        // Valid LTC testnet P2PKH (starts with 'm', correct checksum)
+        let r = futures::executor::block_on(plugin.validate_address(
+            "mfWyW5fc9NUj75YAnFgoRLrjxgLDn2MMth",
+            "litecoin-testnet",
+        ))
+        .expect("test invariant");
+        assert!(r);
+    }
+
+    #[test]
+    fn test_validate_address_testnet_legacy_rejects_bad_checksum() {
+        let plugin = LtcPlugin::new();
+        let r = futures::executor::block_on(plugin.validate_address("mabc12345", "litecoin-testnet"))
+            .expect("test invariant");
+        assert!(!r);
+    }
+
+    #[test]
     fn test_validate_address_testnet_rejects_mainnet() {
         let plugin = LtcPlugin::new();
+        // A valid mainnet LTC address must not validate as testnet
         let r =
-            futures::executor::block_on(plugin.validate_address("ltc1qabc...", "litecoin-testnet"))
-                .expect("test invariant");
+            futures::executor::block_on(plugin.validate_address(
+                "LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34",
+                "litecoin-testnet",
+            ))
+            .expect("test invariant");
         assert!(!r);
     }
 

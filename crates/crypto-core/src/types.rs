@@ -42,14 +42,17 @@ impl MnemonicStrength {
 pub struct MnemonicPhrase(pub Vec<String>);
 
 impl MnemonicPhrase {
+    /// Construct a `MnemonicPhrase` from a word list.
     pub fn new(words: Vec<String>) -> Self {
         Self(words)
     }
 
+    /// Borrow the words of the phrase.
     pub fn as_words(&self) -> &[String] {
         &self.0
     }
 
+    /// Consume the phrase and return ownership of the underlying word list.
     pub fn into_words(self) -> Vec<String> {
         self.0.clone()
     }
@@ -70,14 +73,19 @@ impl AsRef<[u8]> for Seed {
 /// Key types supported across all plugins.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyType {
+    /// secp256k1 elliptic-curve keys (Bitcoin, Litecoin, EVM signatures).
     Secp256k1,
+    /// ed25519 keys (Monero compatibility).
     Ed25519,
 }
 
 /// Generic key handle referencing a key in the keystore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyHandle {
+    /// Opaque identifier resolving to a stored key (e.g. `secp256k1-<fingerprint>`).
     pub key_id: String,
+    /// The family/cipher of the referenced key.
     pub key_type: KeyType,
+    /// SEC1-encoded public key bytes (empty for keys kept locally secret).
     pub public_key: Vec<u8>,
 }

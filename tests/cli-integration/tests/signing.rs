@@ -60,7 +60,7 @@ async fn setup_signing_server(
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.initialize");
+    assert_ok(&r, "vault.initialize");
 
     // Extract the seed hex from initialization — the master_key key_id
     // "bip44-eth-0" is not the seed. Instead, derive the seed locally
@@ -81,7 +81,10 @@ async fn setup_signing_server(
     )
     .await;
     let result = assert_ok(&r, "vault.create_account");
-    let account_id = result["id"].as_str().expect("test invariant").to_string();
+    // NOTE: the tuple returns seed_hex (index 2), not the account id. We bind to
+    // `_account_id` here so the intermediate value is explicit but not flagged
+    // as unused under `-D warnings`.
+    let _account_id = result["id"].as_str().expect("test invariant").to_string();
 
     (token, handle, seed_hex, auth_manager)
 }

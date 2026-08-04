@@ -3687,6 +3687,7 @@ name = "plugin-ltc"
 version = "0.0.7"
 dependencies = [
  "async-trait",
+ "base58ck",
  "bech32",
  "bitcoin",
  "crypto-core",

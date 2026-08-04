@@ -7,19 +7,28 @@ use wallet_plugin::{
 
 use reqwest;
 
+/// Bitcoin plugin for Gullbúr Enclave.
+///
+/// Implements [`WalletPlugin`] for P2WPKH (SegWit v0, BIP-84) accounts, PSBT signing,
+/// and Esplora-backed balance/history/fee/broadcast. All network access can be routed
+/// through a SOCKS5 proxy (e.g. Tor) via [`BtcPlugin::with_tor`].
 pub struct BtcPlugin {
+    /// Optional SOCKS5 proxy URL used for all outbound HTTP requests.
     socks5_proxy: Option<String>,
 }
 
 impl BtcPlugin {
+    /// Create a BTC plugin with no proxy (direct network access).
     pub fn new(socks5_proxy: Option<String>) -> Self {
         Self { socks5_proxy }
     }
 
+    /// Create a BTC plugin that routes all requests through a local Tor SOCKS port.
     pub fn with_tor(socks_port: u16) -> Self {
         Self::new(Some(format!("socks5://127.0.0.1:{socks_port}")))
     }
 
+    /// Build an HTTP client with the configured timeout and optional proxy.
     fn build_client(&self) -> Result<reqwest::Client, reqwest::Error> {
         let mut builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
         if let Some(ref proxy_url) = self.socks5_proxy {
@@ -55,6 +64,7 @@ static BTC_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| {
     ]
 });
 
+/// Return the Esplora HTTP API base URL for the given Bitcoin network.
 fn esplora_base(network: &str) -> &str {
     match network {
         "bitcoin" => "https://blockstream.info/api",
