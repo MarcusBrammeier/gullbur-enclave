@@ -11,7 +11,7 @@ use sha2::Sha512;
 use zeroize::Zeroizing;
 
 fn derive_bytes(seed: &[u8], index: u32, label: &[u8]) -> Result<[u8; 32], CryptoError> {
-    let mut mac = Hmac::<Sha512>::new_from_slice(label)
+    let mut mac = <Hmac<Sha512> as KeyInit>::new_from_slice(label)
         .map_err(|e| CryptoError::DerivationError(e.to_string()))?;
     mac.update(seed);
     mac.update(&index.to_be_bytes());

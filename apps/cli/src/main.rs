@@ -12,7 +12,7 @@ mod vault;
 #[derive(Parser)]
 #[command(
     name = "gullbur-cli",
-    version = "0.0.1",
+    version = "0.0.7",
     about = "Gullbúr Enclave Internal CLI"
 )]
 struct Cli {

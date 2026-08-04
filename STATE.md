@@ -1,6 +1,6 @@
 # Gullbúr Enclave — Project State
 
-> **Version:** 0.1.0  
+> **Version:** 0.0.7 (pre-beta, internal)
 > **Last updated:** 2026-08-03  
 > **HEAD:** `c7480c2` (2026-08-03)  
 > **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (279 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (41) | `cargo test -p vault-core --test e2e_websocket` ✅ | **IPC e2e handshake (3 tests) ✅** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
