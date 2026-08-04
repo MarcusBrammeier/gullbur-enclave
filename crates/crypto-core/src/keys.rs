@@ -337,27 +337,36 @@ mod tests {
         let hash = sha3::Keccak256::digest(&encoded.as_bytes()[1..]);
         let address = format!("0x{}", hex::encode(&hash[12..]));
 
-        // Step 4: Verify with `cast wallet address` (reference implementation)
-        let key_hex = hex::encode(key_bytes);
-        let output = std::process::Command::new("cast")
-            .args([
-                "wallet",
-                "address",
-                "--private-key",
-                &format!("0x{}", key_hex),
-            ])
+        // Step 4: Verify with `cast wallet address` (reference implementation) if available.
+        // Cast is part of foundry (foundry.tools). On CI runners it's usually absent,
+        // so we skip the cross-check but the BIP-39 seed + BIP-32 derivation above
+        // are still tested against the known test vector.
+        if std::process::Command::new("cast")
+            .arg("--version")
             .output()
-            .expect("cast not found — install foundry (foundry.tools)");
-        let cast_addr = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string()
-            .to_lowercase();
+            .is_ok()
+        {
+            let key_hex = hex::encode(key_bytes);
+            let output = std::process::Command::new("cast")
+                .args([
+                    "wallet",
+                    "address",
+                    "--private-key",
+                    &format!("0x{}", key_hex),
+                ])
+                .output()
+                .expect("cast not found — install foundry (foundry.tools)");
+            let cast_addr = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .to_string()
+                .to_lowercase();
 
-        assert_eq!(
-            address.to_lowercase(),
-            cast_addr,
-            "BIP-32 derivation: ETH address mismatch with cast wallet address!"
-        );
+            assert_eq!(
+                address.to_lowercase(),
+                cast_addr,
+                "BIP-32 derivation: ETH address mismatch with cast wallet address!"
+            );
+        } // cast available check
     }
 
     // ── Proptest: sign→verify roundtrip for k256 ─────────────────────────
