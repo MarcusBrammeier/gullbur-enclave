@@ -414,7 +414,9 @@ impl WalletPlugin for LtcPlugin {
                         return Ok(true);
                     }
                     // fall through to legacy check below
-                } else if base58ck::decode_check(addr).is_ok() && (addr.starts_with('L') || addr.starts_with('M')) {
+                } else if base58ck::decode_check(addr).is_ok()
+                    && (addr.starts_with('L') || addr.starts_with('M'))
+                {
                     // Legacy P2PKH/P2SH (L/M...): require a valid base58check checksum,
                     // not just the prefix. This rejects corrupted/garbage addresses.
                     return Ok(true);
@@ -469,10 +471,9 @@ mod tests {
     fn test_validate_ltc1_address() {
         let plugin = LtcPlugin::new();
         // Valid LTC mainnet bech32 segwit (real checksum), starts with 'ltc1'
-        let result = futures::executor::block_on(plugin.validate_address(
-            "ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy",
-            "litecoin",
-        ))
+        let result = futures::executor::block_on(
+            plugin.validate_address("ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy", "litecoin"),
+        )
         .expect("test invariant");
         assert!(result);
     }
@@ -612,10 +613,9 @@ mod tests {
     fn test_validate_address_mainnet_legacy() {
         let plugin = LtcPlugin::new();
         // Valid LTC mainnet P2PKH (starts with 'L', correct base58check checksum)
-        let r = futures::executor::block_on(plugin.validate_address(
-            "LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34",
-            "litecoin",
-        ))
+        let r = futures::executor::block_on(
+            plugin.validate_address("LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34", "litecoin"),
+        )
         .expect("test invariant");
         assert!(r);
     }
@@ -634,10 +634,9 @@ mod tests {
     fn test_validate_address_mainnet_bech32() {
         let plugin = LtcPlugin::new();
         // Valid LTC mainnet bech32 segwit, starts with 'ltc1'
-        let r = futures::executor::block_on(plugin.validate_address(
-            "ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy",
-            "litecoin",
-        ))
+        let r = futures::executor::block_on(
+            plugin.validate_address("ltc1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysn3s44dy", "litecoin"),
+        )
         .expect("test invariant");
         assert!(r);
     }
@@ -658,10 +657,9 @@ mod tests {
     fn test_validate_address_testnet_legacy() {
         let plugin = LtcPlugin::new();
         // Valid LTC testnet P2PKH (starts with 'm', correct checksum)
-        let r = futures::executor::block_on(plugin.validate_address(
-            "mfWyW5fc9NUj75YAnFgoRLrjxgLDn2MMth",
-            "litecoin-testnet",
-        ))
+        let r = futures::executor::block_on(
+            plugin.validate_address("mfWyW5fc9NUj75YAnFgoRLrjxgLDn2MMth", "litecoin-testnet"),
+        )
         .expect("test invariant");
         assert!(r);
     }
@@ -669,8 +667,9 @@ mod tests {
     #[test]
     fn test_validate_address_testnet_legacy_rejects_bad_checksum() {
         let plugin = LtcPlugin::new();
-        let r = futures::executor::block_on(plugin.validate_address("mabc12345", "litecoin-testnet"))
-            .expect("test invariant");
+        let r =
+            futures::executor::block_on(plugin.validate_address("mabc12345", "litecoin-testnet"))
+                .expect("test invariant");
         assert!(!r);
     }
 
@@ -678,12 +677,10 @@ mod tests {
     fn test_validate_address_testnet_rejects_mainnet() {
         let plugin = LtcPlugin::new();
         // A valid mainnet LTC address must not validate as testnet
-        let r =
-            futures::executor::block_on(plugin.validate_address(
-                "LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34",
-                "litecoin-testnet",
-            ))
-            .expect("test invariant");
+        let r = futures::executor::block_on(
+            plugin.validate_address("LKDyUEtTR1HXamkiEphisSiBJu6o3ZPE34", "litecoin-testnet"),
+        )
+        .expect("test invariant");
         assert!(!r);
     }
 
