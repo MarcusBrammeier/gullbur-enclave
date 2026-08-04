@@ -62,10 +62,12 @@ async fn e2e_encrypted_roundtrip() {
         Message::Text(t) => t.to_string(),
         _ => panic!("expected text, got: {session_msg:?}"),
     };
-    let session_val: serde_json::Value =
-        serde_json::from_str(&session_text).expect("valid json");
+    let session_val: serde_json::Value = serde_json::from_str(&session_text).expect("valid json");
     assert_eq!(session_val["type"], "session_key");
-    let key_hex = session_val["key"].as_str().expect("session key").to_string();
+    let key_hex = session_val["key"]
+        .as_str()
+        .expect("session key")
+        .to_string();
     eprintln!("session key exchanged ({} chars)", key_hex.len());
 
     // 3. Encrypt a JSON-RPC request with the session key (AES-256-GCM).
@@ -79,8 +81,7 @@ async fn e2e_encrypted_roundtrip() {
         .expect("valid hex")
         .try_into()
         .expect("32 bytes");
-    let enc_payload =
-        isolation::encrypt(&key_bytes, &request).expect("encrypt");
+    let enc_payload = isolation::encrypt(&key_bytes, &request).expect("encrypt");
     let wrapped = serde_json::json!({
         "__encrypted__": true,
         "__payload__": enc_payload,
@@ -100,8 +101,7 @@ async fn e2e_encrypted_roundtrip() {
         Message::Text(t) => t.to_string(),
         o => panic!("expected text, got: {o:?}"),
     };
-    let resp_val: serde_json::Value =
-        serde_json::from_str(&resp_text).expect("valid json");
+    let resp_val: serde_json::Value = serde_json::from_str(&resp_text).expect("valid json");
     assert!(
         resp_val.get("__encrypted__").and_then(|v| v.as_bool()) == Some(true),
         "response must be encrypted: {resp_text}"
@@ -114,8 +114,6 @@ async fn e2e_encrypted_roundtrip() {
     let mnemonic = decrypted["result"]["mnemonic"].as_str().expect("mnemonic");
     let words: Vec<&str> = mnemonic.split_whitespace().collect();
     assert_eq!(words.len(), 24, "24-word mnemonic, got {}", words.len());
-    eprintln!(
-        "✅ Encrypted IPC round-trip: 24-word mnemonic via AES-256-GCM"
-    );
+    eprintln!("✅ Encrypted IPC round-trip: 24-word mnemonic via AES-256-GCM");
     let _ = std::fs::remove_file(&token_path);
 }

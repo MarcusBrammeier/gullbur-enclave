@@ -91,7 +91,10 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// - `Ok(Some(UpdateInfo))` — a newer release exists or info on current release
 /// - `Ok(None)` — no releases found
 /// - `Err(UpdateError)` — the check failed
-pub async fn check_for_updates(repo: &str, token: Option<&str>) -> Result<Option<UpdateInfo>, UpdateError> {
+pub async fn check_for_updates(
+    repo: &str,
+    token: Option<&str>,
+) -> Result<Option<UpdateInfo>, UpdateError> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
 
     let client = reqwest::Client::builder()

@@ -32,8 +32,7 @@ struct Harness {
 
 impl Harness {
     async fn new(port: u16) -> Self {
-        let server =
-            ipc_core::server::IpcServer::new(port).expect("create IPC server");
+        let server = ipc_core::server::IpcServer::new(port).expect("create IPC server");
         let token_path = server.auth_token_path().to_path_buf();
         {
             let mut handler = server.handler().await;
@@ -57,7 +56,10 @@ impl Harness {
             .expect("connect");
         let (mut write, mut read) = ws.split();
         // Hello handshake
-        write.send(Message::Text(r#"{"type":"hello"}"#.into())).await.ok()?;
+        write
+            .send(Message::Text(r#"{"type":"hello"}"#.into()))
+            .await
+            .ok()?;
         let _ = read.next().await; // session_key
         // Send the raw frame
         write.send(Message::Text(text.into())).await.ok()?;
@@ -140,7 +142,10 @@ async fn sensitive_ops_require_unlock() {
         .await;
     assert!(resp.is_some());
     let v: serde_json::Value = serde_json::from_str(&resp.unwrap()).expect("json");
-    assert_eq!(v["error"]["code"], -32002, "auth required before unlock: {v}");
+    assert_eq!(
+        v["error"]["code"], -32002,
+        "auth required before unlock: {v}"
+    );
     let _ = std::fs::remove_file(&h.token_path);
 }
 
