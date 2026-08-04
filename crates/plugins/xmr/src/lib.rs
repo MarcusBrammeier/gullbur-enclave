@@ -641,7 +641,7 @@ impl WalletPlugin for XmrPlugin {
         let net_ok = match network {
             "monero" => matches!(payload[0], 18 | 42 | 65 | 66), // mainnet 0x12,0x2a,0x41,0x42
             "monero-stagenet" => matches!(payload[0], 24 | 54 | 26), // stagenet
-            "monero-testnet" => matches!(payload[0], 53 | 54 | 55), // testnet
+            "monero-testnet" => matches!(payload[0], 53..=55), // testnet
             _ => false,
         };
         if !net_ok {
