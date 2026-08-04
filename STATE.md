@@ -93,7 +93,7 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo tauri android build --target aarch64` | ✅ (APK 12M universal, **AAB 7.1M**) |
 | `scripts/cli-binary-sweep.sh` | ✅ (12 checks incl. **real WS handshake probe**) |
 | `scripts/android-sweep.sh` | ✅ (added **on-device adb-forward WS handshake**) |
-| **scripts/full-functional-sweep.py** | ✅ **31/31 checks** — every vault IPC method exercised against real binary |
+| **scripts/full-functional-sweep.py** | ✅ **33/33 checks** — every vault IPC method exercised against real binary |
 
 ### Fixes Applied This Batch (beta.5 + beta.6)
 
@@ -134,3 +134,4 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
 - **279+ unit tests** + **41 CLI integration** + **3 IPC e2e handshake** — all passing
 - **ws-handshake-probe.py** — live WS hello→session_key→RPC probe used by CLI & Android sweeps
+- **full-functional-sweep.py** — **33/33 checks**, every IPC method exercised via real binary WS protocol

@@ -245,9 +245,10 @@ check("status after lock: still returns data", "plugin_ids" in st2, str(st2)[:80
 
 # ── PHASE 16: Phase 2 extension methods (expected to reject w/o origin) ──
 print("\n▸ [16] Phase 2 extension methods (expected error w/o origin)")
-eb = ws_call("vault_executeBatch", {"network": "ethereum", "operations": [], "origin": ""})
-# Without a valid origin + approval UI, these fail gracefully
-check("vault_executeBatch: returns error (no approval UI)", "error" in eb or "raw_stdout" in eb, str(eb)[:80])
+for ext_method in ["vault_executeBatch", "vault_requestSessionKey", "vault_simulateAndSend"]:
+    eb = ws_call(ext_method, {"network": "ethereum", "operations": [], "origin": ""})
+    check(f"{ext_method}: returns error (no approval UI)",
+          "error" in eb or "raw_stdout" in eb, str(eb)[:80])
 
 # ── SUMMARY ───────────────────────────────────────────────────────────────
 print(f"\n═══════════════════════════════════════════════════════════")
