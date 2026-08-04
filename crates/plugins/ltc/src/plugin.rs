@@ -413,11 +413,11 @@ impl WalletPlugin for LtcPlugin {
                     if hrp.as_str() == "ltc" {
                         return Ok(true);
                     }
-                }
-                // Legacy P2PKH/P2SH (L/M...): require a valid base58check checksum,
-                // not just the prefix. This rejects corrupted/garbage addresses.
-                if base58ck::decode_check(addr).is_ok() {
-                    return Ok(addr.starts_with('L') || addr.starts_with('M'));
+                    // fall through to legacy check below
+                } else if base58ck::decode_check(addr).is_ok() && (addr.starts_with('L') || addr.starts_with('M')) {
+                    // Legacy P2PKH/P2SH (L/M...): require a valid base58check checksum,
+                    // not just the prefix. This rejects corrupted/garbage addresses.
+                    return Ok(true);
                 }
                 Ok(false)
             }
@@ -427,13 +427,15 @@ impl WalletPlugin for LtcPlugin {
                     if hrp.as_str() == "tltc" {
                         return Ok(true);
                     }
-                }
-                // Legacy P2PKH/P2SH (m/n/Q/T...): require a valid base58check checksum.
-                if base58ck::decode_check(addr).is_ok() {
-                    return Ok(addr.starts_with('m')
+                    // fall through to legacy check below
+                } else if base58ck::decode_check(addr).is_ok()
+                    && (addr.starts_with('m')
                         || addr.starts_with('n')
                         || addr.starts_with('Q')
-                        || addr.starts_with('T'));
+                        || addr.starts_with('T'))
+                {
+                    // Legacy P2PKH/P2SH (m/n/Q/T...): require a valid base58check checksum.
+                    return Ok(true);
                 }
                 Ok(false)
             }
