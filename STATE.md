@@ -93,14 +93,19 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo tauri android build --target aarch64` | ✅ (APK 12M universal, **AAB 7.1M**) |
 | `scripts/cli-binary-sweep.sh` | ✅ (12 checks incl. **real WS handshake probe**) |
 | `scripts/android-sweep.sh` | ✅ (added **on-device adb-forward WS handshake**) |
+| **scripts/full-functional-sweep.py** | ✅ **31/31 checks** — every vault IPC method exercised against real binary |
 
-### Fixes Applied This Batch (beta.4)
+### Fixes Applied This Batch (beta.5 + beta.6)
 
 1. **Closed the IPC handshake verification hole** — CLI/Android sweep scripts previously only checked the port was listening (`/proc/net/tcp`). Added `scripts/ws-handshake-probe.py` doing a **real WebSocket handshake** (hello → session_key → JSON-RPC) against the live binary; wired into both `cli-binary-sweep.sh` (step 1b) and `android-sweep.sh` (adb-forward on-device).
 2. **Fixed brittle hello-auth in `ipc-core`** — the loopback hello check was an exact *string* match (`== "{\"type\":\"hello\"}"`), rejecting valid whitespace-form JSON (e.g. Python's `json.dumps`). Now parsed **structurally**; locked in with `test_hello_is_structural_json`.
 3. **Multi-input PSBT regression test** — `test_sign_transaction_multi_input_all_inputs_signed` proves sign_transaction signs EVERY input (not just `inputs[0]`) with the same key. Closes Phase 2.1.
 4. **APK/AAB shrink** — release profile: `strip=true` (was `strip="symbols"`, keeps debuginfo) → **AAB 12M→7.1M** (under 8M target). Kept `lto="thin"` to preserve build/fuzz speed (fat LTO barely moved the `.so`). Universal APK stays 12M (bundles uncompressed arm64 `.so` for direct-mmap side-load).
 5. **full-test-sweep Layer 3** — grep `-v "0 passed; 0 failed"` filter (doc-header + trailing zero) + Layer 6 branding exclusion for android-sweep.sh (pending from prior session, now committed).
+6. **Phone home: repo deployed to GitHub** — `github.com/MarcusBrammeier/gullbur-enclave` (private). Github Actions CI green (apt deps, frontend build, 32 crypto-core tests, clippy, deny, cli-integration). Dependabot active.
+7. **Phase 2 integration tests** — Extension-relay E2E (3 real-binary pipe tests), Tor real-circuit (3 tests with live HTTP-200 through SOCKS), XMR wallet-rpc live (real v0.18.5.1 binary, stagenet wallet). All #[ignore]d by default for CI.
+8. **Fingerprint/FIDO2 seams** — `BiometricPolicy` lockout extracted (5 tests), wired into `confirm_hardware`. `VaultState::with_biometric_engine()` + `with_fido2_authenticator()` injectors. FIDO2 flow test (4 tests through object-safe dyn trait). Android adapters token-gated (need arm64 device).
+9. **Full functional sweep** — `scripts/full-functional-sweep.py` exercises ALL 16 vault IPC methods through the real binary WebSocket protocol. **31/31 checks PASS** on every launch→generate→init→create (4)→status→list_networks→validate_address→list_accounts→balance→fee→history→sign→broadcast→lock→blocked→status. New Layer 8 in full-test-sweep.sh.
 
 ---
 

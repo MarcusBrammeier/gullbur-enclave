@@ -90,7 +90,7 @@ else
   fail "Stale fosscrypto in: $STALE"
 fi
 
-# ── Layer 7: Desktop build ───────────────────────────────────────
+# ── Layer 7: Desktop binary builds ───────────────────────────────────────
 echo "▸ Layer 7: Desktop binary builds"
 if [ -f target/release/gullbur-desktop ]; then
   pass "gullbur-desktop binary exists ($(du -h target/release/gullbur-desktop | cut -f1))"
@@ -98,7 +98,28 @@ else
   fail "gullbur-desktop binary missing (run: cargo build --release -p gullbur-desktop)"
 fi
 
-# ── Summary ──────────────────────────────────────────────────────
+# ── Layer 8: Full functional sweep (every vault IPC method via WS) ──────
+echo "▸ Layer 8: Full functional sweep"
+# Launch a temp IPC server, run the Python sweep, kill the server
+CLI="$ROOT/target/release/gullbur-cli"
+SWEEP="$ROOT/scripts/full-functional-sweep.py"
+if [ -f "$CLI" ] && [ -f "$SWEEP" ]; then
+  TMPDIR=$(mktemp -d /tmp/full-sweep-layer8-XXXX)
+  "$CLI" --port 19891 launch >/dev/null 2>&1 &
+  SRV=$!
+  sleep 2
+  if python3 "$SWEEP" 19891 2>&1 | grep -q "ALL.*CHECKS PASSED"; then
+    pass "Full functional sweep: all vault IPC methods"
+  else
+    fail "Full functional sweep failed"
+  fi
+  kill $SRV 2>/dev/null || true
+  rm -rf "$TMPDIR"
+else
+  echo "  (skipped — binary or sweep script missing)"
+fi
+
+# ── Summary ──────────────────────────────────────────────────────────────
 echo ""
 if [ $FAIL -eq 0 ]; then
   echo -e "  ${GREEN}ALL TESTS PASSED${NC}"
