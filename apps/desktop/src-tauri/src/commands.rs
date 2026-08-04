@@ -1574,8 +1574,3 @@ pub async fn generate_debug_report(
         recent_crashes,
     })
 }
-
-#[cfg(test)]
-mod vault_file_tests {
-    // Placeholder for vault file tests — method builder not yet implemented
-}

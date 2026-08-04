@@ -62,7 +62,7 @@ enum Commands {
         to: String,
         amount: String,
     },
-    /// Sign a transaction (placeholder — takes raw params)
+    /// Sign a transaction (takes raw params; routed to vault.sign_transaction)
     SignTransaction {
         network: String,
         from: String,
