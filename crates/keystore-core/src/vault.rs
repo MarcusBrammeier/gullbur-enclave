@@ -264,8 +264,8 @@ mod tests {
         assert!(!vault.is_unlocked());
 
         // Open should fail when locked
-        let mut sealed_copy = sealed.clone();
-        let result = vault.open(&mut sealed_copy, aad);
+        let sealed_copy = sealed.clone();
+        let result = vault.open(&sealed_copy, aad);
         assert!(result.is_err());
 
         // Unlock and open

@@ -6,8 +6,6 @@
 //!
 //! Run: cargo test -p update-checker --test live_check -- --ignored --nocapture
 
-use update_checker::check_for_updates;
-
 #[tokio::test]
 #[ignore = "requires live network access to api.github.com — run with --ignored"]
 async fn real_github_repo_has_tags() {
