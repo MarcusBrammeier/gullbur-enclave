@@ -125,10 +125,11 @@
 
 - [x] Zero production `unsafe` — verified (1 non-test block, documented SAFETY).
 - [x] Checksum-aware address validation (XMR/LTC/BTC).
-- [x] Supply chain: deny + audit clean.
-- [x] Doc coverage report generated.
-- [ ] **Threat model reviewed by third party** ← this doc.
-- [ ] Android device adapters (KeyStore/biometric/FIDO2) built + verified.
+- [x] `--all-targets` clippy `-D warnings` clean (lint debt cleared 2026-08-04).
+- [x] Supply chain: deny + audit clean + SUPPLY_CHAIN.md (0 crypto CVEs, 16 unmaintained = GUI-only).
+- [x] Doc coverage report generated + crypto-core/btc docs written.
+- [x] THREAT_MODEL.md written (this doc) — pending third-party review.
+- [ ] Android device adapters (KeyStore/biometric/FIDO2) built + verified — **hardware-gated, needs arm64 device; Rust seams done + tested.**
 - [ ] Longer fuzz runs (nightly 600s) for audit.
 - [ ] `#![warn(missing_docs)]` dry-run to enumerate remaining undocumented pub items.
 
