@@ -169,8 +169,8 @@ async fn live_broadcast_testnet() {
         .next()
         .expect("should have partial sigs");
     let mut witness = Witness::new();
-    witness.push(&sig.to_vec());
-    witness.push(&pk.to_bytes());
+    witness.push(sig.to_vec());
+    witness.push(pk.to_bytes());
 
     let signed_tx = bitcoin::Transaction {
         version: bitcoin::transaction::Version::TWO,

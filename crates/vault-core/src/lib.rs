@@ -471,7 +471,7 @@ mod tests {
         assert!(
             payload["mnemonic"]
                 .as_str()
-                .map(|s| s.len() > 0)
+                .map(|s| !s.is_empty())
                 .unwrap_or(false),
             "sealed seed restores the mnemonic"
         );

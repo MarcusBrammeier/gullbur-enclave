@@ -4,7 +4,7 @@ use plugin_btc::BtcPlugin;
 use wallet_plugin::WalletPlugin;
 
 fn main() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut seed = [0u8; 32];
     use rand::RngCore;
     rng.fill_bytes(&mut seed);
@@ -15,5 +15,5 @@ fn main() {
         .unwrap();
     println!("Address: {}", account.address);
     println!("Path:    {}", account.path.unwrap_or_default());
-    println!("Seed:    {}", hex::encode(&seed));
+    println!("Seed:    {}", hex::encode(seed));
 }

@@ -1044,7 +1044,6 @@ fn base58_encode(data: &[u8]) -> Result<String, PluginError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures;
 
     #[test]
     fn plugin_id_is_xmr() {

@@ -302,7 +302,7 @@ mod tests {
         // Step 1: Verify BIP-39 seed against known test vector
         let mnemonic = bip39::Mnemonic::parse_normalized(phrase).expect("test invariant");
         let seed_bytes = mnemonic.to_seed(passphrase);
-        let seed_hex = hex::encode(&seed_bytes);
+        let seed_hex = hex::encode(seed_bytes);
         assert_eq!(
             seed_hex, expected_seed_hex,
             "BIP-39 seed mismatch with known test vector!"
@@ -313,7 +313,7 @@ mod tests {
         // Step 2: Derive m/44'/60'/0'/0/0 via bip32 XPrv
         let key_bytes: [u8; 32] = {
             use bip32::{ChildNumber, XPrv};
-            let xprv = XPrv::new(&seed_arr).expect("test invariant");
+            let xprv = XPrv::new(seed_arr).expect("test invariant");
             let path = [
                 ChildNumber::new(44, true).expect("test invariant"),
                 ChildNumber::new(60, true).expect("test invariant"),

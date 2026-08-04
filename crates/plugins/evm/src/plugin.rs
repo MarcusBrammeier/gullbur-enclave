@@ -785,8 +785,8 @@ mod tests {
             let mut s = [42u8; 64];
             // Fill the second half with a different pattern so first-32-bytes
             // fallback would produce different keys
-            for i in 32..64 {
-                s[i] = 42 + (i - 32) as u8;
+            for (i, slot) in s.iter_mut().enumerate().skip(32) {
+                *slot = 42 + (i - 32) as u8;
             }
             s
         };

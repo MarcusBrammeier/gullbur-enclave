@@ -1,6 +1,5 @@
 use serial_test::serial;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use vault_core::Vault;
 
 /// Helper: create a temp HOME and init the vault
@@ -23,7 +22,7 @@ async fn init_vault_in(dir: &std::path::Path) -> Vault {
 #[serial]
 async fn test_account_address_formats() {
     let tmp = std::env::temp_dir().join(format!("gullbur-addr-{}", std::process::id()));
-    let mut vault = init_vault_in(&tmp).await;
+    let vault = init_vault_in(&tmp).await;
 
     // BTC testnet
     let btc = vault

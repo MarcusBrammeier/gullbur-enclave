@@ -67,7 +67,7 @@ async fn setup_signing_server(
     // from the mnemonic so we can pass it as the signing key_id.
     let mnemonic_obj = bip39::Mnemonic::parse_normalized(&mnemonic).expect("test invariant");
     let seed_bytes = mnemonic_obj.to_seed("");
-    let seed_hex = hex::encode(&seed_bytes);
+    let seed_hex = hex::encode(seed_bytes.as_slice());
 
     // Create ETH account (for reference, signing uses the seed directly)
     let r = call(

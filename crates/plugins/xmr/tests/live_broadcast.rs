@@ -110,7 +110,7 @@ async fn live_broadcast_stagenet() {
     let seed_512: [u8; 64] = seed[..64].try_into().expect("test invariant");
     let entropy = crypto_core::keys::derive_bip44_xmr_entropy(&seed_512, 0)
         .expect("BIP-44 entropy derivation");
-    let spend_key = hex::encode(&entropy);
+    let spend_key = hex::encode(entropy);
     let view_sk = SpendKey::from_seed(&entropy, 0).view_key();
     let view_key = hex::encode(view_sk.to_bytes());
 

@@ -7,7 +7,7 @@
 //! If the address has no Sepolia ETH, the test fails gracefully.
 
 use plugin_evm::EvmPlugin;
-use wallet_plugin::{KeyHandle, KeyType, WalletPlugin};
+use wallet_plugin::WalletPlugin;
 
 // ── RLP helpers ─────────────────────────────────────────────────────────────
 
@@ -189,7 +189,6 @@ async fn live_broadcast_sepolia() {
     let plugin = EvmPlugin::new();
     let signing_key = k256::ecdsa::SigningKey::from(&secret_key);
 
-    use k256::ecdsa::signature::hazmat::PrehashSigner;
     let (sig, recid) = signing_key.sign_prehash_recoverable(&hash);
     // Verify the signature is valid for our key
     use k256::ecdsa::signature::hazmat::PrehashVerifier;

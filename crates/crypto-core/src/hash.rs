@@ -83,7 +83,7 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn proptest_sha256_keccak256_diff(data: Vec<u8>) {
-            if data.len() >= 1 {
+            if !data.is_empty() {
                 let s = sha256(&data);
                 let k = keccak256(&data);
                 assert_ne!(s, k, "SHA-256 and Keccak-256 must differ on non-empty input");

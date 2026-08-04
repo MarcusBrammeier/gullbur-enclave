@@ -723,7 +723,7 @@ mod tests {
         host.initialize_default_plugins();
         let ids = host.plugin_ids();
         // Structural: verify the method returns Vec<String> and doesn't panic
-        assert!(ids.len() == 0 || ids.len() >= 3);
+        assert!(ids.is_empty() || ids.len() >= 3);
     }
 
     #[test]
