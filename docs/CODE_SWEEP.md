@@ -49,7 +49,7 @@
 | `get_balance` | ✅ | JSON-RPC `eth_getBalance` |
 | `get_transaction_history` | ✅ | JSON-RPC `eth_getTransactionCount` |
 | `estimate_fee` | ✅ | JSON-RPC `eth_gasPrice` (ignores `_tx` — network-wide, intentional) |
-| `validate_address` | ✅ | format check (0x + 42 hex) — **no EIP-55 checksum** (see below) |
+| `validate_address` | ✅ | format check (0x + 42 hex) **+ full EIP-55 mixed-case checksum** (keccak-based; accepts all-lower/all-upper per spec, rejects bad mixed-case) |
 
 ### IPC / vault-core
 - All 16 handlers registered: initialize, generate_mnemonic, status, create_account,

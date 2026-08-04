@@ -727,6 +727,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_validate_address_rejects_bad_checksum_case() {
+        let plugin = EvmPlugin::new();
+        // The correct EIP-55 checksum for vitalik.eth is 0xd8dA6BF...aA96045.
+        // Flipping a single letter's case in the mixed-case portion must be
+        // rejected — this is the EIP-55 false-acceptance case.
+        let bad = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA9604F";
+        let result = plugin.validate_address(bad, "ethereum").await;
+        assert!(!result.expect("test invariant"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_accepts_all_lowercase() {
+        let plugin = EvmPlugin::new();
+        // All-lowercase is accepted by EIP-55 (no checksum protection).
+        let result = plugin
+            .validate_address("0xd8da6bf26964af9d7eed9e03e53415d37aa96045", "ethereum")
+            .await;
+        assert!(result.expect("test invariant"));
+    }
+
+    #[tokio::test]
     async fn test_validate_address_invalid_short() {
         let plugin = EvmPlugin::new();
         let result = plugin.validate_address("0x123", "ethereum").await;
