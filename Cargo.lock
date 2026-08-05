@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "gullbur-desktop"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "aes-gcm",
  "auth-core",
