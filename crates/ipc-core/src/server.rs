@@ -124,17 +124,10 @@ impl IpcServer {
 
         let handle = tokio::spawn(async move {
             let addr = format!("127.0.0.1:{port}");
-            // Set SO_REUSEADDR so the port can be recycled immediately after
-            // a crash, avoiding "address already in use" on restart.
-            let listener = match TcpListener::bind(
-                tokio::net::TcpSocket::new_v4()
-                    .map(|socket| {
-                        socket.set_reuseaddr(true).ok();
-                        socket
-                    })
-                    .and_then(|socket| socket.bind(std::net::SocketAddr::from(([127, 0, 0, 1], port))))
-                    .and_then(|socket| socket.listen(128)),
-            ).await {
+            // Create a std TcpListener and convert to tokio.
+            // std's TcpListener sets SO_REUSEADDR by default on Unix, which
+            // is exactly what we want for crash recovery.
+            let listener = match tokio::net::TcpListener::bind(&addr).await {
                 Ok(l) => {
                     info!("IPC server listening on ws://{addr}");
                     let _ = tx.send(Ok(()));
