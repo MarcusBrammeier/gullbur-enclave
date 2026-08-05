@@ -129,6 +129,33 @@ export async function connect(): Promise<void> {
       }
     }
 
+    // ── 1b. Wait for the IPC server to actually be listening ──────────
+    // launch_ipc_server returns the port, but the background tokio task
+    // may not have called TcpListener::bind() yet. Poll the port until
+    // it's open (up to 5 seconds) so we don't race it.
+    if (!IS_DEMO) {
+      console.log('[vault] Waiting for IPC server to listen...');
+      let portReady = false;
+      for (let attempt = 0; attempt < 25; attempt++) {
+        try {
+          const testSock = new WebSocket(`ws://127.0.0.1:${ipcPort}`);
+          await new Promise<void>((resolve, reject) => {
+            const t = setTimeout(() => { testSock.close(); reject(new Error('timeout')); }, 500);
+            testSock.onopen = () => { clearTimeout(t); testSock.close(); resolve(); };
+            testSock.onerror = () => { clearTimeout(t); testSock.close(); reject(new Error('error')); };
+          });
+          portReady = true;
+          console.log(`[vault] IPC port ${ipcPort} is listening (attempt ${attempt + 1})`);
+          break;
+        } catch {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+      if (!portReady) {
+        throw new Error(`IPC server port ${ipcPort} never became available after 5s`);
+      }
+    }
+
     // 2. Connect the WebSocket client with retry
     let IpcClientClass: new () => IpcClient;
 
