@@ -4,9 +4,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags: ["v*"]
   schedule:
     - cron: '0 4 * * 1'  # weekly Monday 04:00 UTC
 
