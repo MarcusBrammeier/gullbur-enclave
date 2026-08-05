@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { drainPreMountBuffer } from '../consoleBridge';
 
   interface LogEntry {
     id: number;
@@ -25,6 +26,12 @@
       const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
       logs = [{ id: nextId++, timestamp: ts, ...entry }, ...logs].slice(0, maxLogs);
     };
+    // Drain any logs the console bridge captured before this panel mounted.
+    drainPreMountBuffer((entry) => {
+      const now = new Date();
+      const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      logs = [{ id: nextId++, timestamp: ts, ...entry }, ...logs].slice(0, maxLogs);
+    });
     return () => { delete (window as any).__consoleLog; };
   });
 

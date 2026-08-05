@@ -1130,6 +1130,23 @@ pub async fn get_seed_phrase(
 /// before URL-encoding the markdown body. No seed data, keys, or
 /// transaction details are ever included.
 #[tauri::command]
+pub async fn webview_log(level: String, message: String) -> Result<(), String> {
+    // Bridge: route frontend console.* into the native/Rust log so WebView
+    // errors surface in the terminal (desktop) and logcat (Android), not just
+    // the web inspector. Best-effort — never fails the caller.
+    let msg = format!("[webview:{level}] {message}");
+    match level.as_str() {
+        "error" | "warn" => {
+            tracing::warn!("{msg}");
+        }
+        _ => {
+            tracing::info!("{msg}");
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn report_bug(
     description: Option<String>,
     app_handle: tauri::AppHandle,

@@ -167,6 +167,8 @@ pub fn run() {
             // Vault file management
             commands::open_vault_from_path,
             commands::open_vault_from_bytes,
+            // Console bridge (WebView -> Rust logs)
+            commands::webview_log,
             commands::export_current_keystore,
             // Biometric unlock
             commands::biometric_unlock_vault,

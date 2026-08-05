@@ -42,6 +42,12 @@ export const vault = $state({
 
 let client: IpcClient | null = $state(null);
 
+// Guards against concurrent connect() calls so the auto-connect $effect and a
+// manual "Connect to Vault" click can't each spawn their own probe/retry
+// sockets at the same time (that stacking caused the "Insufficient resources"
+// flood). A single in-flight connect is shared; subsequent callers await it.
+let inFlightConnect: Promise<void> | null = null;
+
 // ── Derived values ─────────────────────────────────────────────────────────
 
 export const accountCount = () => vault.accounts.length;
@@ -99,10 +105,17 @@ export async function connect(): Promise<void> {
     return;
   }
 
+  // De-duplicate concurrent connects: if one is already in flight, await it
+  // instead of starting a parallel probe/retry storm.
+  if (inFlightConnect) {
+    return inFlightConnect;
+  }
+
   vault.error = null;
   vault.vaultStatus = 'Starting IPC server…';
 
-  try {
+  const run = (async () => {
+    try {
     // The vault IPC server is auto-launched during app startup.
     // We just connect directly to the running server.
     let ipcPort = VAULT_IPC_PORT;
@@ -130,13 +143,17 @@ export async function connect(): Promise<void> {
     }
 
     // ── 1b. Wait for the IPC server to actually be listening ──────────
-    // launch_ipc_server returns the port, but the background tokio task
-    // may not have called TcpListener::bind() yet. Poll the port until
-    // it's open (up to 5 seconds) so we don't race it.
+    // launch_ipc_server now waits for TcpListener::bind() to complete (v0.0.8
+    // oneshot fix) before returning, so by the time we get here the socket is
+    // almost always listening. Keep a bounded probe with exponential backoff
+    // as a safety net for platform timing (Android), but NEVER blind-flood the
+    // loop with one WebSocket per 200ms — that is what made WebKit throw
+    // "Insufficient resources" when the server was momentarily not up.
     if (!IS_DEMO) {
       console.log('[vault] Waiting for IPC server to listen...');
       let portReady = false;
-      for (let attempt = 0; attempt < 25; attempt++) {
+      const MAX_PROBE_ATTEMPTS = 6;
+      for (let attempt = 0; attempt < MAX_PROBE_ATTEMPTS; attempt++) {
         try {
           const testSock = new WebSocket(`ws://127.0.0.1:${ipcPort}`);
           await new Promise<void>((resolve, reject) => {
@@ -148,11 +165,12 @@ export async function connect(): Promise<void> {
           console.log(`[vault] IPC port ${ipcPort} is listening (attempt ${attempt + 1})`);
           break;
         } catch {
-          await new Promise(r => setTimeout(r, 200));
+          // Exponential backoff: 200ms, 400ms, 800ms, 1.6s, 3.2s — never tighter.
+          await new Promise(r => setTimeout(r, 200 * Math.pow(2, attempt)));
         }
       }
       if (!portReady) {
-        throw new Error(`IPC server port ${ipcPort} never became available after 5s`);
+        throw new Error(`IPC server port ${ipcPort} never became available`);
       }
     }
 
@@ -198,7 +216,13 @@ export async function connect(): Promise<void> {
     vault.error = e instanceof Error ? e.message : String(e);
     console.error('[vault] connect failed:', vault.error);
     throw e; // re-throw so callers like handleGenerate() know it failed
+  } finally {
+    inFlightConnect = null;
   }
+  })();
+
+  inFlightConnect = run;
+  return run;
 }
 
 export async function initialize(seedPhrase: string, passphrase?: string): Promise<string | null> {
