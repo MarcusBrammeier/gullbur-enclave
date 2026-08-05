@@ -42,14 +42,21 @@ export class IpcClient {
   }
 
   async connect(port?: number): Promise<void> {
-    // Initialize WASM crypto module — non-fatal on mobile where
-    // WASM may not load from the tauri:// asset protocol.
+    // Initialize WASM crypto module with a timeout — the WASM file may not
+    // load from the tauri:// asset protocol in AppImage/bundled builds.
+    // If WASM hangs or fails, fall back to plaintext IPC (encryption is
+    // skipped on loopback connections and the server accepts both modes).
     if (!this.wasmReady) {
       try {
-        await init();
+        await Promise.race([
+          init(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('WASM crypto init timed out after 3s')), 3_000)
+          ),
+        ]);
         this.wasmReady = true;
       } catch {
-        console.warn('[ipc] WASM crypto init failed — falling back to plaintext IPC');
+        console.warn('[ipc] WASM crypto init failed/timed out — falling back to plaintext IPC');
         this.wasmReady = false;
       }
     }
