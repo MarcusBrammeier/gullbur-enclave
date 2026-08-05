@@ -1,6 +1,6 @@
 [package]
 name = "gullbur-desktop"
-version = "0.0.7"
+version.workspace = true
 edition = "2024"
 license.workspace = true
 description = "Gullbúr Enclave — Pre-Beta v0.0.7 (internal)"
