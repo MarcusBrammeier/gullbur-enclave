@@ -44,7 +44,7 @@ impl Harness {
             let mn = Arc::new(RwLock::new(None));
             ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
         }
-        let _handle = server.run();
+        let (_handle, _ready) = server.run();
         tokio::time::sleep(Duration::from_millis(200)).await;
         Self { port, token_path }
     }

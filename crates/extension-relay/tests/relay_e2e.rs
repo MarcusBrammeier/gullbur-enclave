@@ -66,7 +66,7 @@ fn spawn_ws_server(port: u16) {
         let rt = tokio::runtime::Runtime::new().expect("test runtime");
         rt.block_on(async {
             let server = ipc_core::server::IpcServer::new(port).expect("create IPC server");
-            let handle = server.run();
+            let (handle, _ready) = server.run();
             // Keep the runtime alive for the duration of the test.
             tokio::time::sleep(Duration::from_secs(30)).await;
             handle.abort();

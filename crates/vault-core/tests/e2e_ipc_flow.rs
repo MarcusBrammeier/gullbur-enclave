@@ -33,7 +33,7 @@ async fn e2e_plaintext_connect_and_generate_mnemonic() {
         ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
     }
 
-    let handle = server.run();
+    let (handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let (ws, _) = connect_async(format!("ws://127.0.0.1:{TEST_PORT}"))

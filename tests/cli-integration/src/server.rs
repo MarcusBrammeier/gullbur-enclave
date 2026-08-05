@@ -4,7 +4,6 @@
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
 
 use auth_core::AuthManager;
@@ -65,9 +64,16 @@ pub async fn spawn_test_server(
         );
     }
 
-    let handle = server.run();
-    // Give the server time to bind
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    // run() now returns (JoinHandle, ready_rx) — the oneshot fires once
+    // TcpListener::bind() succeeds (v0.0.8). Await it instead of a blind
+    // sleep so we never race the server before it's actually listening.
+    let (handle, ready) = server.run();
+    ready
+        .await
+        .map_err(|e| format!("server ready channel closed: {e}"))
+        .expect("await server bind")
+        .map_err(|e| format!("server bind failed: {e}"))
+        .expect("server bound");
 
     (auth_token, handle, auth_manager)
 }

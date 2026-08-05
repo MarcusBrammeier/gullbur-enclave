@@ -120,7 +120,7 @@ async fn e2e_full_browser_extension_flow() {
         ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
     }
 
-    let _handle = server.run();
+    let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // ── 2. Connect WebSocket client (simulating relay) ──────────────────

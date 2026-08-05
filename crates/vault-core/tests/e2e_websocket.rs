@@ -100,7 +100,7 @@ async fn e2e_all_10_methods_via_websocket() {
         );
     }
 
-    let _handle = server.run();
+    let (_handle, _ready) = server.run();
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     let mut client = WsClient::connect(TEST_PORT, &auth_token).await;

@@ -28,7 +28,7 @@ async fn e2e_full_vault_lifecycle() {
         let mn = Arc::new(RwLock::new(None));
         ipc_handlers::register_vault_handlers(&mut h, ph, sd, mn, init, aq, am);
     }
-    let sh = server.run();
+    let (sh, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // ── 2. Connect WebSocket + hello handshake ───────────────────────────
