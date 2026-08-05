@@ -105,23 +105,37 @@ impl IpcServer {
 
     /// Spawn the server in a background tokio task.
     ///
-    /// Returns a `JoinHandle` that can be awaited or aborted.
-    pub fn run(self) -> tokio::task::JoinHandle<()> {
+    /// Binds the TCP listener inside the spawned task and signals readiness
+    /// via the returned watch receiver. Callers should `await` the receiver
+    /// to confirm the server is actually listening before connecting.
+    ///
+    /// ```ignore
+    /// let (handle, ready) = server.run();
+    /// ready.await; // waits until the port is bound
+    /// // now connect safely
+    /// ```
+    pub fn run(self) -> (tokio::task::JoinHandle<()>, tokio::sync::oneshot::Receiver<Result<(), String>>) {
         let auth_token = self.auth_token.clone();
         let port = self.port;
         let handler = Arc::clone(&self.handler);
         let encrypt = self.encrypt_responses;
 
-        tokio::spawn(async move {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+
+        let handle = tokio::spawn(async move {
             let addr = format!("127.0.0.1:{port}");
             let listener = match TcpListener::bind(&addr).await {
-                Ok(l) => l,
+                Ok(l) => {
+                    info!("IPC server listening on ws://{addr}");
+                    let _ = tx.send(Ok(()));
+                    l
+                }
                 Err(e) => {
                     error!("Failed to bind IPC server on {addr}: {e}");
+                    let _ = tx.send(Err(format!("{e}")));
                     return;
                 }
             };
-            info!("IPC server listening on ws://{addr}");
 
             loop {
                 let (stream, peer) = match listener.accept().await {
@@ -364,7 +378,8 @@ impl IpcServer {
                     let _ = write.close().await;
                 });
             }
-        })
+        });
+        (handle, rx)
     }
 }
 

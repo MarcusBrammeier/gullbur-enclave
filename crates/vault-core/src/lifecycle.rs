@@ -105,9 +105,28 @@ impl LifecycleManager {
             // Capture the token path for cleanup on shutdown
             self.token_path = Some(server.auth_token_path().to_path_buf());
 
-            // Spawn the server and store the handle
-            let handle = server.run();
-            self.ipc_handle = Some(handle);
+            // Spawn the server and wait for it to actually bind the port.
+            // The oneshot channel fires once bind() succeeds (or returns
+            // the error). This prevents callers from racing a background
+            // task that hasn't called TcpListener::bind() yet.
+            let (handle, ready) = server.run();
+            match ready.await {
+                Ok(Ok(())) => {
+                    self.ipc_handle = Some(handle);
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("IPC server failed to bind: {e}");
+                    return Err(VaultError::Internal(format!(
+                        "IPC server bind failed: {e}"
+                    )));
+                }
+                Err(_) => {
+                    tracing::error!("IPC server readiness channel closed without signal");
+                    return Err(VaultError::Internal(
+                        "IPC server readiness channel closed".into(),
+                    ));
+                }
+            }
         }
 
         if let Some(port) = self.tor_socks_port {
