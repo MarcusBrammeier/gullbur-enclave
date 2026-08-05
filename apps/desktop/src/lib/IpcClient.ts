@@ -41,13 +41,25 @@ export class IpcClient {
     } catch { /* console logging is best-effort */ }
   }
 
+  /** Log a debug message with timestamp to both console and a debug entry */
+  private dbg(msg: string) {
+    const ts = new Date().toISOString().slice(11, 23);
+    const line = `[${ts}] [IpcClient] ${msg}`;
+    console.log(line);
+    try {
+      (window as any).__consoleLog?.({ direction: 'receive', method: `__debug__`, payload: msg, isError: false });
+    } catch {}
+  }
+
   async connect(port?: number): Promise<void> {
+    this.dbg(`connect() called, port=${port}, wasmReady=${this.wasmReady}`);
     // Initialize WASM crypto module with a timeout — the WASM file may not
     // load from the tauri:// asset protocol in AppImage/bundled builds.
     // If WASM hangs or fails, fall back to plaintext IPC (encryption is
     // skipped on loopback connections and the server accepts both modes).
     if (!this.wasmReady) {
       try {
+        this.dbg('WASM init starting...');
         await Promise.race([
           init(),
           new Promise<never>((_, reject) =>
@@ -55,21 +67,27 @@ export class IpcClient {
           ),
         ]);
         this.wasmReady = true;
-      } catch {
+        this.dbg('WASM init OK');
+      } catch (e) {
         console.warn('[ipc] WASM crypto init failed/timed out — falling back to plaintext IPC');
+        this.dbg(`WASM init FAIL: ${e instanceof Error ? e.message : String(e)}`);
         this.wasmReady = false;
       }
     }
 
     return new Promise((resolve, reject) => {
+      this.dbg('Opening new Promise for WebSocket connect...');
       this.connectResolve = resolve;
       this.connectReject = reject;
 
       const wsPort = port ?? 19876;
-      this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
+      const wsUrl = `ws://127.0.0.1:${wsPort}`;
+      this.dbg(`Creating WebSocket to ${wsUrl}...`);
+      this.ws = new WebSocket(wsUrl);
 
       // Force-reject the promise if the WebSocket doesn't handshake in time
       const timer = setTimeout(() => {
+        this.dbg('CONNECT TIMEOUT — 5000ms elapsed, no session_key received');
         this.ws?.close();
         this.ws = null;
         this.connectResolve = null;
@@ -78,6 +96,7 @@ export class IpcClient {
       }, IpcClient.CONNECT_TIMEOUT_MS);
 
       this.ws.onopen = () => {
+        this.dbg('WebSocket onopen fired, sending hello...');
         // On localhost, skip auth token — the IPC server trusts loopback.
         // The frontend sends a simple "hello" to trigger session key exchange.
         this.ws!.send(JSON.stringify({ type: "hello" }));
@@ -85,6 +104,7 @@ export class IpcClient {
       };
 
       this.ws.onmessage = (event) => {
+        this.dbg(`onmessage: ${event.data.slice(0, 80)}${event.data.length > 80 ? '...' : ''}`);
         try {
           const msg = JSON.parse(event.data);
 
@@ -138,6 +158,7 @@ export class IpcClient {
       };
 
       this.ws.onerror = () => {
+        this.dbg('WebSocket onerror fired');
         clearTimeout(timer);
         const reject = this.connectReject;
         this.connectResolve = null;
@@ -146,6 +167,7 @@ export class IpcClient {
       };
 
       this.ws.onclose = () => {
+        this.dbg('WebSocket onclose fired');
         clearTimeout(timer);
         for (const [, p] of this.pending) {
           p.reject(new Error("Connection closed"));
