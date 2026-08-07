@@ -564,14 +564,14 @@ impl WalletPlugin for XmrPlugin {
                     .into(),
             ));
         }
-        // No wallet-rpc configured — return zero instead of erroring.
-        // The "2 networks failed" toast on mobile was caused by this hard error
-        // on every refresh. Users without wallet-rpc should see 0 XMR.
-        Ok(Balance {
-            confirmed: "0".into(),
-            unconfirmed: "0".into(),
-            unit: "XMR".into(),
-        })
+        // No wallet-rpc configured — XMR balance is genuinely unavailable.
+        // Surface a clear per-network message instead of a misleading silent 0.
+        // The frontend renders this as an inline tooltip next to the account
+        // (per-network error state), NOT a global "networks failed" toast, so
+        // this is safe to return as an error.
+        Err(PluginError::NetworkError(
+            "XMR balance unavailable — no monero-wallet-rpc daemon configured".into(),
+        ))
     }
 
     async fn get_transaction_history(

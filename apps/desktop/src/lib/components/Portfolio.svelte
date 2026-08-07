@@ -145,9 +145,13 @@
             </div>
             <div class="text-right shrink-0">
               <div class="font-mono text-sm font-medium text-vault-400">
-                {formatBalance(account.balance)} {getNetworkUnit(account.network)}
+                {account.balanceError
+                  ? '⚠' 
+                  : formatBalance(account.balance)} {account.balanceError ? '' : getNetworkUnit(account.network)}
               </div>
-              {#if account.balance?.unconfirmed && parseFloat(account.balance.unconfirmed) > 0}
+              {#if account.balanceError}
+                <div class="text-xs text-red-400 max-w-[200px] truncate" title={account.balanceError}>balance error</div>
+              {:else if account.balance?.unconfirmed && parseFloat(account.balance.unconfirmed) > 0}
                 <div class="text-xs text-yellow-400">+{account.balance.unconfirmed} pending</div>
               {/if}
             </div>

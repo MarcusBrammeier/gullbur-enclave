@@ -15,10 +15,14 @@
 
   // Hydrate theme from localStorage on mount
   $effect(() => {
+    // Read saved theme only once on mount; don't re-run
     const saved = localStorage.getItem('foss_wallet_theme');
-    if (saved === 'light' || saved === 'dark' || saved === 'system') {
-      vault.theme = saved;
+    if (saved === 'light') {
+      vault.theme = 'light';
+    } else if (saved === 'system') {
+      vault.theme = 'system';
     }
+    // vault.theme defaults to 'dark', so only set if saved overrides it
     applyTheme(vault.theme);
   });
 
@@ -124,7 +128,7 @@
   </header>
 
   <!-- Main Content -->
-  <section class="flex-1 max-w-6xl mx-auto w-full p-6">
+  <section class="flex-1 max-w-6xl mx-auto w-full p-6 overflow-y-auto">
     {#if !vault.initialized}
       <VaultInit />
     {:else}

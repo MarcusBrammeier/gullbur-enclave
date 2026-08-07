@@ -329,6 +329,17 @@ impl WalletPlugin for LtcPlugin {
             .send()
             .await
             .map_err(|e| PluginError::NetworkError(format!("HTTP: {e}")))?;
+        // Surface the actual HTTP status/body on failure instead of letting
+        // .json() throw a generic parse error — so the UI can show "LTC API
+        // unreachable (429)" rather than a vague "network failed".
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            let snippet: String = body.chars().take(200).collect();
+            return Err(PluginError::NetworkError(format!(
+                "LTC Esplora {status} for balance: {snippet}"
+            )));
+        }
         let json: serde_json::Value = resp
             .json()
             .await

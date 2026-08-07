@@ -30,6 +30,8 @@ export interface Account {
   address: string;
   index: number;
   balance: Balance | null;
+  /** Populated when the most recent balance fetch failed */
+  balanceError?: string | null;
   /** BIP44 derivation path, e.g. "m/84'/0'/0'/0/0" */
   path?: string;
   /** Display label for the account */

@@ -126,21 +126,39 @@ export async function connect(): Promise<void> {
     // 1. Ensure the IPC server is actually listening by invoking the
     //    Tauri command. Returns the port or errors immediately.
     if (!IS_DEMO) {
-      const { invoke } = await import('@tauri-apps/api/core');
-      try {
-        const port = await Promise.race([
-          invoke<number>('launch_ipc_server'),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('launch_ipc_server timed out after 10s')), 10_000)
-          ),
-        ]);
-        ipcPort = port;
-      } catch (e) {
-        vault.vaultStatus = 'IPC server failed to start';
-        vault.error = e instanceof Error ? e.message : String(e);
-        throw new Error(`IPC server launch failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
+          const { invoke } = await import('@tauri-apps/api/core');
+          // Retry launch_ipc_server with exponential backoff. The command is
+          // idempotent — if the server is already running it returns Ok(port)
+          // immediately. This handles the case where a previous process crash
+          // left the port in TIME_WAIT and the first bind attempt fails, giving
+          // the kernel time to release it on retry.
+          const MAX_LAUNCH_RETRIES = 3;
+          let lastErr: unknown;
+          for (let attempt = 0; attempt < MAX_LAUNCH_RETRIES; attempt++) {
+            if (attempt > 0) {
+              vault.vaultStatus = `Starting IPC server… (retry ${attempt + 1}/${MAX_LAUNCH_RETRIES})`;
+              await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+            }
+            try {
+              const port = await Promise.race([
+                invoke<number>('launch_ipc_server'),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('launch_ipc_server timed out after 10s')), 10_000)
+                ),
+              ]);
+              ipcPort = port;
+              lastErr = undefined;
+              break;
+            } catch (e) {
+              lastErr = e;
+            }
+          }
+          if (lastErr) {
+            vault.vaultStatus = 'IPC server failed to start';
+            vault.error = lastErr instanceof Error ? lastErr.message : String(lastErr);
+            throw new Error(`IPC server launch failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+          }
+        }
 
     // ── 1b. Wait for the IPC server to actually be listening ──────────
     // launch_ipc_server now waits for TcpListener::bind() to complete (v0.0.8
@@ -273,14 +291,19 @@ export async function refreshBalances(): Promise<void> {
   const c = await getClient();
   vault.error = null;
   try {
-    // Use allSettled so a single network error doesn't cascade to all networks
     const results = await Promise.allSettled(
       vault.accounts.map(async (acct: Account) => {
-        const result = (await c.call('vault.get_balance', {
-          network: acct.network,
-          address: acct.address,
-        })) as VaultGetBalanceResponse;
-        return { ...acct, balance: result.balance };
+        try {
+          const result = (await c.call('vault.get_balance', {
+            network: acct.network,
+            address: acct.address,
+          })) as VaultGetBalanceResponse;
+          // Clear any previous balance error on success
+          return { ...acct, balance: result.balance, balanceError: undefined };
+        } catch (err) {
+          // Preserve existing balance but mark the error
+          return { ...acct, balanceError: err instanceof Error ? err.message : String(err) };
+        }
       }),
     );
     const updated: Account[] = [];
@@ -302,12 +325,6 @@ export async function refreshBalances(): Promise<void> {
     ];
     if (errors.length > 0) {
       console.warn('[refreshBalances] Some networks failed:', errors.join('; '));
-      // Show a more specific message — networks like XMR without wallet-rpc
-      // are expected to silently return zero now.
-      const nonZeroErrors = errors.filter(e => !e.includes('0 XMR') && !e.includes('wallet-rpc'));
-      if (nonZeroErrors.length > 0) {
-        vault.error = `${nonZeroErrors.length} network(s) failed to refresh`;
-      }
     }
   } catch (e) {
     vault.error = e instanceof Error ? e.message : String(e);
@@ -323,11 +340,15 @@ export async function refreshNetworkBalance(network: string): Promise<void> {
     const networkAccounts = vault.accounts.filter((a: Account) => a.network === network);
     const results = await Promise.allSettled(
       networkAccounts.map(async (acct: Account) => {
-        const result = (await c.call('vault.get_balance', {
-          network: acct.network,
-          address: acct.address,
-        })) as VaultGetBalanceResponse;
-        return { ...acct, balance: result.balance };
+        try {
+          const result = (await c.call('vault.get_balance', {
+            network: acct.network,
+            address: acct.address,
+          })) as VaultGetBalanceResponse;
+          return { ...acct, balance: result.balance, balanceError: undefined };
+        } catch (err) {
+          return { ...acct, balanceError: err instanceof Error ? err.message : String(err) };
+        }
       }),
     );
     const updated: Account[] = [];
@@ -399,7 +420,9 @@ export function disconnect(): void {
   client?.disconnect();
   client = null;
   vault.connected = false;
-  vault.initialized = false;
+  // Don't reset vault.initialized — that's a property of the vault engine,
+  // not the WebSocket connection. Resetting it causes the UI to flash
+  // between VaultInit and Dashboard on disconnect.
   vault.vaultStatus = 'Disconnected';
   vault.networks = [];
   vault.accounts = [];
@@ -413,6 +436,18 @@ export function setSelectedNetwork(value: string): void {
 
 export function setTheme(theme: 'light' | 'dark' | 'system'): void {
   vault.theme = theme;
+  // Apply immediately — don't rely solely on the $effect in App.svelte,
+  // which may not fire if the OptionsBar mounts/unmounts conditionally.
+  if (typeof document !== 'undefined') {
+    let resolved: string;
+    if (theme === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    } else {
+      resolved = theme;
+    }
+    document.documentElement.setAttribute('data-theme', resolved);
+    localStorage.setItem('foss_wallet_theme', theme);
+  }
 }
 
 // ── Transaction pipeline actions ───────────────────────────────────────────

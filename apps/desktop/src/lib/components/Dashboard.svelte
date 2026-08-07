@@ -219,7 +219,11 @@
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium {badge.color}">{badge.label}</span>
               </div>
               <div class="text-sm text-secondary">
-                <span class="font-mono text-vault-400">{formatBalance(account.balance)} {getNetworkUnit(account.network)}</span>
+                {#if account.balanceError}
+                  <span class="text-red-400 text-xs">⚠ {account.balanceError}</span>
+                {:else}
+                  <span class="font-mono text-vault-400">{formatBalance(account.balance)} {getNetworkUnit(account.network)}</span>
+                {/if}
               </div>
             </div>
             <div class="flex gap-2 shrink-0">

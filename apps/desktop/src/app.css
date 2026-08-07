@@ -60,7 +60,7 @@
     color: var(--color-text);
   }
 
-  html, body { overflow: hidden; height: 100%; }
+  html, body { height: 100%; }
 
   body::before {
     content: '';
@@ -178,6 +178,33 @@
   .hover\:border-hover:hover        { border-color: var(--color-border-hover); }
 
   button, a, input, select, textarea { @apply transition-all duration-200; }
+
+  /* ── Styled dropdowns (native select popup) ──────────────────────── */
+  select {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border-strong);
+    appearance: auto;
+    -webkit-appearance: auto;
+  }
+  select option,
+  select optgroup {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+  }
+  select optgroup {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+  select:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.5);
+    outline: none;
+  }
+  select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
