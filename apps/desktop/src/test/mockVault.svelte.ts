@@ -14,6 +14,7 @@ export const mockVault = $state({
   error: null as string | null,
   vaultStatus: 'Connected',
   theme: 'dark',
+  showBetaWarning: false,
 });
 
 export function resetMockVault(): void {
@@ -25,4 +26,5 @@ export function resetMockVault(): void {
   mockVault.error = null;
   mockVault.vaultStatus = 'Connected';
   mockVault.theme = 'dark';
+  mockVault.showBetaWarning = false;
 }
