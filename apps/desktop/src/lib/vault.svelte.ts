@@ -20,6 +20,7 @@ import type {
   TxRecord,
 } from './types';
 import { IS_DEMO, VAULT_IPC_PORT } from './constants';
+import { pushError } from './toasts.svelte.ts';
 
 // ── Reactive state (object form — valid for module export in Svelte 5) ─────
 
@@ -41,6 +42,17 @@ export const vault = $state({
 });
 
 let client: IpcClient | null = $state(null);
+
+/**
+ * Set the vault error message AND surface it as a 3s toast.
+ * Centralizes `vault.error = ...` so every catch site gets toast coverage
+ * without duplicating the push call.
+ */
+export function setVaultError(msg: string | unknown): void {
+  const text = msg instanceof Error ? msg.message : String(msg ?? '');
+  vault.error = text;
+  if (text) pushError(text);
+}
 
 // Guards against concurrent connect() calls so the auto-connect $effect and a
 // manual "Connect to Vault" click can't each spawn their own probe/retry
@@ -155,7 +167,7 @@ export async function connect(): Promise<void> {
           }
           if (lastErr) {
             vault.vaultStatus = 'IPC server failed to start';
-            vault.error = lastErr instanceof Error ? lastErr.message : String(lastErr);
+            setVaultError(lastErr);
             throw new Error(`IPC server launch failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
           }
         }
@@ -231,7 +243,7 @@ export async function connect(): Promise<void> {
   } catch (e) {
     vault.connected = false;
     vault.vaultStatus = 'Disconnected';
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     console.error('[vault] connect failed:', vault.error);
     throw e; // re-throw so callers like handleGenerate() know it failed
   } finally {
@@ -257,7 +269,7 @@ export async function initialize(seedPhrase: string, passphrase?: string): Promi
     return result.mnemonic ?? null;
   } catch (e) {
     vault.vaultStatus = 'Initialization failed';
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     throw e;
   }
 }
@@ -269,7 +281,7 @@ export async function generateMnemonic(): Promise<string> {
     const result = (await c.call('vault.generate_mnemonic', {})) as VaultGenerateMnemonicResponse;
     return result.mnemonic;
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     throw e;
   }
 }
@@ -282,7 +294,7 @@ export async function createAccount(network: string, index: number): Promise<Acc
     vault.accounts = [...vault.accounts, result];
     return result;
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     throw e;
   }
 }
@@ -327,7 +339,7 @@ export async function refreshBalances(): Promise<void> {
       console.warn('[refreshBalances] Some networks failed:', errors.join('; '));
     }
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
   }
 }
 
@@ -364,7 +376,7 @@ export async function refreshNetworkBalance(network: string): Promise<void> {
       ...vault.accounts.filter((a: Account) => a.network !== network || !updatedAddresses.has(a.address)),
     ];
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
   }
 }
 
@@ -391,7 +403,7 @@ export async function getTransactionHistory(
       unit: tx.unit ?? unit,
     }));
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     return [];
   }
 }
@@ -412,7 +424,7 @@ export async function refreshAccounts(network?: string): Promise<void> {
     }
     vault.networks = result.networks ?? [];
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
   }
 }
 
@@ -514,7 +526,7 @@ export async function simulateTransfer(
       revertReason: null,
     };
   } catch (e) {
-    vault.error = e instanceof Error ? e.message : String(e);
+    setVaultError(e);
     return {
       success: false,
       gasUsed: 0,

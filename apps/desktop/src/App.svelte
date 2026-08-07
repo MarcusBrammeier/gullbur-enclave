@@ -1,6 +1,7 @@
 <script lang="ts">
   import './app.css';
   import { vault, connect, disconnect } from './lib/vault.svelte.ts';
+  import { pushError } from './lib/toasts.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
   import VaultInit from './lib/components/VaultInit.svelte';
   import Dashboard from './lib/components/Dashboard.svelte';
@@ -8,6 +9,7 @@
   import AuthPrompt from './lib/components/AuthPrompt.svelte';
   import Settings from './lib/components/Settings.svelte';
   import OptionsBar from './lib/components/OptionsBar.svelte';
+  import Toasts from './lib/components/Toasts.svelte';
 
   let showSettings = $state(false);
   let errorMessage = $state<string | null>(null);
@@ -61,11 +63,15 @@
   if (typeof window !== 'undefined') {
     window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
       console.error('[ErrorBoundary] Unhandled rejection:', e.reason);
-      errorMessage = e.reason instanceof Error ? e.reason.message : String(e.reason);
+      const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
+      errorMessage = msg;
+      pushError(msg);
     });
     window.addEventListener('error', (e: ErrorEvent) => {
       console.error('[ErrorBoundary] Unhandled error:', e.error ?? e.message);
-      errorMessage = e.error instanceof Error ? e.error.message : e.message;
+      const msg = e.error instanceof Error ? e.error.message : e.message;
+      errorMessage = msg;
+      pushError(msg);
     });
   }
 
@@ -87,6 +93,8 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <main class="min-h-screen flex flex-col">
+  <!-- Global toast notifications (top-center, one at a time, 3s each) -->
+  <Toasts />
   <!-- Header -->
   <header class="border-b border-default px-6 py-4">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
