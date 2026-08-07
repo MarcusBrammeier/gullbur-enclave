@@ -702,4 +702,130 @@ mod tests {
             .expect("test invariant");
         assert!(!r);
     }
+
+    #[tokio::test]
+    async fn test_sign_transaction_multi_input_all_inputs_signed() {
+        // Regression test for the "multi-input PSBT only signs inputs[0]" bug.
+        // sign_transaction must produce a partial sig for EVERY input that has
+        // a witness UTXO — mirror of the BTC plugin's test, but for LTC.
+        use bitcoin::absolute::LockTime;
+        use bitcoin::hashes::Hash;
+        use bitcoin::psbt::Psbt;
+        use bitcoin::transaction::Version;
+        use bitcoin::{Amount, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Witness};
+
+        let plugin = LtcPlugin::new();
+
+        // Deterministic 32-byte seed.
+        let seed_hex = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+
+        // A single unsigned tx that spends TWO different UTXOs (2 inputs).
+        let unsigned_tx = bitcoin::Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![
+                TxIn {
+                    previous_output: OutPoint::new(bitcoin::Txid::from_byte_array([1u8; 32]), 0),
+                    script_sig: ScriptBuf::new(),
+                    sequence: Sequence::MAX,
+                    witness: Witness::new(),
+                },
+                TxIn {
+                    previous_output: OutPoint::new(bitcoin::Txid::from_byte_array([2u8; 32]), 1),
+                    script_sig: ScriptBuf::new(),
+                    sequence: Sequence::MAX,
+                    witness: Witness::new(),
+                },
+            ],
+            output: vec![TxOut {
+                value: Amount::from_sat(90000),
+                script_pubkey: ScriptBuf::from_bytes(vec![0u8; 22]),
+            }],
+        };
+
+        // Same P2WPKH script for both inputs (LTC mainnet bech32 path).
+        let mut p2wpkh_bytes = vec![0x00, 0x14];
+        p2wpkh_bytes.extend_from_slice(&[0u8; 20]);
+
+        let psbt = Psbt {
+            unsigned_tx,
+            version: 0,
+            xpub: Default::default(),
+            proprietary: Default::default(),
+            unknown: Default::default(),
+            inputs: vec![
+                bitcoin::psbt::Input {
+                    witness_utxo: Some(TxOut {
+                        value: Amount::from_sat(50000),
+                        script_pubkey: ScriptBuf::from_bytes(p2wpkh_bytes.clone()),
+                    }),
+                    ..Default::default()
+                },
+                bitcoin::psbt::Input {
+                    witness_utxo: Some(TxOut {
+                        value: Amount::from_sat(50000),
+                        script_pubkey: ScriptBuf::from_bytes(p2wpkh_bytes.clone()),
+                    }),
+                    ..Default::default()
+                },
+            ],
+            outputs: vec![Default::default()],
+        };
+
+        let psbt_bytes = psbt.serialize();
+
+        // LTC's sign_transaction parses key_id as "hexseed@index".
+        let key = KeyHandle {
+            key_id: format!("{seed_hex}@0"),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+
+        let signed = plugin
+            .sign_transaction(&psbt_bytes, &key, "litecoin")
+            .await
+            .expect("sign_transaction should succeed");
+
+        let signed_psbt = Psbt::deserialize(&signed).expect("signed PSBT should deserialize");
+
+        // Critical regression assertion: BOTH inputs must carry a partial sig.
+        assert!(
+            !signed_psbt.inputs[0].partial_sigs.is_empty(),
+            "input[0] must have a partial sig"
+        );
+        assert!(
+            !signed_psbt.inputs[1].partial_sigs.is_empty(),
+            "input[1] must have a partial sig (multi-input regression) — was only signing inputs[0]"
+        );
+
+        // Both inputs must be signed by the SAME key (single account key).
+        let key0: &bitcoin::PublicKey = signed_psbt.inputs[0]
+            .partial_sigs
+            .keys()
+            .next()
+            .expect("input[0] pubkey");
+        let key1: &bitcoin::PublicKey = signed_psbt.inputs[1]
+            .partial_sigs
+            .keys()
+            .next()
+            .expect("input[1] pubkey");
+        assert_eq!(
+            key0, key1,
+            "both inputs must be signed by the same account key"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sign_transaction_invalid_psbt() {
+        let plugin = LtcPlugin::new();
+        let key = KeyHandle {
+            key_id: format!("deadbeef@0"),
+            key_type: wallet_plugin::KeyType::Secp256k1,
+            public_key: vec![],
+        };
+        let result = plugin
+            .sign_transaction(b"not a valid PSBT", &key, "litecoin")
+            .await;
+        assert!(result.is_err(), "passing garbage bytes should return Err");
+    }
 }
