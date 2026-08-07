@@ -19,7 +19,11 @@ serde = { version = ">=1,<2", features = ["derive"] }
 serde_json = ">=1,<2"
 hex = ">=0.4,<1"
 aes-gcm = ">=0.10,<1"
-getrandom = { version = ">=0.3,<1", features = ["wasm_js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
+# rand_core 0.9 (dep of rand) pulls in getrandom 0.3.x which needs its own
+# wasm_js feature — Cargo can't unify features across semver-incompatible
+# versions from a single dep spec, so we add both explicitly.
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 
 [profile.release]
 opt-level = "s"    # optimize for size (WASM)

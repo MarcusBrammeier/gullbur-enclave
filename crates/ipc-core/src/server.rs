@@ -123,17 +123,31 @@ impl IpcServer {
 
         let handle = tokio::spawn(async move {
             let addr = format!("127.0.0.1:{port}");
-            // Create a std TcpListener and convert to tokio.
-            // std's TcpListener sets SO_REUSEADDR by default on Unix, which
-            // is exactly what we want for crash recovery.
-            let listener = match tokio::net::TcpListener::bind(&addr).await {
+            // Use std::net::TcpListener (which sets SO_REUSEADDR on Unix by
+            // default) then convert to tokio. Without SO_REUSEADDR a crashed
+            // or aborted server leaves the port in TIME_WAIT and the next
+            // launch fails with EADDRINUSE — this makes crash-recovery work.
+            let listener = match std::net::TcpListener::bind(&addr) {
+                Ok(l) => l,
+                Err(e) => {
+                    error!("Failed to bind IPC server on {addr}: {e}");
+                    let _ = tx.send(Err(format!("{e}")));
+                    return;
+                }
+            };
+            if let Err(e) = listener.set_nonblocking(true) {
+                error!("Failed to set non-blocking on {addr}: {e}");
+                let _ = tx.send(Err(format!("{e}")));
+                return;
+            }
+            let listener = match tokio::net::TcpListener::from_std(listener) {
                 Ok(l) => {
                     info!("IPC server listening on ws://{addr}");
                     let _ = tx.send(Ok(()));
                     l
                 }
                 Err(e) => {
-                    error!("Failed to bind IPC server on {addr}: {e}");
+                    error!("Failed to convert IPC listener on {addr}: {e}");
                     let _ = tx.send(Err(format!("{e}")));
                     return;
                 }
