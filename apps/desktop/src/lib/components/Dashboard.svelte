@@ -193,7 +193,7 @@
       </div>
     {:else}
       <div class="space-y-3">
-        {#each filteredAccounts as account (account.address)}
+        {#each filteredAccounts as account (account.id)}
           {@const badge = getNetworkBadge(account.network)}
           <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex-1 min-w-0">

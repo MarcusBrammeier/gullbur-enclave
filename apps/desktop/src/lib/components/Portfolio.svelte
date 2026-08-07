@@ -124,7 +124,7 @@
       </div>
     {:else}
       <div class="space-y-2">
-        {#each vault.accounts as account (account.address)}
+        {#each vault.accounts as account (account.id)}
           {@const badge = getNetworkBadge(account.network)}
           {@const isSelected = selectedAccountId === `${account.network}-${account.address}`}
           <button
