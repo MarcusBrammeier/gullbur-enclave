@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
-> **Version:** 0.0.7 (pre-beta, internal)
-> **Last updated:** 2026-08-03  
-> **HEAD:** `c7480c2` (2026-08-03)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --lib` ✅ (279 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (41) | `cargo test -p vault-core --test e2e_websocket` ✅ | **IPC e2e handshake (3 tests) ✅** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **Version:** 0.0.8 (pre-beta, internal)
+> **Last updated:** 2026-08-08  
+> **HEAD:** `f7d2164` (2026-08-08)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (296 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e handshake + engine_security (13) ✅** | **frontend Svelte component tests ✅ (83)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ---
 
@@ -50,7 +50,16 @@ fuzz/              — cargo-fuzz targets (nightly only, 5 targets)
 
 ## Recent Commits (all 20+)
 
-```
+```text
+f7d2164 fix(ui): modal accessibility — backdrop-close via onclick|self, Escape/tabindex, labeled debug-comments textarea
+9de7e98 test: add 50 component tests for Send/VaultInit/Portfolio/OptionsBar
+dd84a7f test: fix update-checker live test for private repo (404 skip, not fail)
+94f9d1e test: Phase 2.5 — headless Tauri IPC isolation routing e2e (delegated)
+635e47d feat: Svelte component testing + 3s cycling error-toast system
+928ed06 test: LTC multi-input PSBT signing regression + invalid-PSBT guard
+a455a84 fix: each_key_duplicate when creating multiple accounts
+9457ffc fix: balance visibility + UI polish (Thread B)
+0308445 fix: IPC launch hardening + WASM crypto rebuild (Thread A)
 f46f193 fix: fmt — move inline comment below fn call for cargo fmt compliance
 170f070 fix: remove invalid compressNativeLibs manifest attribute (blocks APK build)
 f16e8dd sweep: fix clippy, unbundle center(), replace GitHub placeholders with MarcusBrammeier
@@ -81,7 +90,7 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (279 passed, 1 ignored) |
+| `cargo test --workspace --lib` | ✅ (296 passed, 1 ignored) |
 | `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
@@ -132,6 +141,6 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 - **APK** (12M universal side-load): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
 - **AAB** (7.1M — Play/distribution, target hit): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
-- **279+ unit tests** + **41 CLI integration** + **3 IPC e2e handshake** — all passing
+- **296+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **83 frontend Svelte component tests** — all passing
 - **ws-handshake-probe.py** — live WS hello→session_key→RPC probe used by CLI & Android sweeps
 - **full-functional-sweep.py** — **33/33 checks**, every IPC method exercised via real binary WS protocol
