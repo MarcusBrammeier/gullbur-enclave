@@ -341,47 +341,63 @@ export async function createAccount(network: string, index: number): Promise<Acc
   }
 }
 
+/** Single-flight guard: coalesces concurrent refreshBalances calls so rapid
+ *  triggers (e.g. create-account then refresh) don't fire parallel RPC storms. */
+let refreshInFlight: Promise<void> | null = null;
+
 export async function refreshBalances(): Promise<void> {
-  const c = await getClient();
-  vault.error = null;
-  try {
-    const results = await Promise.allSettled(
-      vault.accounts.map(async (acct: Account) => {
-        try {
-          const result = (await c.call('vault.get_balance', {
-            network: acct.network,
-            address: acct.address,
-          })) as VaultGetBalanceResponse;
-          // Clear any previous balance error on success
-          return { ...acct, balance: result.balance, balanceError: undefined };
-        } catch (err) {
-          // Preserve existing balance but mark the error
-          return { ...acct, balanceError: err instanceof Error ? err.message : String(err) };
+  // Coalesce: if a refresh is already running, await it instead of duplicating.
+  if (refreshInFlight) return refreshInFlight;
+
+  const run = (async () => {
+    const c = await getClient();
+    vault.error = null;
+    try {
+      const results = await Promise.allSettled(
+        vault.accounts.map(async (acct: Account) => {
+          try {
+            const result = (await c.call('vault.get_balance', {
+              network: acct.network,
+              address: acct.address,
+            })) as VaultGetBalanceResponse;
+            // Clear any previous balance error on success
+            return { ...acct, balance: result.balance, balanceError: undefined };
+          } catch (err) {
+            // Preserve existing balance but mark the error
+            return { ...acct, balanceError: err instanceof Error ? err.message : String(err) };
+          }
+        }),
+      );
+      const updated: Account[] = [];
+      const errors: string[] = [];
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          updated.push(result.value);
+        } else {
+          errors.push(result.reason?.message ?? String(result.reason));
         }
-      }),
-    );
-    const updated: Account[] = [];
-    const errors: string[] = [];
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        updated.push(result.value);
-      } else {
-        errors.push(result.reason?.message ?? String(result.reason));
       }
+      vault.accounts = updated;
+      // Merge successfully refreshed accounts back into the master list
+      // without dropping accounts whose balance requests failed.
+      const refreshedAddresses = new Set(updated.map((a: Account) => a.address));
+      vault.accounts = [
+        ...updated,
+        ...vault.accounts.filter((a: Account) => !refreshedAddresses.has(a.address)),
+      ];
+      if (errors.length > 0) {
+        console.warn('[refreshBalances] Some networks failed:', errors.join('; '));
+      }
+    } catch (e) {
+      setVaultError(e);
     }
-    vault.accounts = updated;
-    // Merge successfully refreshed accounts back into the master list
-    // without dropping accounts whose balance requests failed.
-    const refreshedAddresses = new Set(updated.map((a: Account) => a.address));
-    vault.accounts = [
-      ...updated,
-      ...vault.accounts.filter((a: Account) => !refreshedAddresses.has(a.address)),
-    ];
-    if (errors.length > 0) {
-      console.warn('[refreshBalances] Some networks failed:', errors.join('; '));
-    }
-  } catch (e) {
-    setVaultError(e);
+  })();
+
+  refreshInFlight = run;
+  try {
+    await run;
+  } finally {
+    refreshInFlight = null;
   }
 }
 

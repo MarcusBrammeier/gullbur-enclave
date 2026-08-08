@@ -30,16 +30,27 @@
       : null
   );
 
+  /** Stale-request guard: bumps a token so a slow earlier fetch can't
+   *  overwrite a newer account's history (out-of-order race fix + cancels
+   *  redundant in-flight requests when switching accounts rapidly).
+   *  NOTE: deliberately NOT $state — mutating a reactive value inside the
+   *  effect would trigger `effect_update_depth_exceeded` (infinite loop). */
+  let historyReqId = 0;
+
   /** Fetch tx history when selected account changes */
   $effect(() => {
     const acct = selectedAccount;
+    const myReq = ++historyReqId; // invalidate any previous in-flight request
     if (acct) {
       txLoading = true;
       txHistory = [];
       getTransactionHistory(acct.address, acct.network).then((txs) => {
+        // Discard stale results (a newer account selection superseded this one)
+        if (myReq !== historyReqId) return;
         txHistory = txs;
         txLoading = false;
       }).catch(() => {
+        if (myReq !== historyReqId) return;
         txLoading = false;
       });
     } else {
