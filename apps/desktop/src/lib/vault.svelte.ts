@@ -38,6 +38,7 @@ export const vault = $state({
   authTimeout: 30,
   authStartedAt: 0,
   theme: 'dark' as 'light' | 'dark' | 'system',
+  accent: 'emerald' as AccentTheme,
   showBetaWarning: false,
 });
 
@@ -501,6 +502,25 @@ export function setTheme(theme: 'light' | 'dark' | 'system'): void {
     document.documentElement.setAttribute('data-theme', resolved);
     localStorage.setItem('foss_wallet_theme', theme);
   }
+}
+
+export type AccentTheme = 'emerald' | 'violet' | 'amber' | 'cyan' | 'rose';
+
+export function getAccentTheme(): AccentTheme {
+  if (typeof window === 'undefined') return 'emerald';
+  const saved = localStorage.getItem('foss_wallet_accent');
+  if (saved === 'violet' || saved === 'amber' || saved === 'cyan' || saved === 'rose') {
+    return saved;
+  }
+  return 'emerald';
+}
+
+export function setAccentTheme(accent: AccentTheme): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.setAttribute('data-accent', accent);
+  localStorage.setItem('foss_wallet_accent', accent);
+  // Live-refresh in case the app is already running with a cached value.
+  vault.accent = accent;
 }
 
 // ── Transaction pipeline actions ───────────────────────────────────────────

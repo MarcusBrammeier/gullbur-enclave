@@ -1,6 +1,6 @@
 <script lang="ts">
   import './app.css';
-  import { vault, connect, disconnect } from './lib/vault.svelte.ts';
+  import { vault, connect, disconnect, getAccentTheme } from './lib/vault.svelte.ts';
   import { pushError } from './lib/toasts.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
   import VaultInit from './lib/components/VaultInit.svelte';
@@ -26,6 +26,10 @@
     }
     // vault.theme defaults to 'dark', so only set if saved overrides it
     applyTheme(vault.theme);
+
+    // Hydrate accent theme on mount
+    vault.accent = getAccentTheme();
+    document.documentElement.setAttribute('data-accent', vault.accent);
   });
 
   // Auto-connect to the vault IPC server on mount

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { vault, setTheme } from '../vault.svelte.ts';
+  import { vault, setTheme, setAccentTheme } from '../vault.svelte.ts';
 
   function handleTestnetToggle() {
     if (vault.testnetOnly) {
@@ -48,7 +48,7 @@
       <button
         class="px-3 py-1.5 text-xs font-medium transition-all
           {vault.theme === t
-            ? 'bg-vault-600 text-white shadow-sm'
+            ? 'bg-accent text-white shadow-sm'
             : 'bg-surface text-secondary hover:bg-surface-hover hover:text-primary'}"
         onclick={() => setTheme(t as 'light' | 'dark' | 'system')}
       >
@@ -56,6 +56,19 @@
       </button>
     {/each}
   </div>
+
+  <!-- Accent Theme Selector -->
+  {#each (['emerald', 'violet', 'amber', 'cyan', 'rose'] as const) as accent}
+    <button
+      class="w-5 h-5 rounded-full border border-border-strong transition-all hover:scale-110
+        {vault.accent === accent ? 'ring-1 ring-accent' : ''}"
+      class:bg-accent-subtle={vault.accent === accent}
+      style="background: {accent === 'emerald' ? '#10b981' : accent === 'violet' ? '#8b5cf6' : accent === 'amber' ? '#f59e0b' : accent === 'cyan' ? '#06b6d4' : '#f43f5e'}"
+      title={accent}
+      aria-label={`Accent ${accent}`}
+      onclick={() => setAccentTheme(accent)}
+    ></button>
+  {/each}
 </div>
 
 <!-- Beta Warning Modal -->

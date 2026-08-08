@@ -45,6 +45,58 @@
   --color-input-bg: rgba(235, 235, 235, 0.7);
 }
 
+/* ── Accent theme presets (override --color-accent* per data-accent) ── */
+/* Default (emerald) is set above; alternates give the app its "cool themes". */
+[data-accent="violet"] {
+  --color-accent: #8b5cf6;
+  --color-accent-hover: #7c3aed;
+  --color-accent-subtle: rgba(139, 92, 246, 0.1);
+}
+[data-theme="light"][data-accent="violet"] {
+  --color-accent: #7c3aed;
+  --color-accent-hover: #6d28d9;
+  --color-accent-subtle: rgba(124, 58, 237, 0.1);
+}
+[data-accent="amber"] {
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
+  --color-accent-subtle: rgba(245, 158, 11, 0.12);
+}
+[data-theme="light"][data-accent="amber"] {
+  --color-accent: #d97706;
+  --color-accent-hover: #b45309;
+  --color-accent-subtle: rgba(217, 119, 6, 0.12);
+}
+[data-accent="cyan"] {
+  --color-accent: #06b6d4;
+  --color-accent-hover: #0891b2;
+  --color-accent-subtle: rgba(6, 182, 212, 0.1);
+}
+[data-theme="light"][data-accent="cyan"] {
+  --color-accent: #0891b2;
+  --color-accent-hover: #0e7490;
+  --color-accent-subtle: rgba(8, 145, 178, 0.1);
+}
+[data-accent="rose"] {
+  --color-accent: #f43f5e;
+  --color-accent-hover: #e11d48;
+  --color-accent-subtle: rgba(244, 63, 94, 0.1);
+}
+[data-theme="light"][data-accent="rose"] {
+  --color-accent: #e11d48;
+  --color-accent-hover: #be123c;
+  --color-accent-subtle: rgba(225, 29, 72, 0.1);
+}
+
+/* ── Motion tokens ─────────────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+}
+
 /* ── Map Tailwind tokens to CSS variables ───────────────────────────── */
 @layer base {
   * { border-color: var(--color-border-strong); }
@@ -176,6 +228,19 @@
   .hover\:bg-surface-hover:hover    { background: var(--color-surface-hover); }
   .hover\:text-primary:hover        { color: var(--color-text); }
   .hover\:border-hover:hover        { border-color: var(--color-border-hover); }
+
+  /* ── Accent-aware utilities (follow data-accent theme) ───────────── */
+  .bg-accent        { background: var(--color-accent); }
+  .bg-accent-hover  { background: var(--color-accent-hover); }
+  .bg-accent-subtle { background: var(--color-accent-subtle); }
+  .text-accent      { color: var(--color-accent); }
+  .text-accent-hover{ color: var(--color-accent-hover); }
+  .border-accent    { border-color: var(--color-accent); }
+  .ring-accent      { box-shadow: 0 0 0 1px var(--color-accent); }
+  .hover\:bg-accent:hover        { background: var(--color-accent); }
+  .hover\:bg-accent-hover:hover  { background: var(--color-accent-hover); }
+  .hover\:text-accent:hover      { color: var(--color-accent); }
+  .hover\:border-accent:hover    { border-color: var(--color-accent); }
 
   button, a, input, select, textarea { @apply transition-all duration-200; }
 
