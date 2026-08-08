@@ -2,6 +2,8 @@
   import type { Account, FeeEstimate } from '../types';
   import { vault, validateAddress, estimateFee, signTransaction, broadcastTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
   import { formatBalance, getBalanceFloat } from '../utils';
+  import { getAddressBook, saveAddressEntry, removeAddressEntry, isAddressSaved, findAddressEntry } from '../addressBook';
+  import QrScanner from './QrScanner.svelte';
 
   interface Props {
     account: Account;
@@ -21,6 +23,21 @@
   let addressValid = $state<boolean | null>(null);
   let addressValidating = $state(false);
   let addressError = $state('');
+  let showScanner = $state(false);
+  let showAddressBook = $state(false);
+  let savedAddresses = $state<import('../addressBook').AddressBookEntry[]>([]);
+  let saveToggle = $state(false);
+  let saveLabel = $state('');
+
+  /** Load saved addresses for the current account's network (reactive to account). */
+  $effect(() => {
+    savedAddresses = getAddressBook(account.network);
+  });
+
+  /** Refresh the address book list whenever the modal is (re)opened or changed. */
+  function refreshAddressBook() {
+    savedAddresses = getAddressBook(account.network);
+  }
   let amountError = $state('');
   let txid = $state('');
   let resultError = $state('');
@@ -70,6 +87,36 @@
     } finally {
       addressValidating = false;
     }
+  }
+
+  /** Handle a successful QR scan — fill the recipient and validate it. */
+  function handleScanned(address: string) {
+    recipientAddress = address;
+    showScanner = false;
+    saveToggle = false;
+    // Auto-validate, then offer to save if it's not already in the book.
+    handleValidateAddress();
+    saveToggle = !isAddressSaved(address);
+  }
+
+  function handleSaveToBook() {
+    if (!recipientAddress.trim() || !addressValid) return;
+    saveAddressEntry(recipientAddress.trim(), saveLabel.trim(), account.network);
+    saveToggle = false;
+    saveLabel = '';
+    refreshAddressBook();
+  }
+
+  function handlePickFromBook(address: string) {
+    recipientAddress = address;
+    showAddressBook = false;
+    saveToggle = false;
+    handleValidateAddress();
+  }
+
+  function handleRemoveFromBook(address: string) {
+    removeAddressEntry(address);
+    refreshAddressBook();
   }
 
   function handleAmountInput(e: Event) {
@@ -180,6 +227,10 @@
     amountError = '';
     txid = '';
     resultError = '';
+    showScanner = false;
+    showAddressBook = false;
+    saveToggle = false;
+    saveLabel = '';
     onclose();
   }
 
@@ -268,6 +319,33 @@
           {/if}
         </div>
 
+        <!-- Scan QR + open address book -->
+        <div class="flex gap-2">
+          <button class="btn-secondary text-sm flex-1" onclick={() => (showScanner = true)}>
+            📷 Scan QR
+          </button>
+          <button class="btn-secondary text-sm flex-1" onclick={() => (showAddressBook = true)}>
+            📖 Address Book{savedAddresses.length > 0 ? ` (${savedAddresses.length})` : ''}
+          </button>
+        </div>
+
+        <!-- Save this recipient to the address book once validated -->
+        {#if addressValid === true && saveToggle}
+          <div class="bg-surface/50 border border-strong rounded-lg p-3">
+            <label class="block text-xs text-secondary mb-1" for="save-label">Save to address book (optional label)</label>
+            <div class="flex gap-2">
+              <input
+                id="save-label"
+                type="text"
+                class="input-field flex-1 text-sm"
+                placeholder="e.g. Alice (exchange)"
+                bind:value={saveLabel}
+              />
+              <button class="btn-secondary text-sm" onclick={handleSaveToBook}>Save</button>
+            </div>
+          </div>
+        {/if}
+
         <button
           class="btn-primary w-full"
           disabled={!canProceedFromAddress}
@@ -276,6 +354,38 @@
           Continue
         </button>
       </div>
+
+    <!-- QR Scanner overlay -->
+    {#if showScanner}
+      <QrScanner onScan={handleScanned} onClose={() => (showScanner = false)} />
+    {/if}
+
+    <!-- Address Book overlay -->
+    {#if showAddressBook}
+      <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
+        <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">📖 Address Book</h2>
+            <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => (showAddressBook = false)}>&times;</button>
+          </div>
+          {#if savedAddresses.length === 0}
+            <p class="text-sm text-secondary text-center py-6">No saved addresses for {networkUnit} yet.<br>Scan a QR or enter a valid address to add one.</p>
+          {:else}
+            <ul class="divide-y divide-border max-h-72 overflow-y-auto">
+              {#each savedAddresses as entry (entry.address)}
+                <li class="py-2.5 flex items-center justify-between gap-2">
+                  <button class="text-left flex-1 min-w-0" onclick={() => handlePickFromBook(entry.address)}>
+                    <span class="block text-sm text-primary truncate">{entry.label || 'Unnamed'}</span>
+                    <span class="block font-mono text-xs text-muted truncate">{entry.address.length > 26 ? `${entry.address.slice(0, 12)}...${entry.address.slice(-8)}` : entry.address}</span>
+                  </button>
+                  <button class="text-muted hover:text-red-400 text-xs shrink-0" onclick={() => handleRemoveFromBook(entry.address)} title="Remove">✕</button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      </div>
+    {/if}
 
     <!-- Step 2: Amount -->
     {:else if step === 'amount'}
