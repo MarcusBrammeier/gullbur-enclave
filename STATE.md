@@ -2,8 +2,20 @@
 
 > **Version:** 0.0.8 (pre-beta, internal)
 > **Last updated:** 2026-08-08  
-> **HEAD:** `f7d2164` (2026-08-08)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (296 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e handshake + engine_security (13) ✅** | **frontend Svelte component tests ✅ (83)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **HEAD:** `e8ac852` (2026-08-08)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (303 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (83)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+
+### Security hardening (2026-08-08)
+
+- **Argon2id KDF** (m=32 MiB, t=3, p=1) replacing fast HKDF-SHA256 for the
+  AES-256-GCM envelope — with a self-describing v2 blob (`GBKF` magic + params
+  header) and **transparent legacy-HKDF migration** (older saves keep decrypting).
+- **`accounts.json` encrypted at rest** (device-key `GBAF` AES-256-GCM blob),
+  readable pre-unlock; legacy plaintext still loads.
+- **Seed + accounts files mode 0600** on Unix (were 0644).
+- **Staged-mnemonic IPC** — a generated seed is held in Rust, returned to the
+  UI once for backup, never re-submitted; `clear_staged` discards it on back-out;
+  Settings reveal scrubs the seed on Hide/close.
 
 ---
 
@@ -51,6 +63,10 @@ fuzz/              — cargo-fuzz targets (nightly only, 5 targets)
 ## Recent Commits (all 20+)
 
 ```text
+e8ac852 security: keep generated seed in Rust via staged-mnemonic IPC; scrub JS seed state
+9fe94fa security: argon2id KDF for encrypted vault + device-key encrypted accounts.json at rest
+3f23aa6 docs: refresh STATE.md to v0.0.8 — 296 unit + 83 frontend tests, current HEAD
+6e2af69 Revert "fix(ui): modal accessibility — backdrop-close via onclick|self, Escape/tabindex, labeled debug-comments textarea"
 f7d2164 fix(ui): modal accessibility — backdrop-close via onclick|self, Escape/tabindex, labeled debug-comments textarea
 9de7e98 test: add 50 component tests for Send/VaultInit/Portfolio/OptionsBar
 dd84a7f test: fix update-checker live test for private repo (404 skip, not fail)
@@ -90,7 +106,7 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (296 passed, 1 ignored) |
+| `cargo test --workspace --lib` | ✅ (303 passed, 1 ignored) |
 | `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
@@ -141,6 +157,6 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 - **APK** (12M universal side-load): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
 - **AAB** (7.1M — Play/distribution, target hit): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
-- **296+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **83 frontend Svelte component tests** — all passing
+- **303+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **2 staged-mnemonic e2e** + **83 frontend Svelte component tests** — all passing
 - **ws-handshake-probe.py** — live WS hello→session_key→RPC probe used by CLI & Android sweeps
 - **full-functional-sweep.py** — **33/33 checks**, every IPC method exercised via real binary WS protocol
