@@ -60,10 +60,10 @@
   aria-modal="true"
   aria-label="Receive funds"
   tabindex="-1"
-  onclick={onclose}
+  onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">Receive</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
