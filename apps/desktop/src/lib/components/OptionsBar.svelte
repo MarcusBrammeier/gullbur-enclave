@@ -105,7 +105,7 @@
         Cancel
       </button>
       <button
-        class="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 text-white hover:bg-red-600 transition-colors"
+        class="btn-danger"
         onclick={confirmMainnet}
       >
         Continue
