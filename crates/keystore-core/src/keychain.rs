@@ -24,6 +24,19 @@ impl KeychainStore {
         Ok(())
     }
 
+    /// Store a raw binary secret (arbitrary bytes) in the keychain.
+    ///
+    /// Uses `keyring::Entry::set_secret`, which is safe for non-UTF-8 data
+    /// such as 32-byte cryptographic keys.
+    pub fn store_binary(service: &str, account: &str, secret: &[u8]) -> Result<(), KeystoreError> {
+        let entry = keyring::Entry::new(service, account)
+            .map_err(|e| KeystoreError::Keychain(format!("failed to create keyring entry: {e}")))?;
+        entry
+            .set_secret(secret)
+            .map_err(|e| KeystoreError::Keychain(format!("failed to store binary secret: {e}")))?;
+        Ok(())
+    }
+
     /// Retrieve a secret by `service` / `account`.
     ///
     /// Returns `None` if no entry exists for the given credentials.
@@ -31,6 +44,14 @@ impl KeychainStore {
         let entry = keyring::Entry::new(service, account).ok()?;
         let password = entry.get_password().ok()?;
         Some(password.into_bytes())
+    }
+
+    /// Retrieve a raw binary secret by `service` / `account`.
+    ///
+    /// Returns `None` if no entry exists for the given credentials.
+    pub fn retrieve_binary(service: &str, account: &str) -> Option<Vec<u8>> {
+        let entry = keyring::Entry::new(service, account).ok()?;
+        entry.get_secret().ok()
     }
 
     /// Delete a stored secret.

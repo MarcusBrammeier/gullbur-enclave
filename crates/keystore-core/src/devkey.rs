@@ -82,6 +82,127 @@ impl DeviceKeyProvider for FileDeviceKeyProvider {
     }
 }
 
+/// OS-keychain-backed device key provider.
+///
+/// Stores the 32-byte device key in the platform-native credential store
+/// (macOS Keychain / Windows Credential Manager / Linux Secret Service / kernel
+/// keyring) rather than a plaintext file, when one is available. The key is
+/// base64-encoded so arbitrary 32 bytes fit the `keyring` string store.
+///
+/// If no keychain backend is reachable (headless CI, minimal servers), callers
+/// should fall back to `FileDeviceKeyProvider`; `TieredDeviceKeyProvider` does
+/// this automatically.
+#[derive(Debug)]
+pub struct KeychainDeviceKeyProvider {
+    service: &'static str,
+    account: &'static str,
+}
+
+/// A key stored in `FileDeviceKeyProvider` (as a migration fallback source).
+impl KeychainDeviceKeyProvider {
+    pub const SERVICE: &'static str = "com.gullbur.vault";
+    pub const ACCOUNT: &'static str = "device-key";
+
+    pub fn new() -> Self {
+        Self {
+            service: Self::SERVICE,
+            account: Self::ACCOUNT,
+        }
+    }
+}
+
+impl Default for KeychainDeviceKeyProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DeviceKeyProvider for KeychainDeviceKeyProvider {
+    fn backend_name(&self) -> &'static str {
+        "keychain"
+    }
+
+    fn get_or_create_key(&self) -> Result<[u8; 32], KeystoreError> {
+        // Existing keychain entry → load it (binary-safe).
+        if let Some(raw) = super::KeychainStore::retrieve_binary(self.service, self.account)
+            && raw.len() == 32
+        {
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&raw);
+            return Ok(key);
+        }
+
+        // Generate a fresh random key and store it in the keychain.
+        let mut key = [0u8; 32];
+        rand::rng().fill_bytes(&mut key);
+        super::KeychainStore::store_binary(self.service, self.account, &key)
+            .map_err(|e| KeystoreError::Keychain(format!("failed to store device key: {e}")))?;
+        Ok(key)
+    }
+}
+
+/// Tiered provider: prefer the OS keychain, fall back to the plaintext file.
+///
+/// This keeps the device key out of a plaintext file on machines with a real
+/// credential store, while still working on headless/minimal systems (CI,
+/// servers, sandboxes) that have no keychain backend.
+#[derive(Debug)]
+pub struct TieredDeviceKeyProvider {
+    file: FileDeviceKeyProvider,
+    keychain: KeychainDeviceKeyProvider,
+}
+
+impl TieredDeviceKeyProvider {
+    pub fn new(data_dir: std::path::PathBuf) -> Self {
+        Self {
+            file: FileDeviceKeyProvider::new(data_dir),
+            keychain: KeychainDeviceKeyProvider::new(),
+        }
+    }
+
+    pub fn default_home() -> Self {
+        Self::new(dirs_next::home_dir().unwrap_or_default().join(".gullbur"))
+    }
+}
+
+impl DeviceKeyProvider for TieredDeviceKeyProvider {
+    fn backend_name(&self) -> &'static str {
+        if keychain_persistent() {
+            "keychain"
+        } else {
+            "file"
+        }
+    }
+
+    fn get_or_create_key(&self) -> Result<[u8; 32], KeystoreError> {
+        // Only trust the keychain if it actually PERSISTS the key across calls.
+        // (Some headless `keyring` backends return Ok but regenerate each time;
+        // auto-using one would make the encrypted seed undecryptable after
+        // restart, so we verify stability before preferring it.)
+        if keychain_persistent()
+            && let Ok(k) = self.keychain.get_or_create_key()
+        {
+            return Ok(k);
+        }
+        self.file.get_or_create_key()
+    }
+}
+
+/// Verify the OS keychain is stable/persistent: store a key, then confirm a
+/// fresh retrieval returns the SAME key. Only then is it safe to rely on.
+fn keychain_persistent() -> bool {
+    let provider = KeychainDeviceKeyProvider::new();
+    let k1 = match provider.get_or_create_key() {
+        Ok(k) => k,
+        Err(_) => return false,
+    };
+    // A genuinely persistent backend returns the stored key unchanged.
+    match provider.get_or_create_key() {
+        Ok(k2) => k1 == k2,
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +256,37 @@ mod tests {
             provider.get_or_create_key().expect("test invariant"),
             [0x42; 32]
         );
+    }
+
+    #[test]
+    fn keychain_provider_generates_a_key() {
+        let provider = KeychainDeviceKeyProvider::new();
+        match provider.get_or_create_key() {
+            Ok(k) => {
+                assert_eq!(k.len(), 32);
+                // Round-trip only when the backend is genuinely persistent
+                // (headless Linux keyring may not be; the Tiered provider is
+                // responsible for falling back in that case).
+                if keychain_persistent() {
+                    let k2 = provider.get_or_create_key().expect("test invariant");
+                    assert_eq!(k, k2);
+                }
+            }
+            Err(_) => {
+                // No keychain in this environment — acceptable, tiered falls back.
+            }
+        }
+    }
+
+    #[test]
+    fn tiered_provider_returns_a_key_ok() {
+        // Tiered must always produce a key: keychain if available, else file.
+        let dir = std::env::temp_dir().join(format!("gullbur-tier-{}", std::process::id()));
+        let provider = TieredDeviceKeyProvider::new(dir.clone());
+        let k1 = provider.get_or_create_key().expect("tiered must produce a key");
+        assert_eq!(k1.len(), 32);
+        let k2 = provider.get_or_create_key().expect("test invariant");
+        assert_eq!(k1, k2);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

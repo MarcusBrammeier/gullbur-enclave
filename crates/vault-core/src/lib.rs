@@ -74,8 +74,8 @@ pub struct Vault {
     /// Optional monero-wallet-rpc URL for real balance queries
     xmr_wallet_rpc_url: Option<String>,
     /// Source of the per-device key used to seal the persisted seed.
-    /// Defaults to `FileDeviceKeyProvider` (desktop); Android injects a
-    /// hardware KeyStore-backed provider via `with_key_provider`.
+    /// Defaults to `TieredDeviceKeyProvider` (OS keychain → file fallback);
+    /// Android injects a hardware KeyStore-backed provider via `with_key_provider`.
     key_provider: Box<dyn keystore_core::DeviceKeyProvider>,
 }
 
@@ -93,7 +93,7 @@ impl Vault {
             tor_enabled: Arc::new(AtomicBool::new(false)),
             auth_manager: Arc::new(auth_core::AuthManager::new()),
             xmr_wallet_rpc_url: None,
-            key_provider: Box::new(keystore_core::FileDeviceKeyProvider::default_home()),
+            key_provider: Box::new(keystore_core::TieredDeviceKeyProvider::default_home()),
         }
     }
 
