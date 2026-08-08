@@ -60,6 +60,10 @@
     testnetOnly = vault.testnetOnly;
   }
 
+  function handleBackdropClick(e: MouseEvent) {
+    if (e.target === e.currentTarget) onclose();
+  }
+
   async function handleShowSeed() {
     showSeedConfirm = false;
     seedLoading = true;
@@ -92,7 +96,7 @@
   onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" role="document">
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">⚙️ Settings</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
@@ -321,11 +325,9 @@
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
   role="dialog"
   aria-modal="true"
-  tabindex="-1"
-  onclick|self={() => showConsole = false}
-  onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}
+  onclick={() => showConsole = false}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col">
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">📟 IPC Console</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => showConsole = false}>&times;</button>
@@ -344,10 +346,10 @@
   role="alertdialog"
   aria-modal="true"
   tabindex="-1"
-  onclick|self={() => { if (!pendingTestnetToggle) showTestnetWarning = false; }}
+  onclick={() => { if (!pendingTestnetToggle) showTestnetWarning = false; }}
   onkeydown={(e) => { if (e.key === 'Escape') showTestnetWarning = false; }}
 >
-  <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document">
+  <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="text-center space-y-4">
       <div class="text-4xl">⚠️</div>
       <h3 class="text-lg font-semibold text-amber-400">Mainnet Access</h3>
