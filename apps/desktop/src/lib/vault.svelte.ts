@@ -278,9 +278,50 @@ export async function generateMnemonic(): Promise<string> {
   const c = await getClient();
   vault.error = null;
   try {
-    const result = (await c.call('vault.generate_mnemonic', {})) as VaultGenerateMnemonicResponse;
+    // Stage the fresh phrase in Rust so vault.initialize can consume it without
+    // the UI re-sending the seed back over IPC.
+    const result = (await c.call('vault.stage_mnemonic', {})) as VaultGenerateMnemonicResponse;
     return result.mnemonic;
   } catch (e) {
+    setVaultError(e);
+    throw e;
+  }
+}
+
+/**
+ * Clear any staged (Rust-held) mnemonic. Called when the user backs out of
+ * the generate flow without initializing, so no seed lingers in Rust memory.
+ */
+export async function clearStagedMnemonic(): Promise<void> {
+  const c = await getClient();
+  try {
+    await c.call('vault.clear_staged', {});
+  } catch { /* best-effort */ }
+}
+
+/**
+ * Initialize the vault from the Rust-staged mnemonic (generated wallet flow).
+ *
+ * Sends an EMPTY seed_phrase — the backend consumes the phrase it already holds
+ * from the prior `stage_mnemonic` call, so the generated seed is never
+ * re-submitted from the UI over IPC.
+ */
+export async function initializeFromStaged(passphrase?: string): Promise<string | null> {
+  const c = await getClient();
+  vault.error = null;
+  vault.vaultStatus = 'Initializing vault…';
+  try {
+    const result = (await c.call('vault.initialize', {
+      seed_phrase: '',
+      passphrase: passphrase ?? '',
+    })) as VaultInitializeResponse;
+    if (!result.success) throw new Error('Vault initialization returned failure');
+    vault.initialized = true;
+    vault.vaultStatus = 'Initialized';
+    await refreshStatus();
+    return result.mnemonic ?? null;
+  } catch (e) {
+    vault.vaultStatus = 'Initialization failed';
     setVaultError(e);
     throw e;
   }

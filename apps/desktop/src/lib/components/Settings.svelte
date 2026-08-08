@@ -61,7 +61,7 @@
   }
 
   function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) onclose();
+    if (e.target === e.currentTarget) handleClose();
   }
 
   async function handleShowSeed() {
@@ -69,13 +69,27 @@
     seedLoading = true;
     seedError = '';
     try {
-      seedPhrase = await invoke('get_seed_phrase');
+      // Fetch on demand; clear immediately after the reveal moment (Hide / close)
+      // so the seed does not persist in component state longer than needed.
+      const phrase = await invoke('get_seed_phrase');
+      seedPhrase = phrase;
       seedRevealed = false;
     } catch (e) {
       seedError = e instanceof Error ? e.message : String(e);
     } finally {
       seedLoading = false;
     }
+  }
+
+  function clearSeed() {
+    seedPhrase = '';
+    seedRevealed = false;
+  }
+
+  function handleClose() {
+    // Never let the revealed seed persist in memory once the modal closes.
+    clearSeed();
+    onclose();
   }
 
   async function copySeed() {
@@ -94,12 +108,12 @@
   aria-label="Settings"
   tabindex="-1"
   onclick={handleBackdropClick}
-  onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
+  onkeydown={(e) => { if (e.key === 'Escape') handleClose(); }}
 >
   <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">⚙️ Settings</h2>
-      <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
+      <button class="text-muted hover:text-primary text-xl leading-none" onclick={handleClose}>&times;</button>
     </div>
 
     <div class="space-y-5">
@@ -209,7 +223,7 @@
               <button class="btn-secondary text-xs flex-1" onclick={copySeed}>
                 {seedCopied ? '✅ Copied!' : '📋 Copy'}
               </button>
-              <button class="btn-secondary text-xs flex-1" onclick={() => { seedPhrase = ''; seedRevealed = false; }}>
+              <button class="btn-secondary text-xs flex-1" onclick={() => { clearSeed(); }}>
                 Hide
               </button>
             </div>

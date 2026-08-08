@@ -10,12 +10,16 @@ import { mockVault, resetMockVault } from '../../test/mockVault.svelte.ts';
 
 const connectMock = vi.fn().mockResolvedValue(undefined);
 const initializeMock = vi.fn().mockResolvedValue('test-mnemonic');
+const initializeFromStagedMock = vi.fn().mockResolvedValue('test-mnemonic');
+const clearStagedMock = vi.fn().mockResolvedValue(undefined);
 const generateMnemonicMock = vi.fn().mockResolvedValue('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about');
 
 vi.mock('../vault.svelte.ts', () => ({
   vault: mockVault,
   connect: (...args: any[]) => connectMock(...args),
   initialize: (...args: any[]) => initializeMock(...args),
+  initializeFromStaged: (...args: any[]) => initializeFromStagedMock(...args),
+  clearStagedMnemonic: (...args: any[]) => clearStagedMock(...args),
   generateMnemonic: (...args: any[]) => generateMnemonicMock(...args),
 }));
 
@@ -26,6 +30,8 @@ describe('VaultInit.svelte', () => {
     vi.clearAllMocks();
     connectMock.mockResolvedValue(undefined);
     initializeMock.mockResolvedValue('test-mnemonic');
+    initializeFromStagedMock.mockResolvedValue('test-mnemonic');
+    clearStagedMock.mockResolvedValue(undefined);
     generateMnemonicMock.mockResolvedValue('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about');
     resetMockVault();
   });
@@ -145,8 +151,8 @@ describe('VaultInit.svelte', () => {
     // Click Continue Anyway
     const continueBtns = screen.getAllByText('Continue Anyway');
     await fireEvent.click(continueBtns[0]);
-    // Should call connect + initialize
+    // Should call connect + initialize-from-staged (seed never re-sent)
     expect(connectMock).toHaveBeenCalled();
-    expect(initializeMock).toHaveBeenCalled();
+    expect(initializeFromStagedMock).toHaveBeenCalled();
   });
 });

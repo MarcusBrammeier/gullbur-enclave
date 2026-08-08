@@ -75,6 +75,12 @@ pub fn register_vault_handlers(
     approval_queue: Arc<RwLock<ApprovalQueue>>,
     auth_manager: Arc<auth_core::AuthManager>,
 ) {
+    // Staged mnemonic produced by `vault.stage_mnemonic`. Held in Rust memory so
+    // a freshly generated phrase is returned to the UI once for backup, then
+    // consumed by `vault.initialize` without the UI re-sending the seed.
+    let staged_mnemonic: Arc<RwLock<Option<zeroize::Zeroizing<String>>>> =
+        Arc::new(RwLock::new(None));
+
     // ── vault.initialize ────────────────────────────────────────────────
     {
         let ph = Arc::clone(&plugin_host);
@@ -82,12 +88,16 @@ pub fn register_vault_handlers(
         let mn = Arc::clone(&mnemonic);
         let init = Arc::clone(&initialized);
         let auth = Arc::clone(&auth_manager);
+        // Staged mnemonic produced by vault.stage_mnemonic (kept in Rust so the
+        // phrase is never re-sent from the UI after generation).
+        let staged = Arc::clone(&staged_mnemonic);
         handler.register("vault.initialize", move |params: Value| {
             let ph = Arc::clone(&ph);
             let sd = Arc::clone(&sd);
             let mn = Arc::clone(&mn);
             let init = Arc::clone(&init);
             let auth = Arc::clone(&auth);
+            let staged = Arc::clone(&staged);
             async move {
                 if init.load(Ordering::SeqCst) {
                     return Err(RpcError::new(-32000, "Vault is already initialized"));
@@ -96,14 +106,35 @@ pub fn register_vault_handlers(
                 let seed_phrase = params
                     .get("seed_phrase")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(RpcError::invalid_params)?;
+                    .unwrap_or("");
                 let passphrase = params
                     .get("passphrase")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 
+                // Prefer the staged (Rust-held) mnemonic when the UI generates a new
+                // wallet — the phrase never has to be re-submitted from JavaScript.
+                // A staged phrase takes precedence over an empty seed_phrase.
+                let use_staged = seed_phrase.is_empty() && staged.read().await.is_some();
+
                 // Process seed phrase through BIP-39 → BIP-44 (matching Vault::initialize)
-                let (phrase_str, seed_512): (String, [u8; 64]) = if seed_phrase.is_empty() {
+                let (phrase_str, seed_512): (String, [u8; 64]) = if use_staged {
+                    let guard = staged.read().await;
+                    let staged_phrase = guard
+                        .clone()
+                        .ok_or_else(|| RpcError::new(-32000, "Staged mnemonic unavailable"))?;
+                    let phrase_str = staged_phrase.to_string();
+                    let phrase = crypto_core::keys::mnemonic_from_string(&phrase_str)
+                        .map_err(|e| RpcError::new(-32000, format!("Invalid mnemonic: {e}")))?;
+                    let seed = crypto_core::keys::mnemonic_to_seed(
+                        phrase.as_words(),
+                        passphrase,
+                    )
+                    .map_err(|e| {
+                        RpcError::new(-32000, format!("Seed derivation failed: {e}"))
+                    })?;
+                    (phrase_str, *seed)
+                } else if seed_phrase.is_empty() {
                     // Generate a new BIP-39 mnemonic and derive the 512-bit seed
                     let phrase = crypto_core::keys::generate_mnemonic(
                         crypto_core::MnemonicStrength::TwentyFourWords,
@@ -162,6 +193,9 @@ pub fn register_vault_handlers(
                 // In headless/CLI mode, the init flow itself is the auth.
                 let _ = auth.try_biometric();
 
+                // Clear the staged mnemonic now that the vault holds the real seed.
+                *staged.write().await = None;
+
                 let mut resp = serde_json::json!({
                     "success": true,
                     "initialized": true,
@@ -169,12 +203,47 @@ pub fn register_vault_handlers(
                         .map_err(|e| RpcError::new(-32000, format!("Serialization failed: {e}")))?,
                 });
 
-                // Only return mnemonic when we generated a new one (seed_phrase was empty)
+                // Only return mnemonic when we generated/staged a new one (not an
+                // explicit user-typed seed).
                 if seed_phrase.is_empty() {
                     resp["mnemonic"] = serde_json::Value::String(phrase_str);
                 }
 
                 Ok(resp)
+            }
+        });
+    }
+
+    // ── vault.stage_mnemonic ─────────────────────────────────────────────
+    // Generates a fresh BIP-39 mnemonic in Rust and holds it in memory so the
+    // UI can display it once for backup, then initialize without re-sending
+    // the phrase. The staged value is zero-copied into vault.initialize.
+    {
+        let staged = Arc::clone(&staged_mnemonic);
+        handler.register("vault.stage_mnemonic", move |_params: Value| {
+            let staged = Arc::clone(&staged);
+            async move {
+                let phrase = crypto_core::keys::generate_mnemonic(
+                    crypto_core::MnemonicStrength::TwentyFourWords,
+                )
+                .map_err(|e| RpcError::new(-32000, e.to_string()))?;
+                let phrase_str = phrase.to_string();
+                *staged.write().await = Some(zeroize::Zeroizing::new(phrase_str.clone()));
+                Ok(serde_json::json!({ "mnemonic": phrase_str }))
+            }
+        });
+    }
+
+    // ── vault.clear_staged ──────────────────────────────────────────────
+    // Discard any staged mnemonic (user backed out of the generate flow without
+    // initializing) so no seed lingers in Rust memory.
+    {
+        let staged = Arc::clone(&staged_mnemonic);
+        handler.register("vault.clear_staged", move |_params: Value| {
+            let staged = Arc::clone(&staged);
+            async move {
+                *staged.write().await = None;
+                Ok(serde_json::json!({ "success": true }))
             }
         });
     }

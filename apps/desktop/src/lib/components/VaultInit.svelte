@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { vault, connect, initialize, generateMnemonic } from '../vault.svelte.ts';
+  import { vault, connect, initialize, initializeFromStaged, clearStagedMnemonic, generateMnemonic } from '../vault.svelte.ts';
 
   type Step = 'input' | 'backup' | 'confirm' | 'skip_warn' | 'initializing' | 'error';
 
@@ -80,7 +80,9 @@
       localError = 'Initialization timed out — is the IPC server running?';
     }, 15_000);
     connect().then(() => {
-      initialize(generatedMnemonic, passphrase.trim()).then(() => {
+      // Initialize from the Rust-staged phrase — the seed is never re-sent
+      // from the UI after it was generated.
+      initializeFromStaged(passphrase.trim()).then(() => {
         clearTimeout(timeout);
         // App.svelte handles transition to Dashboard via vault.initialized
       }).catch((e) => {
@@ -106,7 +108,7 @@
       localError = 'Initialization timed out — is the IPC server running?';
     }, 15_000);
     connect().then(() => {
-      initialize(generatedMnemonic, passphrase.trim()).then(() => {
+      initializeFromStaged(passphrase.trim()).then(() => {
         clearTimeout(timeout);
         // App.svelte handles transition to Dashboard via vault.initialized
       }).catch((e) => {
@@ -122,6 +124,7 @@
   }
 
   function goBackToInput() {
+    clearStagedMnemonic();
     step = 'input';
     seedPhrase = '';
     localError = null;
@@ -133,6 +136,7 @@
   }
 
   function resetState() {
+    clearStagedMnemonic();
     step = 'input';
     seedPhrase = '';
     localError = null;
