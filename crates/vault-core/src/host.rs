@@ -1,40 +1,91 @@
 //! Plugin host — manages registration, lifecycle, and dispatch for all blockchain plugins.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use keystore_core::vault;
+use keystore_core::DeviceKeyProvider;
 use wallet_plugin::{
     Account, Balance, FeeEstimate, KeyHandle, PluginError, TxRecord, WalletPlugin,
 };
 
 /// Path for persisted accounts, relative to ~/.gullbur/
 const ACCOUNTS_FILE: &str = "accounts.json";
+/// AAD binding the encrypted accounts file to its context.
+const ACCOUNTS_AAD: &[u8] = b"gullbur-accounts";
 
-/// Load accounts from `~/.gullbur/accounts.json`.
-/// Returns an empty vec if the file doesn't exist or can't be parsed.
-fn load_accounts_from_disk() -> Vec<Account> {
-    let path = match dirs_next::home_dir() {
-        Some(h) => h.join(".gullbur").join(ACCOUNTS_FILE),
-        None => return vec![],
-    };
-    match std::fs::read_to_string(&path) {
-        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-        Err(_) => vec![],
-    }
+/// Resolve the accounts file path under ~/.gullbur.
+fn accounts_path() -> Option<PathBuf> {
+    dirs_next::home_dir().map(|h| h.join(".gullbur").join(ACCOUNTS_FILE))
 }
 
-/// Save accounts to `~/.gullbur/accounts.json`.
+/// Get the per-device 32-byte key used to encrypt the accounts file at rest.
+fn device_key() -> Result<[u8; 32], keystore_core::KeystoreError> {
+    keystore_core::FileDeviceKeyProvider::default_home().get_or_create_key()
+}
+
+/// Load accounts from `~/.gullbur/accounts.json`.
+///
+/// The file is AES-256-GCM encrypted at rest (device-key). If the file on disk
+/// is still an older plaintext blob (written before this feature), it is
+/// transparently read as plaintext so old saves keep working. Returns an empty
+/// vec if the file doesn't exist or can't be decrypted/parsed.
+fn load_accounts_from_disk() -> Vec<Account> {
+    let path = match accounts_path() {
+        Some(p) => p,
+        None => return vec![],
+    };
+    let raw = match std::fs::read(&path) {
+        Ok(r) => r,
+        Err(_) => return vec![],
+    };
+
+    // Try to decrypt with the device key; on any failure fall through to the
+    // legacy plaintext path below.
+    if let Ok(key) = device_key()
+        && let Ok(Some(plaintext)) = vault::decrypt_file_with_key(&key, &raw, ACCOUNTS_AAD)
+        && let Ok(accounts) = serde_json::from_slice(&plaintext)
+    {
+        return accounts;
+    }
+
+    // Fallback: legacy plaintext JSON (pre-encryption save).
+    if let Ok(json) = std::str::from_utf8(&raw)
+        && let Ok(accounts) = serde_json::from_str(json)
+    {
+        return accounts;
+    }
+    vec![]
+}
+
+/// Save accounts to `~/.gullbur/accounts.json`, encrypted at rest.
 fn save_accounts_to_disk(accounts: &[Account]) {
-    let path = match dirs_next::home_dir() {
-        Some(h) => h.join(".gullbur").join(ACCOUNTS_FILE),
+    let path = match accounts_path() {
+        Some(p) => p,
         None => return,
     };
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(json) = serde_json::to_string_pretty(accounts) {
-        let _ = std::fs::write(&path, &json);
+    let json = match serde_json::to_vec(accounts) {
+        Ok(j) => j,
+        Err(_) => return,
+    };
+    // Encrypt with the device key; on key failure, skip writing rather than
+    // silently dropping to plaintext (defense-in-depth: never write secrets
+    // unencrypted once the encrypted path exists).
+    if let Ok(key) = device_key()
+        && let Ok(blob) = vault::encrypt_file_with_key(&key, &json, ACCOUNTS_AAD)
+    {
+        let _ = std::fs::write(&path, &blob);
+        // Encrypted secret-adjacent file: owner-only on Unix.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        }
     }
 }
 
@@ -759,5 +810,54 @@ mod tests {
     fn test_new_host_has_no_plugins_count() {
         let host = PluginHost::new();
         assert_eq!(host.plugin_ids().len(), 0);
+    }
+
+    /// Accounts are encrypted at rest with the device key — the on-disk file
+    /// must NOT be plaintext JSON and must round-trip through load/save.
+    #[test]
+    fn test_accounts_encrypted_at_rest_and_roundtrip() {
+        // Isolate HOME so the device key + accounts file land in temp space.
+        let tmp = std::env::temp_dir().join(format!("gullbur-acct-enc-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).expect("test invariant");
+        unsafe { std::env::set_var("HOME", &tmp) };
+
+        let accts = vec![Account {
+            id: "btc-0".into(),
+            network: "bitcoin-testnet".into(),
+            address: "tb1qtesting".into(),
+            path: Some("m/84'/1'/0'/0/0".into()),
+            label: None,
+        }];
+
+        save_accounts_to_disk(&accts);
+
+        // On-disk file must be the GBAF-encrypted blob, NOT plaintext.
+        let path = tmp.join(".gullbur").join(ACCOUNTS_FILE);
+        let raw = std::fs::read(&path).expect("accounts file should exist");
+        assert!(
+            raw.len() > 32,
+            "encrypted blob should be larger than magic+nonce"
+        );
+        assert!(
+            raw.windows(4).any(|w| w == b"GBAF"),
+            "file must carry the device-key GBAF magic"
+        );
+        // Neither the JSON nor the address may appear in cleartext.
+        let text = String::from_utf8_lossy(&raw);
+        assert!(
+            !text.contains("tb1qtesting"),
+            "address must not appear in cleartext on disk"
+        );
+        assert!(
+            !text.contains("\"network\""),
+            "JSON keys must not appear in cleartext on disk"
+        );
+
+        // Round-trip: reload must restore the accounts.
+        let loaded = load_accounts_from_disk();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].address, "tb1qtesting");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

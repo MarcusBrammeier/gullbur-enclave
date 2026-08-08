@@ -174,7 +174,14 @@ impl Vault {
         if let Some(home) = dirs_next::home_dir() {
             let data_dir = home.join(".gullbur");
             let _ = std::fs::create_dir_all(&data_dir);
-            let _ = std::fs::write(data_dir.join(SEED_FILE), &encrypted);
+            let seed_path = data_dir.join(SEED_FILE);
+            let _ = std::fs::write(&seed_path, &encrypted);
+            // Encrypted seed: owner-only on Unix.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600));
+            }
         }
 
         // 4. Register default blockchain plugins
