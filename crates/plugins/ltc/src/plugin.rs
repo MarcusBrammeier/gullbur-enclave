@@ -206,6 +206,7 @@ impl WalletPlugin for LtcPlugin {
             address: address_str,
             path: Some(path),
             label: None,
+            index,
         })
     }
 

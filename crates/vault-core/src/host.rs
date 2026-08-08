@@ -741,6 +741,7 @@ mod tests {
             address: "0xtest".into(),
             path: None,
             label: None,
+            index: 0,
         };
 
         let result = host
@@ -827,6 +828,7 @@ mod tests {
             address: "tb1qtesting".into(),
             path: Some("m/84'/1'/0'/0/0".into()),
             label: None,
+            index: 0,
         }];
 
         save_accounts_to_disk(&accts);

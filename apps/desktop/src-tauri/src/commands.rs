@@ -264,6 +264,7 @@ pub async fn get_balance(
         address,
         path: None,
         label: None,
+        index: 0,
     };
     let host = vault.plugin_host.read().await;
     let balance = host
@@ -340,6 +341,7 @@ pub async fn get_transaction_history(
         address,
         path: None,
         label: None,
+        index: 0,
     };
     let host = vault.plugin_host.read().await;
     let records = host
@@ -542,6 +544,7 @@ pub async fn simulate_and_send(
         address,
         path: None,
         label: None,
+        index: 0,
     };
     let host = vault.plugin_host.read().await;
     host.simulate_and_send(&tx_bytes, &key, &account, &network)
@@ -689,6 +692,7 @@ async fn dispatch_method(
                 address: address.to_string(),
                 path: None,
                 label: None,
+                index: 0,
             };
             let host = vault.plugin_host.read().await;
             let balance = host
@@ -759,6 +763,7 @@ async fn dispatch_method(
                 address: address.to_string(),
                 path: None,
                 label: None,
+                index: 0,
             };
             let host = vault.plugin_host.read().await;
             let records = host
@@ -849,6 +854,7 @@ async fn dispatch_method(
                 address: address.to_string(),
                 path: None,
                 label: None,
+                index: 0,
             };
             let host = vault.plugin_host.read().await;
             let result = host

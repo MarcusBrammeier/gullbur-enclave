@@ -73,6 +73,7 @@ impl VaultBridge for VaultBridgeImpl {
             address: address.into(),
             path: None,
             label: None,
+            index: 0,
         };
         let balance = host
             .get_balance(&acc, network)

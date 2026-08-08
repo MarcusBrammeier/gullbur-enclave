@@ -152,6 +152,7 @@ impl WalletPlugin for BtcPlugin {
             address: address.to_string(),
             path: Some(path),
             label: None,
+            index,
         })
     }
 
@@ -541,6 +542,29 @@ mod tests {
         assert_eq!(account.network, "bitcoin-testnet");
         assert!(account.id.starts_with("btc-bitcoin-testnet-"));
         assert!(account.address.starts_with("tb1q") || account.address.starts_with("bc1q"));
+        assert_eq!(account.index, 0, "account must carry its derivation index");
+    }
+
+    /// Regression: distinct account indices MUST yield distinct addresses.
+    /// A wallet bug once computed nextIndex wrong so the 3rd+ account reused
+    /// index 1; this guards the backend uniqueness invariant.
+    #[tokio::test]
+    async fn test_distinct_indices_yield_distinct_addresses() {
+        let plugin = BtcPlugin::new(None);
+        let seed = [0x42u8; 32];
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for idx in 0..8u32 {
+            let account = plugin
+                .create_account(&seed, idx, "bitcoin-testnet")
+                .await
+                .expect("test invariant");
+            assert_eq!(account.index, idx);
+            assert!(
+                seen.insert(account.address.clone()),
+                "address for index {idx} collided with an earlier account"
+            );
+        }
+        assert_eq!(seen.len(), 8, "all 8 accounts must have unique addresses");
     }
 
     #[tokio::test]

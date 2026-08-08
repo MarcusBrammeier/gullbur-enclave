@@ -18,6 +18,10 @@ pub struct Account {
     pub address: String,
     pub path: Option<String>,
     pub label: Option<String>,
+    /// BIP-44 account index used for derivation. Serialized so the UI can
+    /// compute the next free index; defaults to 0 for legacy persisted data.
+    #[serde(default)]
+    pub index: u32,
 }
 
 /// Balance of an account.
@@ -129,6 +133,7 @@ mod tests {
             address: "bc1qtest".into(),
             path: Some("m/84'/0'/0'/0/0".into()),
             label: None,
+            index: 0,
         };
         assert_eq!(account.id, "btc-mainnet-0");
         assert_eq!(account.network, "bitcoin");
@@ -205,6 +210,7 @@ mod tests {
                 id: id.clone(), network: network.clone(), address: address.clone(),
                 path: if path_present { Some("m/44'/0'/0'/0/0".into()) } else { None },
                 label: if label_present { Some("My Wallet".into()) } else { None },
+                index: 0,
             };
             let json = serde_json::to_string(&acct).expect("test invariant");
             let parsed: Account = serde_json::from_str(&json).expect("test invariant");

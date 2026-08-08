@@ -19,6 +19,7 @@ async fn sepolia_live_get_balance() {
         address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".into(),
         path: None,
         label: None,
+        index: 0,
     };
     let balance = plugin
         .get_balance(&account, "sepolia")

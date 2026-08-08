@@ -484,6 +484,7 @@ impl WalletPlugin for XmrPlugin {
             address: addr,
             path: Some(format!("m/44'/128'/{index}'/0/0")),
             label: None,
+            index,
         })
     }
 
@@ -1315,6 +1316,7 @@ mod tests {
             address: "4abc123".into(),
             path: None,
             label: None,
+            index: 0,
         };
         let result = futures::executor::block_on(plugin.get_balance(&account, "monero"));
         match result {
@@ -1344,6 +1346,7 @@ mod tests {
             address: "4abc123".into(),
             path: None,
             label: None,
+            index: 0,
         };
         let result =
             futures::executor::block_on(plugin.get_transaction_history(&account, "monero", 10))

@@ -394,6 +394,7 @@ impl WalletPlugin for EvmPlugin {
             address,
             path: Some(format!("m/44'/60'/{index}'/0/0")),
             label: None,
+            index,
         })
     }
 

@@ -390,6 +390,7 @@ pub fn register_vault_handlers(
                     address,
                     path: None,
                     label: None,
+                    index: 0,
                 };
 
                 let host = ph.read().await;
@@ -581,6 +582,7 @@ pub fn register_vault_handlers(
                     address,
                     path: None,
                     label: None,
+                    index: 0,
                 };
 
                 let host = ph.read().await;
@@ -928,6 +930,7 @@ pub fn register_vault_handlers(
                     address,
                     path: None,
                     label: None,
+                    index: 0,
                 };
 
                 let host = ph.read().await;
