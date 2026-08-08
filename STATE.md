@@ -2,8 +2,8 @@
 
 > **Version:** 0.0.8 (pre-beta, internal)
 > **Last updated:** 2026-08-08  
-> **HEAD:** `e8ac852` (2026-08-08)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (303 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (83)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **HEAD:** `87e88b3` (2026-08-08)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ### Security hardening (2026-08-08)
 
@@ -16,6 +16,31 @@
 - **Staged-mnemonic IPC** — a generated seed is held in Rust, returned to the
   UI once for backup, never re-submitted; `clear_staged` discards it on back-out;
   Settings reveal scrubs the seed on Hide/close.
+
+### Features & robustness (2026-08-08, batch 2)
+
+- **Account uniqueness** — `Account.index` now serialized on the wire
+  (`#[serde(default)]`, backward-compat) and populated in all 4 plugin
+  derivation paths; UI can finally derive truly distinct BIP-44 addresses
+  (was: 3rd+ accounts all reused index 1). Regression test asserts 8 distinct
+  indices → 8 distinct addresses.
+- **Device-key → OS keychain** — `TieredDeviceKeyProvider` (keychain-first,
+  file fallback) with a **persistence round-trip probe** before trusting the
+  backend (headless-Linux keyring can return `Ok` yet regenerate a different
+  key per call, which would make the encrypted seed undecryptable).
+- **Address book** — persistent per-network saved recipients in localStorage
+  (non-secrets only), with save/update/remove + 6 store tests; wired into Send.
+- **QR receive-scan** — `QrScanner.svelte` (getUserMedia + jsQR) fills + auto-
+  validates the recipient address; Android CAMERA permission added.
+- **E2EE IPC confirmed** — session-key handshake + AES-256-GCM both directions
+  (server decrypts requests / encrypts responses; client encrypts every request
+  via the WASM crypto blob); verified end-to-end (`e2e_ipc_encrypted`).
+- **UI accent-theme system** — 5 accent presets (emerald/violet/amber/cyan/rose)
+  drive `--color-accent` tokens + motion tokens; accent picker in OptionsBar.
+- **Balance refresh single-flight + tx-history stale-guard** — concurrent
+  refreshes coalesce; account-switch history fetches can't overwrite out-of-order.
+- *Note:* EVM gas was already REAL on the Rust side (`eth_estimateGas` +
+  `eth_call`); the hardcoded `21000` exists only in the `IS_DEMO` browser mock.
 
 ---
 
@@ -63,6 +88,12 @@ fuzz/              — cargo-fuzz targets (nightly only, 5 targets)
 ## Recent Commits (all 20+)
 
 ```text
+87e88b3 perf/robustness: single-flight balance refresh + stale-guard on tx history (regression-fixed effect loop)
+2aa64ce feat(ui): accent-theme system + motion tokens + premium polish (Phase A)
+85d96c0 fix(android): add CAMERA permission; feat(ui): address book + QR camera scan for recipient selection
+3b76169 fix: serialize BIP-44 index on Account so the UI derives truly unique addresses
+520e136 security: tiered device-key provider (OS keychain → file fallback)
+98fd69e docs: refresh STATE.md — security hardening summary, 303 unit + staged-mnemonic e2e
 e8ac852 security: keep generated seed in Rust via staged-mnemonic IPC; scrub JS seed state
 9fe94fa security: argon2id KDF for encrypted vault + device-key encrypted accounts.json at rest
 3f23aa6 docs: refresh STATE.md to v0.0.8 — 296 unit + 83 frontend tests, current HEAD
@@ -99,14 +130,14 @@ c36a865 chore: pre-shrink sweep fixes
 
 ---
 
-## Sweep Status (2026-08-03)
+## Sweep Status (2026-08-08)
 
 | Gate | Status |
 |------|--------|
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (303 passed, 1 ignored) |
+| `cargo test --workspace --lib` | ✅ (304 passed, 1 ignored) |
 | `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
@@ -157,6 +188,9 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 - **APK** (12M universal side-load): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
 - **AAB** (7.1M — Play/distribution, target hit): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
-- **303+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **2 staged-mnemonic e2e** + **83 frontend Svelte component tests** — all passing
+- **304+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **2 staged-mnemonic e2e** + **89 frontend Svelte component tests** — all passing
+- **Address book store** (`apps/desktop/src/lib/addressBook.ts`) — persistent per-network recipients + 6 tests
+- **QR receive-scan** (`QrScanner.svelte`) — getUserMedia + jsQR recipient scanning
+- **Accent-theme system** — 5 presets (emerald/violet/amber/cyan/rose) + motion tokens
 - **ws-handshake-probe.py** — live WS hello→session_key→RPC probe used by CLI & Android sweeps
 - **full-functional-sweep.py** — **33/33 checks**, every IPC method exercised via real binary WS protocol
