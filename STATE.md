@@ -2,7 +2,7 @@
 
 > **Version:** 0.0.8 (pre-beta, internal)
 > **Last updated:** 2026-08-09  
-> **HEAD:** `___` (2026-08-09)  
+> **HEAD:** `ab3b272` (2026-08-09)  
 > **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ### Security hardening (2026-08-08)
@@ -64,6 +64,23 @@
   `derive_secp256k1_key` marked `#[deprecated]` with migration notes pointing
   to `derive_bip44_eth_key` and plugin-side derivation. No callers deleted
   (backward compat).
+
+### Batch 4 — Real XMR decoy selection (2026-08-09)
+
+- **Real decoy selection wired into CLSAG signing (P0)** — `sign_monero_tx` is
+  now `async` and accepts an optional `reqwest` daemon client. When the daemon
+  is reachable, `fetch_and_build_ring()` fetches *actual blockchain UTXO output
+  keys* via `get_output_distribution` + `get_outs` daemon RPC. Ring signature
+  privacy is now real.
+- **Graceful fallback** — if the daemon is unreachable or returns an error,
+  the signer falls back to synthetic random decoys (safe for testnet/dev; a
+  mainnet deployment should always have a daemon connection).
+- **Real blockchain offsets** — the returned `offsets` array contains actual
+  output indices for `Decoys::new`, replacing the all-zero placeholder that
+  would produce invalid transactions on-chain.
+- **Removed `#[allow(dead_code)]`** — all decoy_selector functions are now
+  exercised through the signing path. The old `build_decoy_ring` is still
+  present as a synthetic fallback.
 
 ---
 
