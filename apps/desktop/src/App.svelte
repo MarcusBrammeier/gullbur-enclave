@@ -101,7 +101,7 @@
   <Toasts />
 
   <!-- Header -->
-  <header class="border-b border-default px-4 py-3 sm:px-6 sm:py-4">
+  <header class="glass border-b border-default px-4 py-3 sm:px-6 sm:py-4 sticky top-0 z-30">
     <div class="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-2">
       <div class="flex items-center gap-3 shrink-0">
         <span class="text-vault-500 text-2xl">🔐</span>

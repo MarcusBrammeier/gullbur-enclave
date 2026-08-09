@@ -128,10 +128,10 @@
   function closeReceive() { showReceive = false; }
 </script>
 
-<div class="flex flex-col gap-6">
+<div class="flex flex-col" style="gap: var(--rhythm-lg);">
   <!-- Network Selector -->
   <div class="card">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between" style="margin-bottom: var(--rhythm-md);">
       <h2 class="text-lg font-semibold">🌐 Networks</h2>
       {#if !vault.connected}
         <span class="text-xs text-red-400 flex items-center gap-1">
@@ -200,7 +200,7 @@
 
   <!-- Accounts List -->
   <div class="card">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between" style="margin-bottom: var(--rhythm-md);">
       <h2 class="text-lg font-semibold">💰 Accounts</h2>
       <span class="text-xs text-muted">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}</span>
     </div>
@@ -215,10 +215,10 @@
         </button>
       </div>
     {:else}
-      <div class="space-y-3">
+      <div style="display: flex; flex-direction: column; gap: var(--rhythm-sm);">
         {#each filteredAccounts as account, i (account.id)}
           {@const badge = getNetworkBadge(account.network)}
-          <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="view-transition-name: acct-{account.id}; animation: fade-up 300ms both; animation-delay: {i * 40}ms;">
+          <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="animation: fade-up 300ms both; animation-delay: {i * 40}ms;">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 {#if editingLabelAddress === account.address}
@@ -261,8 +261,8 @@
 
   <!-- Quick Actions -->
   <div class="card">
-    <h2 class="text-lg font-semibold mb-4">⚡ Quick Actions</h2>
-    <div class="flex flex-wrap gap-3">
+    <h2 class="text-lg font-semibold" style="margin-bottom: var(--rhythm-md);">⚡ Quick Actions</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--rhythm-sm);">
       <button class="btn-primary" disabled={!vault.connected || creatingAccount} onclick={handleCreateAccount}>
           {creatingAccount ? '⏳ Creating...' : '+ Create Account'}
         </button>
