@@ -2,6 +2,7 @@
   import { vault, setTheme } from '../vault.svelte.ts';
   import { themeEngine } from '../themeEngine.svelte.ts';
   import type { AccentTheme } from '../vault.svelte.ts';
+  import { iconHtml } from '../icons';
 
   function handleTestnetToggle() {
     if (vault.testnetOnly) {
@@ -32,10 +33,14 @@
   const builtinThemeIds = ['obsidian', 'dark-slate', 'light-studio'] as const;
   type BuiltinThemeId = (typeof builtinThemeIds)[number];
   const themeIcons: Record<BuiltinThemeId, string> = {
-    obsidian: '🪨',
-    'dark-slate': '🌙',
-    'light-studio': '☀️',
+    obsidian: 'moon',
+    'dark-slate': 'moon',
+    'light-studio': 'sun',
   };
+
+  function getThemeIcon(id: BuiltinThemeId): string {
+    return iconHtml(themeIcons[id], 'w-3.5 h-3.5');
+  }
 
   function handleThemeChange(id: BuiltinThemeId) {
     themeEngine.applyTheme(id);
@@ -81,9 +86,9 @@
 
   function getPaletteItems(): PaletteItem[] {
     const items: PaletteItem[] = [
-      { icon: '🪨', label: 'Switch to Obsidian', desc: 'OLED tactical dark theme', keywords: ['obsidian', 'dark', 'theme', 'oled'], shortcut: '', action: () => handleThemeChange('obsidian') },
-      { icon: '🌙', label: 'Switch to Dark Slate', desc: 'Legacy dark gray theme', keywords: ['dark', 'slate', 'theme', 'legacy'], shortcut: '', action: () => handleThemeChange('dark-slate') },
-      { icon: '☀️', label: 'Switch to Light Studio', desc: 'Warm studio-slate light theme', keywords: ['light', 'studio', 'theme', 'bright'], shortcut: '', action: () => handleThemeChange('light-studio') },
+      { icon: getThemeIcon('obsidian'), label: 'Switch to Obsidian', desc: 'OLED tactical dark theme', keywords: ['obsidian', 'dark', 'theme', 'oled'], shortcut: '', action: () => handleThemeChange('obsidian') },
+      { icon: getThemeIcon('dark-slate'), label: 'Switch to Dark Slate', desc: 'Legacy dark gray theme', keywords: ['dark', 'slate', 'theme', 'legacy'], shortcut: '', action: () => handleThemeChange('dark-slate') },
+      { icon: getThemeIcon('light-studio'), label: 'Switch to Light Studio', desc: 'Warm studio-slate light theme', keywords: ['light', 'studio', 'theme', 'bright'], shortcut: '', action: () => handleThemeChange('light-studio') },
     ];
 
     // Add network switches from the vault store
@@ -160,7 +165,7 @@
         onclick={() => handleThemeChange(id)}
         title={id === 'obsidian' ? 'OLED Tactical Dark' : id === 'dark-slate' ? 'Legacy Dark Slate' : 'Warm Light Studio'}
       >
-        {themeIcons[id]}
+        {@html getThemeIcon(id)}
       </button>
     {/each}
   </div>
@@ -185,17 +190,17 @@
       class="px-2 py-1 transition-colors {themeEngine.motionSpeed === 'instant' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Instant transitions (0ms)"
       onclick={() => handleMotionChange('instant')}
-    >⚡ 0ms</button>
+    >{@html iconHtml('zap', 'w-3.5 h-3.5')} 0ms</button>
     <button
       class="px-2 py-1 transition-colors {themeEngine.motionSpeed === 'normal' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Tactical transitions (100ms)"
       onclick={() => handleMotionChange('normal')}
-    >🎯 100ms</button>
+    >{@html iconHtml('target', 'w-3.5 h-3.5')} 100ms</button>
     <button
       class="px-2 py-1 transition-colors {themeEngine.motionSpeed === 'expressive' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Expressive transitions (200ms)"
       onclick={() => handleMotionChange('expressive')}
-    >✨ 200ms</button>
+    >{@html iconHtml('sparkles', 'w-3.5 h-3.5')} 200ms</button>
   </div>
 
   <!-- Density Toggle -->
@@ -204,17 +209,17 @@
       class="px-2 py-1 transition-colors {density === 'compact' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Compact layout — dense Bloomberg terminal style"
       onclick={() => handleDensityChange('compact')}
-    >📊 Compact</button>
+    >{@html iconHtml('barChart', 'w-3.5 h-3.5')} Compact</button>
     <button
       class="px-2 py-1 transition-colors {density === 'normal' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Normal layout"
       onclick={() => handleDensityChange('normal')}
-    >🎯 Normal</button>
+    >{@html iconHtml('target', 'w-3.5 h-3.5')} Normal</button>
     <button
       class="px-2 py-1 transition-colors {density === 'expanded' ? 'bg-accent text-white' : 'bg-surface text-secondary hover:text-primary'}"
       title="Expanded layout — spacious readability"
       onclick={() => handleDensityChange('expanded')}
-    >🛋️ Expanded</button>
+    >{@html iconHtml('grid', 'w-3.5 h-3.5')} Expanded</button>
   </div>
 </div>
 
@@ -238,7 +243,7 @@
     >
       <!-- Search input -->
       <div class="flex items-center gap-3 px-4 py-3 border-b border-strong/30">
-        <span class="text-muted text-sm">🔍</span>
+        <span class="text-muted text-sm">{@html iconHtml('search', 'w-4 h-4')}</span>
         <input
           class="flex-1 bg-transparent border-none outline-none text-primary text-sm placeholder:text-muted"
           placeholder="Search accounts, networks, or actions…"
@@ -260,7 +265,7 @@
               class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-colors hover:bg-surface-hover"
               onclick={() => runPaletteAction(item)}
             >
-              <span class="text-base">{item.icon}</span>
+              <span class="text-base">{@html item.icon}</span>
               <div class="flex-1 min-w-0">
                 <div class="text-primary font-medium">{item.label}</div>
                 {#if item.desc}
@@ -296,7 +301,7 @@
     onclick={(e) => e.stopPropagation()}
   >
     <div class="flex items-start gap-3 mb-4">
-      <span class="text-2xl">⚠️</span>
+      <span class="text-2xl">{@html iconHtml('alertTriangle', 'w-7 h-7 text-amber-400')}</span>
       <div>
         <h3 class="text-base font-semibold text-primary">Mainnet is in Beta</h3>
         <p class="text-sm text-secondary mt-1 leading-relaxed">

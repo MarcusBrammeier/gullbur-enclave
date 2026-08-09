@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { iconHtml } from '../icons';
 
   interface DebugReport {
     version: string;
@@ -169,29 +170,33 @@
 >
   <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[85vh] flex flex-col" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-4 shrink-0">
-      <h2 class="text-lg font-semibold">🔍 Debug Report</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('search', 'w-5 h-5 inline-block mr-1.5')}Debug Report</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
     </div>
 
     {#if !showReport}
       <!-- Pre-generation info -->
       <div class="flex-1 overflow-y-auto space-y-4">
-        <div class="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-sm text-blue-300 space-y-2">
-          <p>⚠️ <strong>This report is designed to be safe for sharing.</strong></p>
-          <p>It includes your wallet addresses, plugin config, and crash data — but <strong>never</strong> your seed phrase, private keys, or balances.</p>
-          <p class="text-secondary">Review the report below before sharing. You can redact any line you're not comfortable with.</p>
-        </div>
+              <div class="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-sm text-blue-300 space-y-2">
+                <p>{@html iconHtml('alertTriangle', 'w-4 h-4 inline-block mr-1')}<strong>This report is designed to be safe for sharing.</strong></p>
+                <p>It includes your wallet addresses, plugin config, and crash data — but <strong>never</strong> your seed phrase, private keys, or balances.</p>
+                <p class="text-secondary">Review the report below before sharing. You can redact any line you're not comfortable with.</p>
+              </div>
 
-        <button
-          class="btn-primary w-full"
-          disabled={loading}
-          onclick={generate}
-        >
-          {loading ? '⏳ Generating...' : '🔍 Generate Debug Report'}
-        </button>
+              <button
+                class="btn-primary w-full"
+                disabled={loading}
+                onclick={generate}
+              >
+                {#if loading}
+                  {@html iconHtml('refresh', 'w-4 h-4 inline-block animate-spin mr-1')}Generating...
+                {:else}
+                  {@html iconHtml('search', 'w-4 h-4 inline-block mr-1')}Generate Debug Report
+                {/if}
+              </button>
 
         {#if error}
-          <div class="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300">❌ {error}</div>
+          <div class="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300">{@html iconHtml('alertCircle', 'w-4 h-4 inline-block mr-1')}{error}</div>
         {/if}
       </div>
     {:else if report}
@@ -222,7 +227,7 @@
         <!-- Crashes -->
         {#if report.recent_crashes.length > 0}
           <div class="bg-amber-900/10 border border-amber-700/20 rounded-lg p-3 text-xs">
-            <p class="font-medium text-amber-400 mb-2">📋 {report.recent_crashes.length} crash report(s) found</p>
+            <p class="font-medium text-amber-400 mb-2">{@html iconHtml('barChart', 'w-4 h-4 inline-block mr-1')}{report.recent_crashes.length} crash report(s) found</p>
             {#each report.recent_crashes as crash}
               <pre class="text-secondary mt-1 overflow-x-auto">{JSON.stringify(crash, null, 2)}</pre>
             {/each}
@@ -245,7 +250,7 @@
       <!-- Preview -->
       {#if report.accounts.length > 0 || userComments}
         <details class="mt-3">
-          <summary class="text-xs text-muted cursor-pointer hover:text-primary">📄 Preview report text</summary>
+          <summary class="text-xs text-muted cursor-pointer hover:text-primary">{@html iconHtml('fileText', 'w-3.5 h-3.5 inline-block mr-1')}Preview report text</summary>
           <pre class="mt-2 bg-surface-elevated border border-default rounded-lg p-3 text-xs text-secondary max-h-40 overflow-y-auto">{formatReportAsText(true)}</pre>
         </details>
       {/if}
@@ -253,17 +258,26 @@
       <!-- Action buttons -->
       <div class="flex gap-2 mt-4 shrink-0">
         <button class="btn-secondary text-sm flex-1" onclick={copyReport}>
-          {copied ? '✅ Copied!' : '📋 Copy Report'}
+          {#if copied}
+            {@html iconHtml('check', 'w-4 h-4 inline-block mr-1')}Copied!
+          {:else}
+            {@html iconHtml('copy', 'w-4 h-4 inline-block mr-1')}Copy Report
+          {/if}
         </button>
         <button
           class="btn-primary text-sm flex-1"
           disabled={uploadStatus === 'uploading'}
           onclick={uploadToGitHub}
         >
-          {uploadStatus === 'uploading' ? '⏳ Opening...'
-            : uploadStatus === 'done' ? '✅ Opened'
-            : uploadStatus === 'error' ? '❌ Failed'
-            : '⬆️ Open GitHub Issue'}
+          {#if uploadStatus === 'uploading'}
+            {@html iconHtml('refresh', 'w-4 h-4 inline-block animate-spin mr-1')}Opening...
+          {:else if uploadStatus === 'done'}
+            {@html iconHtml('check', 'w-4 h-4 inline-block mr-1')}Opened
+          {:else if uploadStatus === 'error'}
+            {@html iconHtml('alertCircle', 'w-4 h-4 inline-block mr-1')}Failed
+          {:else}
+            {@html iconHtml('externalLink', 'w-4 h-4 inline-block mr-1')}Open GitHub Issue
+          {/if}
         </button>
       </div>
     {/if}

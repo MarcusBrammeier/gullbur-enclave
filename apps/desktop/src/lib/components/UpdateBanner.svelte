@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { IS_DEMO } from '../constants';
+  import { iconHtml } from '../icons';
 
   interface UpdateInfo {
     local_version: string;
@@ -45,13 +46,13 @@
 {#if !checking && info && !info.up_to_date && !dismissed}
   <div class="update-banner">
     <span class="update-text">
-      🚀 <strong>v{info.latest_version}</strong> available
+      {@html iconHtml('rocket')} <strong>v{info.latest_version}</strong> available
       {#if info.prerelease}
         <span class="prerelease-badge">pre-release</span>
       {/if}
       — <button class="link-btn" onclick={openRelease}>Download</button>
     </span>
-    <button class="dismiss-btn" onclick={dismiss}>✕</button>
+    <button class="dismiss-btn" onclick={dismiss}>{@html iconHtml('close')}</button>
   </div>
 {/if}
 

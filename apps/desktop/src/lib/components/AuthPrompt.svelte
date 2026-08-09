@@ -1,5 +1,6 @@
 <script lang="ts">
   import { vault } from '../vault.svelte.ts';
+  import { iconHtml } from '../icons';
 
   // ── Local state ──────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@
       {#if locked}
         <!-- Lockout state -->
         <div class="text-center">
-          <div class="text-4xl mb-4">🔒</div>
+          <div class="inline-flex items-center justify-center mb-4">{@html iconHtml('shield', 'w-8 h-8')}</div>
           <h2 class="text-lg font-semibold text-red-400 mb-2">Security Lockout</h2>
           <p class="text-sm text-secondary mb-4">
             Hardware authentication has been locked due to repeated failures.
@@ -111,7 +112,7 @@
       {:else}
         <!-- Normal auth prompt -->
         <div class="text-center mb-6">
-          <div class="text-4xl mb-3">🔐</div>
+          <div class="inline-flex items-center justify-center mb-3">{@html iconHtml('lock', 'w-8 h-8')}</div>
           <h2 class="text-lg font-semibold text-amber-400 mb-1">Hardware Authentication Required</h2>
           <p class="text-sm text-secondary">
             Touch your YubiKey or use biometrics to authorize this operation.

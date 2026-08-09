@@ -1,5 +1,6 @@
 <script lang="ts">
   import { vault, connect, initialize, initializeFromStaged, clearStagedMnemonic, generateMnemonic } from '../vault.svelte.ts';
+  import { iconHtml } from '../icons';
 
   type Step = 'input' | 'backup' | 'confirm' | 'skip_warn' | 'initializing' | 'error';
 
@@ -222,7 +223,7 @@
             <span class="animate-spin inline-block w-4 h-4 border-2 border-strong border-t-transparent rounded-full"></span>
             Generating...
           {:else}
-            <span class="text-vault-400">✨</span>
+            <span class="text-vault-400">{@html iconHtml('sparkles', 'w-4 h-4 inline-block')}</span>
             Generate New
           {/if}
         </button>
@@ -233,7 +234,7 @@
 
       <div class="mt-3 pt-3 border-t border-default">
         <button class="btn-secondary text-sm w-full flex items-center justify-center gap-2" onclick={openVaultFile}>
-          📂 Open Existing Vault File…
+          {@html iconHtml('folder', 'w-4 h-4')} Open Existing Vault File…
         </button>
         <p class="text-xs text-muted mt-1 text-center">Open a previously saved keystore file from anywhere on disk</p>
       </div>
@@ -247,7 +248,7 @@
     <!-- Step 2: Show generated phrase + confirm backup -->
     <div class="bg-vault-900/30 border border-amber-600/30 rounded-xl p-6 pb-safe">
       <div class="flex items-center gap-2 mb-3">
-        <span class="text-2xl">🔐</span>
+        <span class="text-2xl">{@html iconHtml('lock', 'w-7 h-7')}</span>
         <h2 class="text-lg font-semibold">Back Up Your Seed Phrase</h2>
       </div>
       <p class="text-sm text-amber-300 mb-4">
@@ -326,7 +327,7 @@
   {:else if step === 'skip_warn'}
     <!-- Skip verification warning -->
     <div class="bg-vault-900/30 border border-red-800 rounded-xl p-6 text-center">
-      <div class="text-4xl mb-3">⚠️</div>
+      <div class="text-4xl mb-3">{@html iconHtml('alertTriangle', 'w-10 h-10 text-red-400')}</div>
       <h2 class="text-lg font-semibold text-red-400 mb-2">Skip Seed Backup?</h2>
       <p class="text-sm text-secondary mb-4">
         You won't be able to recover this wallet if you lose access.<br>
@@ -351,7 +352,7 @@
 
   {:else if step === 'error'}
     <div class="bg-vault-900/30 border border-red-800 rounded-xl p-6 text-center">
-      <div class="text-4xl mb-3">❌</div>
+      <div class="text-4xl mb-3">{@html iconHtml('alertCircle', 'w-10 h-10 text-red-400')}</div>
       <h2 class="text-lg font-semibold text-red-400 mb-1">Initialization Failed</h2>
       <p class="text-sm text-secondary mb-4">{localError || vault.error || 'An unknown error occurred.'}</p>
       <button class="btn-secondary text-sm" onclick={resetState}>Try Again</button>

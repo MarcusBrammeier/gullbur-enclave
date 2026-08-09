@@ -6,6 +6,7 @@
   import { fade, scale } from 'svelte/transition';
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
+  import { iconHtml } from '../icons';
   interface Props {
     onclose: () => void;
   }
@@ -123,7 +124,7 @@
     transition:scale={{ start: 0.97, duration: 180 }}
     role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-5">
-      <h2 class="text-lg font-semibold">⚙️ Settings</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('settings', 'w-5 h-5 inline-block mr-1.5')}Settings</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={handleClose}>&times;</button>
     </div>
 
@@ -190,12 +191,12 @@
       <div>
         <p class="text-sm font-medium text-primary mb-2">Security</p>
         {#if lockResult === 'locked'}
-          <p class="text-xs text-vault-400 mb-2">✅ Vault locked</p>
+          <p class="text-xs text-vault-400 mb-2">{@html iconHtml('check', 'w-3.5 h-3.5 inline-block mr-1')}Vault locked</p>
         {:else if lockResult === 'error'}
-          <p class="text-xs text-red-400 mb-2">❌ Lock failed</p>
+          <p class="text-xs text-red-400 mb-2">{@html iconHtml('alertCircle', 'w-3.5 h-3.5 inline-block mr-1')}Lock failed</p>
         {/if}
         <button class="btn-secondary text-sm w-full" disabled={!vault.connected || vault.authStatus === 'unauthenticated'} onclick={handleLock}>
-          🔒 Lock Vault Now
+          {@html iconHtml('lock', 'w-4 h-4 inline-block mr-1.5')}Lock Vault Now
         </button>
       </div>
 
@@ -203,14 +204,14 @@
 
       <!-- Seed Phrase Re-export -->
       <div>
-        <p class="text-sm font-medium text-primary mb-2">📝 Seed Recovery</p>
+        <p class="text-sm font-medium text-primary mb-2">{@html iconHtml('book', 'w-4 h-4 inline-block mr-1.5')}Seed Recovery</p>
         {#if !showSeedConfirm && !seedPhrase}
           <button class="btn-secondary text-sm w-full" disabled={!vault.connected || !vault.initialized} onclick={() => showSeedConfirm = true}>
             Show Seed Phrase
           </button>
         {:else if showSeedConfirm && !seedPhrase}
           <div class="bg-amber-900/20 border border-amber-700/30 rounded-xl p-4 text-xs text-amber-300 space-y-2">
-            <p>⚠️ <strong>Your seed phrase gives full access to your wallet.</strong></p>
+            <p>{@html iconHtml('alertTriangle', 'w-4 h-4 inline-block mr-1')}<strong>Your seed phrase gives full access to your wallet.</strong></p>
             <p>Never share it. Never type it into any website. Anyone with these words can steal your funds.</p>
             <p class="text-secondary">Only reveal in a private, secure environment.</p>
             <div class="flex gap-2 mt-3">
@@ -225,14 +226,18 @@
           <button class="btn-secondary text-xs mt-2" onclick={() => { showSeedConfirm = true; seedError = ''; }}>Try Again</button>
         {:else if seedPhrase}
           {#if !seedRevealed}
-            <button class="btn-secondary text-sm w-full" onclick={() => seedRevealed = true}>👁️ Click to Reveal</button>
+            <button class="btn-secondary text-sm w-full" onclick={() => seedRevealed = true}>{@html iconHtml('eye', 'w-4 h-4 inline-block mr-1.5')}Click to Reveal</button>
           {:else}
             <div class="bg-surface border border-strong rounded-lg p-3 font-mono text-xs text-primary leading-relaxed break-all select-all">
               {seedPhrase}
             </div>
             <div class="flex gap-2 mt-2">
               <button class="btn-secondary text-xs flex-1" onclick={copySeed}>
-                {seedCopied ? '✅ Copied!' : '📋 Copy'}
+                {#if seedCopied}
+                  {@html iconHtml('check', 'w-3.5 h-3.5 inline-block mr-1')}Copied!
+                {:else}
+                  {@html iconHtml('copy', 'w-3.5 h-3.5 inline-block mr-1')}Copy
+                {/if}
               </button>
               <button class="btn-secondary text-xs flex-1" onclick={() => { clearSeed(); }}>
                 Hide
@@ -248,7 +253,7 @@
       <div class="text-center">
         <a href="https://github.com/MarcusBrammeier/gullbur-enclave" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 text-xs text-vault-400 hover:text-vault-300 transition-colors">
-          ❤️ Donate — support open-source development
+          {@html iconHtml('heart', 'w-3.5 h-3.5 inline-block')} Donate — support open-source development
         </a>
       </div>
 
@@ -256,7 +261,7 @@
 
       <!-- Vault file management -->
       <div>
-        <p class="text-sm font-medium text-primary mb-2">💾 Vault File</p>
+        <p class="text-sm font-medium text-primary mb-2">{@html iconHtml('download', 'w-4 h-4 inline-block mr-1.5')}Vault File</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={async () => {
@@ -270,13 +275,13 @@
               if (!dest) return;
               const { invoke } = await import('@tauri-apps/api/core');
               const bytes = await invoke('export_current_keystore', { destination: dest });
-              alert(`✅ Keystore exported (${bytes} bytes) to:\n${dest}`);
+              alert(`✓ Keystore exported (${bytes} bytes) to:\n${dest}`);
             } catch (e) {
-              alert('❌ Export failed: ' + (e instanceof Error ? e.message : String(e)));
+              alert('✗ Export failed: ' + (e instanceof Error ? e.message : String(e)));
             }
           }}
         >
-          📤 Export Current Keystore…
+          {@html iconHtml('upload', 'w-4 h-4 inline-block mr-1.5')}Export Current Keystore…
         </button>
         <p class="text-xs text-muted mt-1">Save your encrypted keystore file to a custom location</p>
       </div>
@@ -285,7 +290,7 @@
 
       <!-- Debug Console -->
       <div>
-        <p class="text-sm font-medium text-primary mb-2">📟 Debug Console</p>
+        <p class="text-sm font-medium text-primary mb-2">{@html iconHtml('terminal', 'w-4 h-4 inline-block mr-1.5')}Debug Console</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={() => showConsole = true}
@@ -299,7 +304,7 @@
 
       <!-- Debug Report -->
       <div>
-        <p class="text-sm font-medium text-primary mb-2">🔍 Debug Report</p>
+        <p class="text-sm font-medium text-primary mb-2">{@html iconHtml('search', 'w-4 h-4 inline-block mr-1.5')}Debug Report</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={() => showDebugReport = true}
@@ -313,7 +318,7 @@
 
       <!-- Bug Reporter -->
       <div>
-        <p class="text-sm font-medium text-primary mb-2">🐛 Beta Feedback</p>
+        <p class="text-sm font-medium text-primary mb-2">{@html iconHtml('bug', 'w-4 h-4 inline-block mr-1.5')}Beta Feedback</p>
         <button
           class="btn-secondary text-sm w-full"
           onclick={async () => {
@@ -354,7 +359,7 @@
 >
   <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
     <div class="flex items-center justify-between mb-4 shrink-0">
-      <h2 class="text-lg font-semibold">📟 IPC Console</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('terminal', 'w-5 h-5 inline-block mr-1.5')}IPC Console</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => showConsole = false}>&times;</button>
     </div>
     <div class="flex-1 overflow-hidden">
@@ -376,7 +381,7 @@
 >
   <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
     <div class="text-center space-y-4">
-      <div class="text-4xl">⚠️</div>
+      <div class="text-4xl">{@html iconHtml('alertTriangle', 'w-10 h-10 inline-block text-amber-400')}</div>
       <h3 class="text-lg font-semibold text-amber-400">Mainnet Access</h3>
       <div class="text-sm text-primary space-y-2">
         <p><strong>This is beta software.</strong> Gullbúr Enclave Core v0.1.0 has not been audited and may contain bugs.</p>

@@ -7,6 +7,7 @@
    * the camera open until the user closes (repeated/false reads are de-duped).
    */
   import jsQR from 'jsqr';
+  import { iconHtml } from '../icons';
 
   interface Props {
     onScan: (text: string) => void;
@@ -87,7 +88,7 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
   <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold">📷 Scan Recipient Address</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('camera', 'w-5 h-5 inline-block mr-2')}Scan Recipient Address</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={close}>&times;</button>
     </div>
 
@@ -105,7 +106,7 @@
       Point your camera at a wallet-address QR code.
     </p>
     {#if lastScanned}
-      <p class="text-xs text-vault-400 mt-1 text-center">✅ Found: <span class="font-mono break-all">{lastScanned}</span></p>
+      <p class="text-xs text-vault-400 mt-1 text-center">{@html iconHtml('check', 'w-4 h-4 inline-block mr-1')}Found: <span class="font-mono break-all">{lastScanned}</span></p>
     {/if}
   </div>
 </div>
