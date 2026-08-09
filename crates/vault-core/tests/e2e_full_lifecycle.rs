@@ -16,7 +16,7 @@ const PORT: u16 = 19993;
 #[tokio::test(flavor = "multi_thread")]
 async fn e2e_full_vault_lifecycle() {
     // ── 1. Start IPC server ──────────────────────────────────────────────
-    let server = ipc_core::server::IpcServer::with_encryption(PORT, true).expect("test invariant");
+    let server = ipc_core::server::IpcServer::new(PORT).expect("test invariant");
     let token = server.auth_token_path().to_path_buf();
     {
         let mut h = server.handler().await;

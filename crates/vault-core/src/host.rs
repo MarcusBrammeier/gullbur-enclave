@@ -273,13 +273,14 @@ impl PluginHost {
     pub async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
-        plugin.sign_transaction(tx, key, network).await
+        plugin.sign_transaction(tx, seed, account_index, network).await
     }
 
     pub async fn broadcast_transaction(
@@ -497,7 +498,8 @@ impl PluginHost {
     pub async fn simulate_and_send(
         &self,
         tx: &[u8],
-        key: &wallet_plugin::KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         account: &wallet_plugin::Account,
         network: &str,
     ) -> Result<serde_json::Value, PluginError> {
@@ -519,8 +521,8 @@ impl PluginHost {
             PluginError::Internal(format!("Simulation failed (gas estimation): {e}"))
         })?;
 
-        // Step 3: Sign the transaction
-        let signed_tx = plugin.sign_transaction(tx, key, network).await?;
+        // Step 3: Sign the transaction with the seed directly
+        let signed_tx = plugin.sign_transaction(tx, seed, account_index, network).await?;
 
         // Step 4: Broadcast
         let txid = plugin.broadcast_transaction(&signed_tx, network).await?;
@@ -730,11 +732,7 @@ mod tests {
         host.initialize_default_plugins();
 
         let tx = hex::decode("02f8").expect("test invariant"); // minimal EIP-1559 envelope
-        let key = wallet_plugin::KeyHandle {
-            key_id: "test-key".into(),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![2, 3, 4],
-        };
+        let seed_bytes = vec![0xdeu8; 32];
         let account = wallet_plugin::Account {
             id: "eth-test".into(),
             network: "ethereum".into(),
@@ -745,7 +743,7 @@ mod tests {
         };
 
         let result = host
-            .simulate_and_send(&tx, &key, &account, "ethereum")
+            .simulate_and_send(&tx, &seed_bytes, 0, &account, "ethereum")
             .await;
         match result {
             Ok(output) => {

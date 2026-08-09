@@ -42,7 +42,7 @@ pub trait VaultBridge: Send + Sync {
         &self,
         network: &str,
         tx_hex: &str,
-        key_id: &str,
+        account_index: u32,
     ) -> Result<Value, String>;
     /// Broadcast a signed transaction.
     async fn broadcast_transaction(
@@ -126,8 +126,8 @@ async fn handle_rpc(
         "sign_transaction" => {
             let network = params.get("network").and_then(|v| v.as_str()).unwrap_or("");
             let tx_hex = params.get("tx_hex").and_then(|v| v.as_str()).unwrap_or("");
-            let key_id = params.get("key_id").and_then(|v| v.as_str()).unwrap_or("");
-            bridge.sign_transaction(network, tx_hex, key_id).await
+            let account_index = params.get("account_index").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            bridge.sign_transaction(network, tx_hex, account_index).await
         }
         "broadcast_transaction" => {
             let network = params.get("network").and_then(|v| v.as_str()).unwrap_or("");

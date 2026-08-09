@@ -6,6 +6,7 @@
 
 use clap::Parser;
 use extension_relay::native_host::{self, NativeMessage, NativeResponse};
+use extension_relay::rate_limiter::RateLimiter;
 use extension_relay::router;
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -131,6 +132,7 @@ async fn main() {
 
     // ── Main stdio loop ────────────────────────────────────────────────
     let mut request_counter: u64 = 0;
+    let mut limiter = RateLimiter::new();
 
     loop {
         let msg: NativeMessage = match native_host::read_message().await {
@@ -143,6 +145,21 @@ async fn main() {
 
         request_counter += 1;
         let id = request_counter;
+
+        // Security: rate-limit per origin
+        if let Err(e) = limiter.check(&msg.origin) {
+            tracing::warn!("{e} for origin: {}", msg.origin);
+            let response = NativeResponse {
+                id,
+                result: None,
+                error: Some(native_host::NativeError {
+                    code: -32000,
+                    message: e,
+                }),
+            };
+            native_host::write_response(&response).await;
+            continue;
+        }
 
         // Security: validate origin
         if !allowed_ids.is_empty() && !native_host::validate_origin(&msg.origin, &allowed_ids) {

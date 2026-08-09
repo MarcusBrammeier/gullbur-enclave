@@ -60,7 +60,7 @@ pub struct Vault {
     /// Whether the vault has been initialized with a seed
     pub initialized: Arc<AtomicBool>,
     /// Raw 64-byte BIP-39 seed (stored after initialization; zeroized on drop)
-    seed: Arc<RwLock<Option<Zeroizing<Vec<u8>>>>>,
+    pub seed: Arc<RwLock<Option<Zeroizing<Vec<u8>>>>>,
     /// BIP-39 mnemonic phrase (for display/recovery)
     mnemonic: Arc<RwLock<Option<String>>>,
     /// Encrypted seed blob (salt || nonce || ciphertext)

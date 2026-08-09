@@ -49,7 +49,7 @@ where
 #[tokio::test(flavor = "multi_thread")]
 async fn e2e_disconnect_reconnect() {
     // Start server
-    let server = ipc_core::server::IpcServer::with_encryption(PORT, true).expect("test invariant");
+    let server = ipc_core::server::IpcServer::new(PORT).expect("test invariant");
     let token = server.auth_token_path().to_path_buf();
     {
         let mut h = server.handler().await;

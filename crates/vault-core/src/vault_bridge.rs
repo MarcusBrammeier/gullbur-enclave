@@ -86,17 +86,15 @@ impl VaultBridge for VaultBridgeImpl {
         &self,
         network: &str,
         tx_hex: &str,
-        key_id: &str,
+        account_index: u32,
     ) -> Result<Value, String> {
         let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("hex decode: {e}"))?;
-        let key = wallet_plugin::KeyHandle {
-            key_id: key_id.to_string(),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
+        let seed_guard = self.seed.read().await;
+        let seed = seed_guard.as_ref().ok_or("vault not initialized")?.clone();
+        drop(seed_guard);
         let host = self.plugin_host.read().await;
         let signed = host
-            .sign_transaction(&tx_bytes, &key, network)
+            .sign_transaction(&tx_bytes, &seed, account_index, network)
             .await
             .map_err(|e| e.to_string())?;
         Ok(Value::String(hex::encode(signed)))

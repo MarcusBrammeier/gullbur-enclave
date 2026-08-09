@@ -159,7 +159,8 @@ impl WalletPlugin for BtcPlugin {
     async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         use bitcoin::psbt::Psbt;
@@ -172,24 +173,7 @@ impl WalletPlugin for BtcPlugin {
         if psbt.inputs.is_empty() {
             return Err(PluginError::Internal("PSBT has no inputs".into()));
         }
-
-        // Decode the seed from key_id (format: "hex_seed@index" or "0xhex_seed@index")
-        let (seed_hex, acct_index) = {
-            let raw = key.key_id.strip_prefix("0x").unwrap_or(&key.key_id);
-            if let Some(at_pos) = raw.find('@') {
-                let seed_part = &raw[..at_pos];
-                let index_part = &raw[at_pos + 1..];
-                let idx: u32 = index_part
-                    .parse()
-                    .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
-                (seed_part.to_string(), idx)
-            } else {
-                // Backward compat: key_id is just the seed hex, use index 0
-                (raw.to_string(), 0u32)
-            }
-        };
-        let seed = hex::decode(&seed_hex)
-            .map_err(|e| PluginError::Internal(format!("invalid seed hex in key_id: {e}")))?;
+        let acct_index = account_index;
 
         // Determine BIP-84 network
         let btc_network = match network {
@@ -612,14 +596,10 @@ mod tests {
         };
 
         let psbt_bytes = psbt.serialize();
-        let key = KeyHandle {
-            key_id: "deadbeef".into(),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
+        let seed_bytes = vec![0xdeu8; 32];
 
         let signed = plugin
-            .sign_transaction(&psbt_bytes, &key, "bitcoin")
+            .sign_transaction(&psbt_bytes, &seed_bytes, 0, "bitcoin")
             .await
             .expect("sign_transaction should succeed");
 
@@ -701,6 +681,7 @@ mod tests {
         };
 
         let psbt_bytes = psbt.serialize();
+        let seed_bytes = hex::decode(seed_hex).expect("test invariant");
         let key = KeyHandle {
             key_id: seed_hex.into(),
             key_type: wallet_plugin::KeyType::Secp256k1,
@@ -708,7 +689,7 @@ mod tests {
         };
 
         let signed = plugin
-            .sign_transaction(&psbt_bytes, &key, "bitcoin")
+            .sign_transaction(&psbt_bytes, &seed_bytes, 0, "bitcoin")
             .await
             .expect("sign_transaction should succeed");
 
@@ -744,13 +725,9 @@ mod tests {
     #[tokio::test]
     async fn test_sign_transaction_invalid_psbt() {
         let plugin = BtcPlugin::new(None);
-        let key = KeyHandle {
-            key_id: "deadbeef".into(),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
+        let seed_bytes = vec![0xdeu8; 32];
         let result = plugin
-            .sign_transaction(b"not a valid PSBT", &key, "bitcoin")
+            .sign_transaction(b"not a valid PSBT", &seed_bytes, 0, "bitcoin")
             .await;
         assert!(result.is_err(), "passing garbage bytes should return Err");
     }

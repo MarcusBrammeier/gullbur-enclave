@@ -53,6 +53,7 @@ impl LifecycleManager {
         self
     }
 
+    #[cfg(test)]
     pub fn with_no_encrypt(mut self) -> Self {
         self.no_encrypt = true;
         self
@@ -84,7 +85,7 @@ impl LifecycleManager {
         auth_manager: Arc<auth_core::AuthManager>,
     ) -> Result<tokio::task::JoinHandle<()>, VaultError> {
         if let Some(port) = self.ipc_port {
-            let server = ipc_core::server::IpcServer::with_encryption(port, !self.no_encrypt)
+            let server = ipc_core::server::IpcServer::new(port)
                 .map_err(|e| VaultError::Internal(format!("IPC server creation failed: {e}")))?;
             tracing::info!("IPC server starting on 127.0.0.1:{}", port);
 

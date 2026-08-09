@@ -95,39 +95,23 @@ static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| {
     ]
 });
 
-/// Derive a k256 secret key from a hex seed (stored in key_id)
-/// following the same BIP-44 path as create_account.
+/// Derive a k256 secret key from seed bytes and account index.
 /// This ensures sign_transaction produces the same address as create_account.
-/// key_id format: "64-char-hex-seed@index" (or "0x64-char-hex-seed@index")
-fn derive_key_from_keyid(key_id: &str) -> Result<k256::ecdsa::SigningKey, PluginError> {
-    // Strip optional "0x" prefix
-    let raw = key_id.strip_prefix("0x").unwrap_or(key_id);
-    // Extract seed hex and optional index
-    let (seed_hex, index) = if let Some(at_pos) = raw.find('@') {
-        let seed_part = &raw[..at_pos];
-        let index_part = &raw[at_pos + 1..];
-        let idx: u32 = index_part
-            .parse()
-            .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
-        (seed_part.to_string(), idx)
-    } else {
-        (raw.to_string(), 0u32)
-    };
-    let seed_bytes = hex::decode(&seed_hex)
-        .map_err(|e| PluginError::Internal(format!("invalid seed hex: {e}")))?;
+fn derive_key_from_seed(seed: &[u8], account_index: u32) -> Result<k256::ecdsa::SigningKey, PluginError> {
+    let index = account_index;
     // Prefer full BIP-44 derivation (64-byte BIP-39 seed), fallback to raw key bytes
-    if seed_bytes.len() >= 64 {
+    if seed.len() >= 64 {
         let seed_512: [u8; 64] = {
             let mut arr = [0u8; 64];
-            arr.copy_from_slice(&seed_bytes[..64]);
+            arr.copy_from_slice(&seed[..64]);
             arr
         };
         let secret = crypto_core::keys::derive_bip44_eth_key(&seed_512, index)
             .map_err(|e| PluginError::Internal(format!("BIP-44 derivation failed: {e}")))?;
         Ok(k256::ecdsa::SigningKey::from(&secret))
-    } else if seed_bytes.len() >= 32 {
+    } else if seed.len() >= 32 {
         let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&seed_bytes[..32]);
+        key_bytes.copy_from_slice(&seed[..32]);
         let secret = k256::SecretKey::from_slice(&key_bytes)
             .map_err(|e| PluginError::Internal(format!("invalid k256 secret key: {e}")))?;
         Ok(k256::ecdsa::SigningKey::from(&secret))
@@ -401,7 +385,8 @@ impl WalletPlugin for EvmPlugin {
     async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         _network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         if tx.is_empty() || tx[0] != 0x02 {
@@ -432,7 +417,7 @@ impl WalletPlugin for EvmPlugin {
             .ok_or_else(|| PluginError::Internal("Invalid chain_id in tx".into()))?;
         let _ = chain_id;
 
-        let signing_key = derive_key_from_keyid(&key.key_id)?;
+        let signing_key = derive_key_from_seed(seed, account_index)?;
 
         // Build EIP-1559 signing hash: keccak256(0x02 || full_rlp_list)
         // Use the original RLP-encoded list (with prefix) from tx input
@@ -812,14 +797,9 @@ mod tests {
             }
             s
         };
-        let key = KeyHandle {
-            key_id: format!("{}@1", hex::encode(seed_64)),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
 
         let signed = plugin
-            .sign_transaction(&tx_bytes, &key, "ethereum")
+            .sign_transaction(&tx_bytes, &seed_64, 1, "ethereum")
             .await
             .expect("sign_transaction should succeed for valid EIP-1559 tx");
 
@@ -827,13 +807,8 @@ mod tests {
         assert!(signed.len() > tx_bytes.len());
 
         // Verify that index 1 produces a different signature than index 0
-        let key0 = KeyHandle {
-            key_id: format!("{}@0", hex::encode(seed_64)),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
         let signed0 = plugin
-            .sign_transaction(&tx_bytes, &key0, "ethereum")
+            .sign_transaction(&tx_bytes, &seed_64, 0, "ethereum")
             .await
             .expect("sign_transaction should succeed for index 0");
         assert_ne!(
@@ -845,13 +820,9 @@ mod tests {
     #[tokio::test]
     async fn test_sign_transaction_invalid_rlp() {
         let plugin = EvmPlugin::new();
-        let key = KeyHandle {
-            key_id: hex::encode([42u8; 32]),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
+        let seed_bytes = [42u8; 32];
         let result = plugin
-            .sign_transaction(b"not a valid tx", &key, "ethereum")
+            .sign_transaction(b"not a valid tx", &seed_bytes, 0, "ethereum")
             .await;
         assert!(result.is_err(), "passing garbage bytes should return Err");
     }

@@ -494,15 +494,16 @@ impl WalletPlugin for XmrPlugin {
     async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         _network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         // Parse the unsigned transaction JSON
         let tx_json: serde_json::Value = serde_json::from_slice(tx)
             .map_err(|e| PluginError::Internal(format!("invalid tx JSON: {e}")))?;
 
-        // Derive the spend key from the key_id
-        let spend_key = SpendKey::from_seed(key.key_id.as_bytes(), 0);
+        // Derive the spend key from the seed directly (never exposed through IPC)
+        let spend_key = SpendKey::from_seed(seed, account_index);
 
         // Sign using CLSAG
         sign_monero_tx(&spend_key, &tx_json)
@@ -1174,11 +1175,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_transaction_produces_clsag_signature() {
         let plugin = XmrPlugin::new();
-        let key = KeyHandle {
-            key_id: "test-xmr-key-clsag-01".into(),
-            key_type: wallet_plugin::KeyType::Ed25519,
-            public_key: vec![],
-        };
+        let seed_bytes = b"test-xmr-key-clsag-01";
 
         // Build a simple unsigned transaction JSON
         let unsigned_tx = serde_json::json!({
@@ -1189,7 +1186,7 @@ mod tests {
         });
         let tx_bytes = serde_json::to_vec(&unsigned_tx).expect("test invariant");
 
-        let result = plugin.sign_transaction(&tx_bytes, &key, "monero").await;
+        let result = plugin.sign_transaction(&tx_bytes, seed_bytes, 0, "monero").await;
         assert!(
             result.is_ok(),
             "CLSAG signing should succeed: {:?}",

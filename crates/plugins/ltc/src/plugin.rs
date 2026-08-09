@@ -213,7 +213,8 @@ impl WalletPlugin for LtcPlugin {
     async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         use bitcoin::psbt::Psbt;
@@ -223,21 +224,7 @@ impl WalletPlugin for LtcPlugin {
         if psbt.inputs.is_empty() {
             return Err(PluginError::Internal("PSBT has no inputs".into()));
         }
-        // Decode seed from key_id (format: "hex_seed@index" or "0xhex_seed@index")
-        let (seed_hex, acct_index): (String, u32) = {
-            let raw = key.key_id.strip_prefix("0x").unwrap_or(&key.key_id);
-            if let Some(at_pos) = raw.find('@') {
-                let seed_part = &raw[..at_pos];
-                let idx: u32 = raw[at_pos + 1..]
-                    .parse()
-                    .map_err(|e| PluginError::Internal(format!("invalid account index: {e}")))?;
-                (seed_part.to_string(), idx)
-            } else {
-                (raw.to_string(), 0u32)
-            }
-        };
-        let seed = hex::decode(&seed_hex)
-            .map_err(|e| PluginError::Internal(format!("invalid seed: {e}")))?;
+        let acct_index = account_index;
         let btc_net = btc_network(network)?;
         let ct = coin_type(network);
         let path = format!("m/84'/{ct}'/0'/0/{acct_index}");
@@ -719,6 +706,7 @@ mod tests {
 
         // Deterministic 32-byte seed.
         let seed_hex = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        let seed_bytes = hex::decode(seed_hex).expect("test invariant");
 
         // A single unsigned tx that spends TWO different UTXOs (2 inputs).
         let unsigned_tx = bitcoin::Transaction {
@@ -783,7 +771,7 @@ mod tests {
         };
 
         let signed = plugin
-            .sign_transaction(&psbt_bytes, &key, "litecoin")
+            .sign_transaction(&psbt_bytes, &seed_bytes, 0, "litecoin")
             .await
             .expect("sign_transaction should succeed");
 
@@ -819,13 +807,9 @@ mod tests {
     #[tokio::test]
     async fn test_sign_transaction_invalid_psbt() {
         let plugin = LtcPlugin::new();
-        let key = KeyHandle {
-            key_id: format!("deadbeef@0"),
-            key_type: wallet_plugin::KeyType::Secp256k1,
-            public_key: vec![],
-        };
+        let seed_bytes = vec![0xdeu8; 32];
         let result = plugin
-            .sign_transaction(b"not a valid PSBT", &key, "litecoin")
+            .sign_transaction(b"not a valid PSBT", &seed_bytes, 0, "litecoin")
             .await;
         assert!(result.is_err(), "passing garbage bytes should return Err");
     }

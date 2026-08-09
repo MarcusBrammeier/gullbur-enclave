@@ -43,11 +43,12 @@ pub trait WalletPlugin: Send + Sync {
         network: &str,
     ) -> Result<Account, PluginError>;
 
-    /// Sign a raw transaction.
+    /// Sign a raw transaction using the master seed and account index.
     async fn sign_transaction(
         &self,
         tx: &[u8],
-        key: &KeyHandle,
+        seed: &[u8],
+        account_index: u32,
         network: &str,
     ) -> Result<Vec<u8>, PluginError>;
 

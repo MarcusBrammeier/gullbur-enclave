@@ -22,6 +22,7 @@ fn derive_bytes(seed: &[u8], index: u32, label: &[u8]) -> Result<[u8; 32], Crypt
 }
 
 /// Derive a secp256k1 key pair from seed and index (pure Rust via k256).
+#[deprecated(note = "Use derive_bip44_key or a dedicated plugin derivation instead")]
 pub fn derive_secp256k1_key(seed: &[u8], index: u32) -> Result<KeyHandle, CryptoError> {
     let key_bytes = derive_bytes(seed, index, b"foss-crypto-core-secp256k1-v1")?;
     let secret = k256::SecretKey::from_bytes(&key_bytes.into())
@@ -47,6 +48,7 @@ pub fn derive_ed25519_key(seed: &[u8], index: u32) -> Result<KeyHandle, CryptoEr
 }
 
 /// Derive a k256 (Ethereum-compatible) secret key.
+#[deprecated(note = "Use derive_bip44_eth_key or the EVM plugin's derive_key_from_seed instead")]
 pub fn derive_k256_key(seed: &[u8], index: u32) -> Result<k256::SecretKey, CryptoError> {
     let key_bytes = derive_bytes(seed, index, b"foss-crypto-core-k256-v1")?;
     k256::SecretKey::from_bytes(&key_bytes.into())

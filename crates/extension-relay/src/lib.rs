@@ -9,4 +9,5 @@
 pub mod native_host;
 pub mod permissions;
 pub mod provider;
+pub mod rate_limiter;
 pub mod router;

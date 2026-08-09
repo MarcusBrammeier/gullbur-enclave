@@ -287,22 +287,16 @@ pub async fn sign_transaction(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let tx_bytes = hex::decode(&tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
-    // Embed account index in key_id so BTC/LTC plugins derive the correct key
-    let full_key_id = match account_index {
-        Some(idx) => format!("{}@{}", key_id, idx),
-        None => key_id.clone(),
-    };
-    let key = wallet_plugin::KeyHandle {
-        key_id: full_key_id,
-        key_type: wallet_plugin::KeyType::Secp256k1,
-        public_key: Vec::new(),
-    };
-    let host = vault.plugin_host.read().await;
-    let signed = host
-        .sign_transaction(&tx_bytes, &key, &network)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(hex::encode(signed))
+        let seed_guard = vault.seed.read().await;
+        let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
+        drop(seed_guard);
+        let idx = account_index.unwrap_or(0);
+        let host = vault.plugin_host.read().await;
+        let signed = host
+            .sign_transaction(&tx_bytes, &seed_bytes, idx, &network)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(hex::encode(signed))
 }
 
 #[tauri::command]
@@ -524,7 +518,7 @@ pub async fn request_session_key(
 pub async fn simulate_and_send(
     network: String,
     tx_hex: String,
-    key_id: String,
+    account_index: u32,
     address: String,
     state: State<'_, Arc<RwLock<VaultState>>>,
 ) -> Result<serde_json::Value, String> {
@@ -533,11 +527,9 @@ pub async fn simulate_and_send(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let tx_bytes = hex::decode(&tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
-    let key = wallet_plugin::KeyHandle {
-        key_id,
-        key_type: wallet_plugin::KeyType::Secp256k1,
-        public_key: Vec::new(),
-    };
+    let seed_guard = vault.seed.read().await;
+    let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
+    drop(seed_guard);
     let account = wallet_plugin::Account {
         id: format!("{network}-sim"),
         network: network.clone(),
@@ -547,7 +539,7 @@ pub async fn simulate_and_send(
         index: 0,
     };
     let host = vault.plugin_host.read().await;
-    host.simulate_and_send(&tx_bytes, &key, &account, &network)
+    host.simulate_and_send(&tx_bytes, &seed_bytes, account_index, &account, &network)
         .await
         .map_err(|e| e.to_string())
 }
@@ -716,14 +708,16 @@ async fn dispatch_method(
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
             let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
-            let key = wallet_plugin::KeyHandle {
-                key_id: key_id.to_string(),
-                key_type: wallet_plugin::KeyType::Secp256k1,
-                public_key: Vec::new(),
-            };
+            let seed_guard = vault.seed.read().await;
+            let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
+            drop(seed_guard);
+            let account_index = args
+                .get("account_index")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
             let host = vault.plugin_host.read().await;
             let signed = host
-                .sign_transaction(&tx_bytes, &key, network)
+                .sign_transaction(&tx_bytes, &seed_bytes, account_index, network)
                 .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"signed_tx_hex": hex::encode(signed)}))
@@ -834,20 +828,18 @@ async fn dispatch_method(
                 .get("tx_hex")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing tx_hex")?;
-            let key_id = args
-                .get("key_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("default");
+            let account_index = args
+                .get("account_index")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
             let address = args
                 .get("address")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing address")?;
             let tx_bytes = hex::decode(tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
-            let key = wallet_plugin::KeyHandle {
-                key_id: key_id.to_string(),
-                key_type: wallet_plugin::KeyType::Secp256k1,
-                public_key: Vec::new(),
-            };
+            let seed_guard = vault.seed.read().await;
+            let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
+            drop(seed_guard);
             let account = wallet_plugin::Account {
                 id: format!("{network}-sim"),
                 network: network.to_string(),
@@ -858,7 +850,7 @@ async fn dispatch_method(
             };
             let host = vault.plugin_host.read().await;
             let result = host
-                .simulate_and_send(&tx_bytes, &key, &account, network)
+                .simulate_and_send(&tx_bytes, &seed_bytes, account_index, &account, network)
                 .await
                 .map_err(|e| e.to_string())?;
             drop(host);

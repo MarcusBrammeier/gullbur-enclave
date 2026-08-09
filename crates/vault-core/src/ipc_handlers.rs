@@ -438,8 +438,7 @@ pub fn register_vault_handlers(
                     .ok_or_else(RpcError::invalid_params)?;
 
                 // Read the stored seed — sign_transaction needs the raw seed
-                // to pass as key_id for plugin-side derivation (matching
-                // create_account which takes seed directly).
+                // for plugin-side derivation (matching create_account).
                 let seed_guard = sd.read().await;
                 let seed_bytes = seed_guard
                     .as_ref()
@@ -452,7 +451,7 @@ pub fn register_vault_handlers(
                 if let Some(origin) = origin {
                     let mut summary = HashMap::new();
                     summary.insert("network".into(), network.clone());
-                    summary.insert("key".into(), key_id.clone());
+                    summary.insert("method".into(), "vault.sign_transaction".to_string());
                     let (approval_id, rx) = {
                         let mut queue = aq.write().await;
                         queue.submit(
@@ -484,32 +483,14 @@ pub fn register_vault_handlers(
                 let tx_bytes = hex::decode(tx_hex)
                     .map_err(|e| RpcError::new(-32000, format!("Invalid tx_hex: {e}")))?;
 
-                let key_type = match key_type_str {
-                    "Secp256k1" => KeyType::Secp256k1,
-                    "Ed25519" => KeyType::Ed25519,
-                    _ => return Err(RpcError::invalid_params()),
-                };
-
-                // Use the hex-encoded seed as key_id so the plugin can
-                // derive the correct key — matching create_account's seed flow.
-                // Append account index so plugins derive at the right BIP path.
-                let seed_hex = hex::encode(seed_bytes);
-                drop(seed_guard);
                 let account_index = params
                     .get("account_index")
                     .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
-                let full_key_id = format!("{}@{}", seed_hex, account_index);
-
-                let key_handle = KeyHandle {
-                    key_id: full_key_id,
-                    key_type,
-                    public_key: Vec::new(),
-                };
+                    .unwrap_or(0) as u32;
 
                 let host = ph.read().await;
                 let signed = host
-                    .sign_transaction(&tx_bytes, &key_handle, &network)
+                    .sign_transaction(&tx_bytes, seed_bytes, account_index, &network)
                     .await
                     .map_err(|e| RpcError::new(-32000, format!("Signing failed: {e}")))?;
 
@@ -852,10 +833,12 @@ pub fn register_vault_handlers(
         let ph = Arc::clone(&plugin_host);
         let aq = Arc::clone(&approval_queue);
         let auth = Arc::clone(&auth_manager);
+        let sd = Arc::clone(&seed);
         handler.register("vault_simulateAndSend", move |params: Value| {
             let ph = Arc::clone(&ph);
             let aq = Arc::clone(&aq);
             let auth = Arc::clone(&auth);
+            let sd = Arc::clone(&sd);
             async move {
                 enforce_auth(&auth, auth_core::AuthStatus::HardwareRequired)?;
                 let network = params
@@ -912,17 +895,10 @@ pub fn register_vault_handlers(
                 let tx_bytes = hex::decode(tx_hex)
                     .map_err(|e| RpcError::new(-32000, format!("Invalid tx_hex: {e}")))?;
 
-                let key_type = match key_type_str {
-                    "Secp256k1" => wallet_plugin::KeyType::Secp256k1,
-                    "Ed25519" => wallet_plugin::KeyType::Ed25519,
-                    _ => return Err(RpcError::invalid_params()),
-                };
-
-                let key_handle = wallet_plugin::KeyHandle {
-                    key_id,
-                    key_type,
-                    public_key: Vec::new(),
-                };
+                let account_index = params
+                    .get("account_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
 
                 let account = wallet_plugin::Account {
                     id: format!("{network}-sim"),
@@ -933,9 +909,16 @@ pub fn register_vault_handlers(
                     index: 0,
                 };
 
+                // Read the seed for signing (never exposed to IPC params)
+                let seed_guard = sd.read().await;
+                let seed_bytes = seed_guard
+                    .as_ref()
+                    .map(|s| s.as_slice())
+                    .ok_or_else(|| RpcError::new(-32000, "Vault is not initialized"))?;
+
                 let host = ph.read().await;
                 let result = host
-                    .simulate_and_send(&tx_bytes, &key_handle, &account, &network)
+                    .simulate_and_send(&tx_bytes, seed_bytes, account_index, &account, &network)
                     .await
                     .map_err(|e| RpcError::new(-32000, format!("Simulate-and-send failed: {e}")))?;
 
