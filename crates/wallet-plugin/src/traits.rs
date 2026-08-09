@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::error::PluginError;
 use crate::types::{
-    Account, Balance, Capability, FeeEstimate, KeyHandle, NetworkSpec, PluginMetadata, TxRecord,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginMetadata, TxRecord,
 };
 
 /// The core trait that every blockchain plugin must implement.

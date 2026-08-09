@@ -10,11 +10,17 @@ export const mockVault = $state({
   networks: [] as any[],
   selectedNetwork: 'litecoin-testnet',
   connected: true,
+  initialized: true,
   testnetOnly: false,
   error: null as string | null,
   vaultStatus: 'Connected',
   theme: 'dark',
+  accent: 'emerald' as string,
+  authStatus: 'biometric_unlocked' as string,
+  authTimeout: 30,
+  authStartedAt: 0,
   showBetaWarning: false,
+  torEnabled: false,
 });
 
 export function resetMockVault(): void {
@@ -22,9 +28,15 @@ export function resetMockVault(): void {
   mockVault.networks = [];
   mockVault.selectedNetwork = 'litecoin-testnet';
   mockVault.connected = true;
+  mockVault.initialized = true;
   mockVault.testnetOnly = false;
   mockVault.error = null;
   mockVault.vaultStatus = 'Connected';
   mockVault.theme = 'dark';
+  mockVault.accent = 'emerald';
+  mockVault.authStatus = 'biometric_unlocked';
+  mockVault.authTimeout = 30;
+  mockVault.authStartedAt = 0;
   mockVault.showBetaWarning = false;
+  mockVault.torEnabled = false;
 }
