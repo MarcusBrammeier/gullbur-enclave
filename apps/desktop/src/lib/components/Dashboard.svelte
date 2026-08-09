@@ -2,6 +2,7 @@
   import type { Account, NetworkSpec } from '../types';
   import { vault, createAccount, refreshBalances, refreshNetworkBalance, setSelectedNetwork, getAccountLabel, setAccountLabel, getNetworkUnit } from '../vault.svelte.ts';
   import { truncateAddress, formatBalance, getNetworkBadge } from '../utils';
+  import { fade } from 'svelte/transition';
   import Send from './Send.svelte';
   import Receive from './Receive.svelte';
   import Portfolio from './Portfolio.svelte';
@@ -13,6 +14,26 @@
   let editingLabelAddress: string | null = $state(null);
   let editingLabelValue: string = $state('');
   let creatingAccount = $state(false);
+
+  // Tab indicator position — set on mount and on view change
+  let tabBarEl = $state<HTMLDivElement | null>(null);
+  let tabIndicator = $state<{ left: number; width: number }>({ left: 0, width: 0 });
+
+  function updateTabIndicator(view: 'accounts' | 'portfolio') {
+    requestAnimationFrame(() => {
+      if (!tabBarEl) return;
+      const btns = tabBarEl.querySelectorAll('button');
+      const idx = view === 'accounts' ? 0 : 1;
+      const btn = btns[idx] as HTMLElement | undefined;
+      if (btn) {
+        tabIndicator = { left: btn.offsetLeft, width: btn.offsetWidth };
+      }
+    });
+  }
+
+  $effect(() => {
+    updateTabIndicator(view);
+  });
 
   /** Networks filtered by testnet-only mode */
   let filteredNetworks = $derived(
@@ -145,13 +166,16 @@
     <div class="bg-red-900/30 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300">⚠️ {vault.error}</div>
   {/if}
 
-  <!-- View Tabs -->
-  <div class="flex gap-1 p-1 bg-surface/50 rounded-lg mb-2" role="tablist">
+  <!-- View Tabs with sliding pill -->
+  <div class="relative flex gap-1 p-1 bg-surface/50 rounded-lg mb-2" role="tablist" bind:this={tabBarEl}>
+    <div
+      class="absolute top-1 bottom-1 rounded-md bg-accent/15 transition-all"
+      style="left: {tabIndicator.left}px; width: {tabIndicator.width}px; transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1), width 180ms cubic-bezier(0.16, 1, 0.3, 1);"
+    ></div>
     <button
-      class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors
-        {view === 'accounts'
-          ? 'bg-surface-hover text-primary shadow-sm'
-          : 'text-secondary hover:text-primary'}"
+      class="relative flex-1 px-4 py-2 text-sm font-medium rounded-md z-10 transition-colors"
+      class:text-accent={view === 'accounts'}
+      class:text-secondary={view !== 'accounts'}
       onclick={() => view = 'accounts'}
       role="tab"
       aria-selected={view === 'accounts'}
@@ -159,10 +183,9 @@
       📂 Accounts
     </button>
     <button
-      class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors
-        {view === 'portfolio'
-          ? 'bg-surface-hover text-primary shadow-sm'
-          : 'text-secondary hover:text-primary'}"
+      class="relative flex-1 px-4 py-2 text-sm font-medium rounded-md z-10 transition-colors"
+      class:text-accent={view === 'portfolio'}
+      class:text-secondary={view !== 'portfolio'}
       onclick={() => view = 'portfolio'}
       role="tab"
       aria-selected={view === 'portfolio'}
@@ -193,9 +216,9 @@
       </div>
     {:else}
       <div class="space-y-3">
-        {#each filteredAccounts as account (account.id)}
+        {#each filteredAccounts as account, i (account.id)}
           {@const badge = getNetworkBadge(account.network)}
-          <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="view-transition-name: acct-{account.id}; animation: fade-up 300ms both; animation-delay: {i * 40}ms;">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 {#if editingLabelAddress === account.address}

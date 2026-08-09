@@ -3,6 +3,8 @@
   import { vault, validateAddress, estimateFee, signTransaction, broadcastTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
   import { formatBalance, getBalanceFloat } from '../utils';
   import { getAddressBook, saveAddressEntry, removeAddressEntry, isAddressSaved, findAddressEntry } from '../addressBook';
+  import { fade, scale } from 'svelte/transition';
+  import { cubicInOut } from 'svelte/easing';
   import QrScanner from './QrScanner.svelte';
 
   interface Props {
@@ -262,6 +264,7 @@
 <!-- Modal Backdrop -->
 <div
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+  transition:fade={{ duration: 150 }}
   onclick={handleBackdropClick}
   onkeydown={handleKeydown}
   role="dialog"
@@ -270,7 +273,9 @@
   tabindex="-1"
 >
   <!-- Modal Card -->
-  <div class="card w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border-strong">
+  <div class="card w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border-strong"
+    transition:scale={{ start: 0.97, duration: 180, easing: cubicInOut }}
+  >
     <!-- Header -->
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">💸 Send {networkUnit}</h2>
@@ -617,7 +622,12 @@
             </button>
           </div>
         {:else}
-          <div class="text-4xl mb-3">✅</div>
+          <div class="text-4xl mb-3">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke="var(--color-accent)" stroke-width="2" fill="none" opacity="0.3"/>
+              <path class="checkmark-path" d="M7 12l3 3 7-7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
           <h3 class="text-lg font-semibold text-vault-400 mb-2">Transaction Sent</h3>
           <div class="bg-surface/50 border border-strong rounded-lg p-3 mb-4">
             <span class="text-xs text-muted block mb-1">Transaction ID</span>

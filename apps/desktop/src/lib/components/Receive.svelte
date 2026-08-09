@@ -1,5 +1,6 @@
 <script lang="ts">
   import { vault, getAccountLabel } from '../vault.svelte.ts';
+  import { fade, scale } from 'svelte/transition';
   // qrcode has no TS types — runtime import only
 
   interface Props {
@@ -56,6 +57,7 @@
 
 <div
   class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+  transition:fade={{ duration: 150 }}
   role="dialog"
   aria-modal="true"
   aria-label="Receive funds"
@@ -63,7 +65,9 @@
   onclick={onclose}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6"
+    transition:scale={{ start: 0.97, duration: 180 }}
+    role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">Receive</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>

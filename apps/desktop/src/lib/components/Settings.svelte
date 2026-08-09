@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { themeEngine } from '../themeEngine.svelte.ts';
   import { pushError, pushInfo, pushWarning } from '../toasts.svelte.ts';
+  import { fade, scale } from 'svelte/transition';
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
   interface Props {
@@ -110,6 +111,7 @@
 
 <div
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+  transition:fade={{ duration: 150 }}
   role="dialog"
   aria-modal="true"
   aria-label="Settings"
@@ -117,7 +119,9 @@
   onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') handleClose(); }}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6"
+    transition:scale={{ start: 0.97, duration: 180 }}
+    role="document" onclick={(e) => e.stopPropagation()}>
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">⚙️ Settings</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={handleClose}>&times;</button>
