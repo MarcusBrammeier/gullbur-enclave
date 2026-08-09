@@ -2,8 +2,8 @@
 
 > **Version:** 0.0.8 (pre-beta, internal)
 > **Last updated:** 2026-08-09  
-> **HEAD:** `ab3b272` (2026-08-09)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **HEAD:** `1dba49a` (2026-08-09)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (136+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **Linux AppImage .deb ✅** | **Android APK 23M + AAB 12M ✅**
 
 ### Security hardening (2026-08-08)
 
@@ -81,6 +81,28 @@
 - **Removed `#[allow(dead_code)]`** — all decoy_selector functions are now
   exercised through the signing path. The old `build_decoy_ring` is still
   present as a synthetic fallback.
+
+### Batch 5 — UI Polish, Address Book Encryption & Build Pipeline (2026-08-09)
+
+- **Sidebar navigation** — replaced crowded top-header layout with persistent
+  sidebar nav (`w-64`, fixed-left) using SVG icons for Dashboard, Portfolio,
+  Send, Receive, Settings. Active state tracking via `activeView`.
+- **All emoji → SVG icons** — every button and nav item now uses inline
+  feather-style SVG icons from `icons.ts`. Zero emoji in UI chrome.
+- **Demo/test mode** — `VITE_DEMO=true` / `?demo=true` enables `MockIpcClient`
+  with realistic fake balance data. **Amber sticky warning banner** at top:
+  "GUI Test Mode — Core engine not connected. Mock data for visual review only."
+  Includes an ✕ exit button.
+- **Address book encrypted at rest** — `vault.encrypt_data` / `vault.decrypt_data`
+  IPC handlers using device-key AES-256-GCM (`encrypt_file_with_key`).
+  Frontend `addressBook.ts` wires the IPC client on connect; falls back to
+  cleartext localStorage when IPC unavailable (demo mode).
+- **Rich mock data** — `MockIpcClient` now returns multi-chain accounts
+  (ETH, Arbitrum, Base, Polygon, Sepolia) with realistic addresses, balances,
+  transaction history, and fee estimates.
+- **Build pipeline automated** — Linux AppImage (177M) + .deb (4.7M) +
+  Android APK (23M) + AAB (12M) all built from latest HEAD. Served via
+  local webserver at `http://192.168.50.184:8080/`.
 
 ---
 

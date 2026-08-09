@@ -26,6 +26,11 @@ fn device_key() -> Result<[u8; 32], keystore_core::KeystoreError> {
     keystore_core::FileDeviceKeyProvider::default_home().get_or_create_key()
 }
 
+/// Public accessor for the per-device key, used by IPC handlers.
+pub(crate) fn get_device_key() -> Result<[u8; 32], keystore_core::KeystoreError> {
+    device_key()
+}
+
 /// Load accounts from `~/.gullbur/accounts.json`.
 ///
 /// The file is AES-256-GCM encrypted at rest (device-key). If the file on disk

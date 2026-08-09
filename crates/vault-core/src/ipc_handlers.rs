@@ -696,6 +696,76 @@ pub fn register_vault_handlers(
         });
     }
 
+    // ── vault.encrypt_data / vault.decrypt_data ─────────────────────────
+    // Encrypt/decrypt arbitrary string data using the per-device key file.
+    // Used by the frontend to encrypt the address book at rest in localStorage.
+    // Does NOT require vault initialization (works with just the device key).
+    {
+        handler.register("vault.encrypt_data", |params: Value| async move {
+            let plaintext = params
+                .get("data")
+                .and_then(|v| v.as_str())
+                .ok_or_else(RpcError::invalid_params)?;
+            let aad = params
+                .get("aad")
+                .and_then(|v| v.as_str())
+                .unwrap_or("gullbur-addressbook");
+
+            let key = crate::host::get_device_key()
+                .map_err(|e| RpcError::new(-32000, format!("Device key unavailable: {e}")))?;
+
+            let encrypted = keystore_core::vault::encrypt_file_with_key(
+                &key,
+                plaintext.as_bytes(),
+                aad.as_bytes(),
+            )
+            .map_err(|e| RpcError::new(-32000, format!("Encryption failed: {e}")))?;
+
+            let blob = serde_json::to_string(
+                &serde_json::json!({"v": 1, "blob": hex::encode(&encrypted)})
+            )
+            .map_err(|e| RpcError::new(-32000, format!("Serialization failed: {e}")))?;
+
+            Ok(json!({"encrypted": blob}))
+        });
+    }
+
+    {
+        handler.register("vault.decrypt_data", |params: Value| async move {
+            let blob_str = params
+                .get("encrypted")
+                .and_then(|v| v.as_str())
+                .ok_or_else(RpcError::invalid_params)?;
+            let aad = params
+                .get("aad")
+                .and_then(|v| v.as_str())
+                .unwrap_or("gullbur-addressbook");
+
+            let parsed: serde_json::Value = serde_json::from_str(blob_str)
+                .map_err(|e| RpcError::new(-32000, format!("Invalid JSON blob: {e}")))?;
+            let hex_blob = parsed
+                .get("blob")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| RpcError::new(-32000, "Invalid encrypted blob format"))?;
+            let encrypted = hex::decode(hex_blob)
+                .map_err(|e| RpcError::new(-32000, format!("Invalid hex: {e}")))?;
+
+            let key = crate::host::get_device_key()
+                .map_err(|e| RpcError::new(-32000, format!("Device key unavailable: {e}")))?;
+
+            let plaintext = keystore_core::vault::decrypt_file_with_key(
+                &key, &encrypted, aad.as_bytes(),
+            )
+            .map_err(|e| RpcError::new(-32000, format!("Decryption failed: {e}")))?
+            .ok_or_else(|| RpcError::new(-32000, "Invalid encrypted blob format"))?;
+
+            let data = String::from_utf8(plaintext)
+                .map_err(|e| RpcError::new(-32000, format!("Invalid UTF-8: {e}")))?;
+
+            Ok(json!({"data": data}))
+        });
+    }
+
     // ── Channel B: Next-gen vault_* API (Phase 2) ────────────────────
     // All three methods are ALWAYS approval-gated when accessed via IPC
     // (they're extension-only operations). The origin must be present.

@@ -21,6 +21,7 @@ import type {
 } from './types';
 import { IS_DEMO, VAULT_IPC_PORT } from './constants';
 import { pushError } from './toasts.svelte.ts';
+import { setAddressBookIpc } from './addressBook';
 
 // ── Reactive state (object form — valid for module export in Svelte 5) ─────
 
@@ -242,6 +243,8 @@ export async function connect(): Promise<void> {
     vault.connected = true;
     vault.vaultStatus = 'Connected';
     await refreshStatus();
+    // Wire IPC client into address book for encrypted storage
+    setAddressBookIpc(client);
   } catch (e) {
     vault.connected = false;
     vault.vaultStatus = 'Disconnected';

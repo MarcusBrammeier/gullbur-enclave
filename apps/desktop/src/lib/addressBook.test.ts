@@ -11,10 +11,14 @@ import {
   addressBookSize,
 } from './addressBook';
 
-const KEY = 'foss_wallet_address_book';
+const KEY = 'gullbur_address_book_enc';
+const KEY_LEGACY = 'gullbur_address_book';
+const KEY_OLD = 'foss_wallet_address_book';
 
 beforeEach(() => {
   localStorage.removeItem(KEY);
+  localStorage.removeItem(KEY_LEGACY);
+  localStorage.removeItem(KEY_OLD);
 });
 
 describe('addressBook', () => {
