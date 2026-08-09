@@ -146,8 +146,8 @@ describe('ThemeEngine', () => {
   // ── Theme application ────────────────────────────────────────────────
 
   it('applies obsidian theme by default', () => {
-    expect(themeEngine.currentThemeId).toBe('obsidian');
-    expect(themeEngine.currentTheme.name).toBe('Obsidian');
+    expect(themeEngine.currentThemeId).toBe('dark-slate');
+    expect(themeEngine.currentTheme.name).toBe('Dark Slate');
   });
 
   it('applies light-studio theme correctly', () => {

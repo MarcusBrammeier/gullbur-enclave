@@ -152,7 +152,7 @@ async fn live_broadcast_testnet() {
     };
 
     let signed_psbt_bytes = plugin
-        .sign_transaction(&psbt_bytes, &key, "bitcoin-testnet")
+        .sign_transaction(&psbt_bytes, seed_hex.as_bytes(), 0, "bitcoin-testnet")
         .await
         .expect("sign_transaction should succeed");
     let signed_psbt =

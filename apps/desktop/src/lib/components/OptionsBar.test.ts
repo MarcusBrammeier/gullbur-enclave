@@ -30,9 +30,11 @@ describe('OptionsBar.svelte', () => {
 
   it('renders theme options for obsidian, dark-slate, and light-studio', () => {
     render(OptionsBar);
-    expect(screen.getAllByText('🪨').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('🌙').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('☀️').length).toBeGreaterThan(0);
+    // Theme buttons now render SVG via iconHtml() instead of emoji
+    const themeBtns = screen.getAllByRole('button').filter(
+      b => b.getAttribute('title')?.startsWith('OLED') || b.getAttribute('title')?.startsWith('Legacy') || b.getAttribute('title')?.startsWith('Warm')
+    );
+    expect(themeBtns.length).toBeGreaterThanOrEqual(3);
   });
 
   it('renders accent color dot buttons', () => {
