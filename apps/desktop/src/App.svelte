@@ -11,6 +11,7 @@
   import Settings from './lib/components/Settings.svelte';
   import OptionsBar from './lib/components/OptionsBar.svelte';
   import Toasts from './lib/components/Toasts.svelte';
+  import { iconHtml } from './lib/icons';
 
   let showSettings = $state(false);
   let errorMessage = $state<string | null>(null);
@@ -104,8 +105,7 @@
   <header class="glass border-b border-default px-4 py-3 sm:px-6 sm:py-4 sticky top-0 z-30">
     <div class="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-2">
       <div class="flex items-center gap-3 shrink-0">
-        <span class="text-vault-500 text-2xl">🔐</span>
-        <h1 class="text-lg sm:text-xl font-bold tracking-tight">Gullbúr Enclave</h1>
+        {@html iconHtml('wallet')}<h1 class="text-lg sm:text-xl font-bold tracking-tight">Gullbúr Enclave</h1>
       </div>
       <div class="hidden sm:block flex-1" aria-hidden="true"></div>
       {#if vault.connected}
@@ -123,11 +123,11 @@
           {vault.vaultStatus}
         </span>
         {#if vault.connected && vault.initialized && vault.authStatus !== 'unauthenticated'}
-          <button class="btn-secondary text-sm px-2 py-1" onclick={() => invoke('lock_vault')} title="Lock vault">
-            🔒
+          <button class="btn-secondary text-sm px-2 py-1 flex items-center" onclick={() => invoke('lock_vault')} title="Lock vault">
+            {@html iconHtml('lock', 'w-4 h-4')}
           </button>
-          <button class="btn-secondary text-sm px-2 py-1" onclick={() => showSettings = true} title="Settings">
-            ⚙️
+          <button class="btn-secondary text-sm px-2 py-1 flex items-center" onclick={() => showSettings = true} title="Settings">
+            {@html iconHtml('settings', 'w-4 h-4')}
           </button>
         {/if}
         {#if !vault.connected}

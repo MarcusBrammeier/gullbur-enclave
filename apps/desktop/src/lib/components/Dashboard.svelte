@@ -3,6 +3,7 @@
   import { vault, createAccount, refreshBalances, refreshNetworkBalance, setSelectedNetwork, getAccountLabel, setAccountLabel, getNetworkUnit } from '../vault.svelte.ts';
   import { truncateAddress, formatBalance, getNetworkBadge } from '../utils';
   import { fade } from 'svelte/transition';
+  import { iconHtml } from '../icons';
   import Send from './Send.svelte';
   import Receive from './Receive.svelte';
   import Portfolio from './Portfolio.svelte';
@@ -126,13 +127,37 @@
   function closeSend() { showSend = false; sendingAccount = null; }
   function openReceive() { showReceive = true; }
   function closeReceive() { showReceive = false; }
+
+  /** Computed total balance across all accounts */
+  let totalBalance = $derived(
+    vault.accounts.reduce((s: number, a: Account) => s + parseFloat(a.balance || '0'), 0)
+  );
+  let formattedTotal = $derived(
+    '$' + totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
 </script>
 
 <div class="flex flex-col" style="gap: var(--rhythm-lg);">
+  <!-- Global Balance Hero Card -->
+  <div class="hero-balance card">
+    <span class="text-xs text-muted" style="letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500;">Total Balance</span>
+    <div class="hero-amount">
+      <span class="text-hero">{formattedTotal}</span>
+    </div>
+    <div class="flex items-center gap-3" style="margin-top: var(--rhythm-xs);">
+      <button class="btn-primary text-sm flex items-center gap-1.5" onclick={() => { const a = vault.accounts[0]; if (a) { sendingAccount = a; showSend = true; } }}>
+        {@html iconHtml('send')} Send
+      </button>
+      <button class="btn-secondary text-sm flex items-center gap-1.5" onclick={openReceive}>
+        {@html iconHtml('receive')} Receive
+      </button>
+    </div>
+  </div>
+
   <!-- Network Selector -->
   <div class="card">
     <div class="flex items-center justify-between" style="margin-bottom: var(--rhythm-md);">
-      <h2 class="text-lg font-semibold">🌐 Networks</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('globe')} Networks</h2>
       {#if !vault.connected}
         <span class="text-xs text-red-400 flex items-center gap-1">
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-red-400"></span> Disconnected
@@ -167,7 +192,7 @@
   {/if}
 
   <!-- View Tabs with sliding pill -->
-  <div class="relative flex gap-1 p-1 bg-surface/50 rounded-lg mb-2" role="tablist" bind:this={tabBarEl}>
+  <div class="relative flex gap-1 p-1 bg-surface/50 rounded-lg" role="tablist" bind:this={tabBarEl}>
     <div
       class="absolute top-1 bottom-1 rounded-md bg-accent/15 transition-all"
       style="left: {tabIndicator.left}px; width: {tabIndicator.width}px; transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1), width 180ms cubic-bezier(0.16, 1, 0.3, 1);"
@@ -180,7 +205,7 @@
       role="tab"
       aria-selected={view === 'accounts'}
     >
-      📂 Accounts
+      {@html iconHtml('layout')} Accounts
     </button>
     <button
       class="relative flex-1 px-4 py-2 text-sm font-medium rounded-md z-10 transition-colors"
@@ -190,7 +215,7 @@
       role="tab"
       aria-selected={view === 'portfolio'}
     >
-      📊 Portfolio
+      {@html iconHtml('bolt')} Portfolio
     </button>
   </div>
 
@@ -201,7 +226,7 @@
   <!-- Accounts List -->
   <div class="card">
     <div class="flex items-center justify-between" style="margin-bottom: var(--rhythm-md);">
-      <h2 class="text-lg font-semibold">💰 Accounts</h2>
+      <h2 class="text-lg font-semibold">{@html iconHtml('wallet')} Accounts</h2>
       <span class="text-xs text-muted">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}</span>
     </div>
 
@@ -245,13 +270,13 @@
                 {#if account.balanceError}
                   <span class="text-red-400 text-xs">⚠ {account.balanceError}</span>
                 {:else}
-                  <span class="font-mono text-vault-400">{formatBalance(account.balance)} {getNetworkUnit(account.network)}</span>
+                  <span class="font-mono" style="font-size: var(--text-xl); font-weight: 200; letter-spacing: -0.02em; color: var(--accent);">{formatBalance(account.balance)} <span style="font-size: var(--text-sm); font-weight: 400; color: var(--text-muted);">{getNetworkUnit(account.network)}</span></span>
                 {/if}
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
-              <button class="btn-secondary text-sm" onclick={() => openReceive()}>📥 Receive</button>
-              <button class="btn-primary text-sm" disabled={!vault.connected} onclick={() => openSend(account)}>Send</button>
+              <button class="btn-secondary text-sm flex items-center gap-1.5" onclick={() => openReceive()}>{@html iconHtml('receive')} Receive</button>
+              <button class="btn-primary text-sm flex items-center gap-1.5" disabled={!vault.connected} onclick={() => openSend(account)}>{@html iconHtml('send')} Send</button>
             </div>
           </div>
         {/each}
@@ -261,13 +286,13 @@
 
   <!-- Quick Actions -->
   <div class="card">
-    <h2 class="text-lg font-semibold" style="margin-bottom: var(--rhythm-md);">⚡ Quick Actions</h2>
+    <h2 class="text-lg font-semibold" style="margin-bottom: var(--rhythm-md);">{@html iconHtml('bolt')} Quick Actions</h2>
     <div style="display: flex; flex-wrap: wrap; gap: var(--rhythm-sm);">
-      <button class="btn-primary" disabled={!vault.connected || creatingAccount} onclick={handleCreateAccount}>
-          {creatingAccount ? '⏳ Creating...' : '+ Create Account'}
+      <button class="btn-primary flex items-center gap-1.5" disabled={!vault.connected || creatingAccount} onclick={handleCreateAccount}>
+          {@html iconHtml('plus')} {creatingAccount ? 'Creating...' : 'Create Account'}
         </button>
-      <button class="btn-secondary" disabled={!vault.connected} onclick={handleRefresh}>🔄 Refresh</button>
-      <button class="btn-ghost" disabled={!vault.connected} onclick={handleRefreshAll}>🔄 Refresh All</button>
+      <button class="btn-secondary flex items-center gap-1.5" disabled={!vault.connected} onclick={handleRefresh}>{@html iconHtml('refresh')} Refresh</button>
+      <button class="btn-ghost flex items-center gap-1.5" disabled={!vault.connected} onclick={handleRefreshAll}>{@html iconHtml('refresh')} All</button>
     </div>
   </div>
 
