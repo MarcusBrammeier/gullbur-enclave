@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
 > **Version:** 0.0.8 (pre-beta, internal)
-> **Last updated:** 2026-08-08  
-> **HEAD:** `87e88b3` (2026-08-08)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **Last updated:** 2026-08-09  
+> **HEAD:** `a093f80` (2026-08-09)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ### Security hardening (2026-08-08)
 
@@ -41,6 +41,29 @@
   refreshes coalesce; account-switch history fetches can't overwrite out-of-order.
 - *Note:* EVM gas was already REAL on the Rust side (`eth_estimateGas` +
   `eth_call`); the hardcoded `21000` exists only in the `IS_DEMO` browser mock.
+
+### Batch 3 — Security IPC & hardening (2026-08-09)
+
+- **Seed removed from IPC key_id (P1)** — `sign_transaction` now takes
+  `(tx, &[u8], u32, network)` instead of `&KeyHandle` with the seed hex-encoded
+  into `key_id`. The master seed is read from `Arc<RwLock<seed>>` inside
+  `ipc_handlers.rs` and never circulates through the wire protocol. All 4
+  plugins updated, all bridges/handlers/commands updated.
+- **Extension-relay rate limiter (P1)** — sliding-window 30 req/min per origin,
+  max 3 concurrent pending approvals. Applied in `gullbur-relay` main loop
+  before origin validation.
+- **Unencrypted IPC gated (P1)** — production `LifecycleManager` always calls
+  `IpcServer::new(port)` (encrypted). `with_no_encrypt()` is `#[cfg(test)]`
+  only. The `with_encryption(port, false)` path is still reachable for external
+  test crates but never in production builds.
+- **Extension-relay rate limiter (P1)** — `rate_limiter.rs`: sliding-window
+  30 req/min per origin, max 3 concurrent approvals, wired into main loop.
+- **Removed redundant `[workspace]` from crypto-wasm (P3)** — the standalone
+  workspace declaration was a copy-paste artifact that could cause build issues.
+- **Deprecated legacy HMAC key derivation (P3)** — `derive_k256_key` and
+  `derive_secp256k1_key` marked `#[deprecated]` with migration notes pointing
+  to `derive_bip44_eth_key` and plugin-side derivation. No callers deleted
+  (backward compat).
 
 ---
 
