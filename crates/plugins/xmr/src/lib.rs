@@ -19,6 +19,9 @@ use monero_serai_mirror::generators::hash_to_point;
 use monero_serai_mirror::primitives::{Commitment, Decoys, INV_EIGHT, keccak256_to_scalar};
 use zeroize::Zeroizing;
 
+#[allow(dead_code)]
+mod decoy_selector;
+
 pub struct XmrPlugin {
     socks5_proxy: Option<String>,
     wallet_rpc_url: Option<String>,

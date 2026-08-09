@@ -1,6 +1,8 @@
 <script lang="ts">
   import { vault } from '../vault.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
+  import { themeEngine } from '../themeEngine.svelte.ts';
+  import { pushError, pushInfo, pushWarning } from '../toasts.svelte.ts';
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
   interface Props {
@@ -27,6 +29,11 @@
   let showTestnetWarning = $state(false);
   let pendingTestnetToggle = $state(false);
   let showConsole = $state(false);
+  let themeImportRef = $state<HTMLInputElement | null>(null);
+
+  // Reactive theme list — re-evaluates whenever customThemes changes
+  let availableThemes = $derived(themeEngine.getAvailableThemes());
+  let currentThemeId = $derived(themeEngine.currentThemeId);
 
   // Sync auto-lock to localStorage on change
   $effect(() => {

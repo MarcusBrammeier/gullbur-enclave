@@ -1,8 +1,9 @@
 <script lang="ts">
   import './app.css';
-  import { vault, connect, disconnect, getAccentTheme } from './lib/vault.svelte.ts';
+  import { vault, connect, disconnect } from './lib/vault.svelte.ts';
   import { pushError } from './lib/toasts.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
+  import { themeEngine } from './lib/themeEngine.svelte.ts';
   import VaultInit from './lib/components/VaultInit.svelte';
   import Dashboard from './lib/components/Dashboard.svelte';
   import StatusBar from './lib/components/StatusBar.svelte';
@@ -15,21 +16,15 @@
   let errorMessage = $state<string | null>(null);
   let connecting = $state(false);
 
-  // Hydrate theme from localStorage on mount
+  // Hydrate theme & options on mount
   $effect(() => {
-    // Read saved theme only once on mount; don't re-run
     const saved = localStorage.getItem('foss_wallet_theme');
     if (saved === 'light') {
       vault.theme = 'light';
     } else if (saved === 'system') {
       vault.theme = 'system';
     }
-    // vault.theme defaults to 'dark', so only set if saved overrides it
     applyTheme(vault.theme);
-
-    // Hydrate accent theme on mount
-    vault.accent = getAccentTheme();
-    document.documentElement.setAttribute('data-accent', vault.accent);
   });
 
   // Auto-connect to the vault IPC server on mount
@@ -41,7 +36,6 @@
       .catch((e: unknown) => {
         connecting = false;
         console.warn('[auto-connect] IPC connection failed:', e);
-        // Status shows "Disconnected" — user can tap Connect to retry
       });
   });
 
@@ -55,10 +49,18 @@
   function applyTheme(theme: 'light' | 'dark' | 'system') {
     let resolved: string;
     if (theme === 'system') {
-      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      resolved = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     } else {
       resolved = theme;
     }
+    
+    // Delegate to themeEngine for full token injection + fallback safety
+    if (resolved === 'dark') {
+      themeEngine.applyTheme('dark-slate');
+    } else {
+      themeEngine.applyTheme('light-slate');
+    }
+
     document.documentElement.setAttribute('data-theme', resolved);
     localStorage.setItem('foss_wallet_theme', theme);
   }
@@ -82,11 +84,9 @@
   function dismissError() { errorMessage = null; }
 
   function handleGlobalKeydown(e: KeyboardEvent) {
-    // Escape — close Settings if open
     if (e.key === 'Escape' && showSettings) {
       showSettings = false;
     }
-    // Ctrl+Shift+L — lock vault
     if (e.key === 'L' && e.ctrlKey && e.shiftKey) {
       e.preventDefault();
       if (vault.connected) invoke('lock_vault').catch(() => {});
@@ -97,19 +97,23 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <main class="min-h-screen flex flex-col">
-  <!-- Global toast notifications (top-center, one at a time, 3s each) -->
+  <!-- Global toast notifications -->
   <Toasts />
+
   <!-- Header -->
-  <header class="border-b border-default px-6 py-4">
-    <div class="max-w-6xl mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
+  <header class="border-b border-default px-4 py-3 sm:px-6 sm:py-4">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div class="flex items-center gap-3 shrink-0">
         <span class="text-vault-500 text-2xl">🔐</span>
-        <h1 class="text-xl font-bold tracking-tight">Gullbúr Enclave</h1>
+        <h1 class="text-lg sm:text-xl font-bold tracking-tight">Gullbúr Enclave</h1>
       </div>
+      <div class="hidden sm:block flex-1" aria-hidden="true"></div>
       {#if vault.connected}
-        <OptionsBar />
+        <div class="w-full sm:w-auto order-last sm:order-none">
+          <OptionsBar />
+        </div>
       {/if}
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4 ml-auto">
         <span class="flex items-center gap-2 text-sm">
           <span
             class="inline-block w-2 h-2 rounded-full"
@@ -140,7 +144,7 @@
   </header>
 
   <!-- Main Content -->
-  <section class="flex-1 max-w-6xl mx-auto w-full p-6 overflow-y-auto">
+  <section class="flex-1 max-w-6xl mx-auto w-full px-4 py-5 sm:p-6 overflow-y-auto">
     {#if !vault.initialized}
       <VaultInit />
     {:else}
@@ -149,14 +153,14 @@
   </section>
 
   <!-- Footer -->
-  <footer class="border-t border-default px-6 py-3">
+  <footer class="border-t border-default px-4 py-3 sm:px-6">
     <div class="max-w-6xl mx-auto">
       <StatusBar />
     </div>
   </footer>
 </main>
 
-<!-- Auth overlay (renders above everything) -->
+<!-- Auth overlay -->
 <AuthPrompt />
 
 <!-- Global error banner -->

@@ -3,116 +3,34 @@
 @tailwind utilities;
 
 /* ── Theme Variables ────────────────────────────────────────────────── */
-/* Applied via data-theme attribute on <html>. Tailwind classes still work
-   because we use CSS custom properties for the dynamic theme colors. */
+/* Applied via CSS custom properties set by ThemeEngine. Tailwind classes
+   still work because we use CSS custom properties for dynamic theme colors. */
 
-:root,
-[data-theme="dark"] {
-  --color-bg-primary: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-surface: #1c2333;
-  --color-surface-hover: #252d3f;
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-hover: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.14);
-  --color-text: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-muted: #6e7681;
-  --color-accent: #10b981;
-  --color-accent-hover: #059669;
-  --color-accent-subtle: rgba(16, 185, 129, 0.08);
-  --color-accent-shadow: rgba(16, 185, 129, 0.15);
-  --color-accent-glow: rgba(16, 185, 129, 0.3);
-  --color-accent-contrast: #ffffff;
-  --color-danger: #ef4444;
-  --color-danger-hover: #dc2626;
-  --color-card-bg: rgba(28, 35, 51, 0.8);
-  --color-card-bg-hover: rgba(28, 35, 51, 0.9);
-  --color-input-bg: rgba(37, 45, 63, 0.7);
-}
-
-[data-theme="light"] {
-  --color-bg-primary: #f0f0f0;
-  --color-bg-secondary: #e4e5e7;
-  --color-surface: #f5f5f5;
-  --color-surface-hover: #ebebeb;
-  --color-border: rgba(0, 0, 0, 0.06);
-  --color-border-hover: rgba(0, 0, 0, 0.1);
-  --color-border-strong: rgba(0, 0, 0, 0.15);
-  --color-text: #1f2328;
-  --color-text-secondary: #656d76;
-  --color-text-muted: #8b949e;
-  --color-accent: #059669;
-  --color-accent-hover: #047857;
-  --color-accent-subtle: rgba(5, 150, 105, 0.08);
-  --color-accent-shadow: rgba(5, 150, 105, 0.2);
-  --color-accent-glow: rgba(5, 150, 105, 0.35);
-  --color-accent-contrast: #ffffff;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-card-bg: rgba(255, 255, 255, 0.7);
-  --color-card-bg-hover: rgba(255, 255, 255, 0.85);
-  --color-input-bg: rgba(235, 235, 235, 0.7);
-}
-
-/* ── Accent theme presets (override --color-accent* per data-accent) ── */
-/* Default (emerald) is set above; alternates give the app its "cool themes". */
-[data-accent="violet"] {
-  --color-accent: #8b5cf6;
-  --color-accent-hover: #7c3aed;
-  --color-accent-subtle: rgba(139, 92, 246, 0.1);
-  --color-accent-shadow: rgba(139, 92, 246, 0.18);
-  --color-accent-glow: rgba(139, 92, 246, 0.35);
-}
-[data-theme="light"][data-accent="violet"] {
-  --color-accent: #7c3aed;
-  --color-accent-hover: #6d28d9;
-  --color-accent-subtle: rgba(124, 58, 237, 0.1);
-}
-[data-accent="amber"] {
-  --color-accent: #f59e0b;
-  --color-accent-hover: #d97706;
-  --color-accent-subtle: rgba(245, 158, 11, 0.12);
-  --color-accent-shadow: rgba(245, 158, 11, 0.2);
-  --color-accent-glow: rgba(245, 158, 11, 0.35);
-}
-[data-theme="light"][data-accent="amber"] {
-  --color-accent: #d97706;
-  --color-accent-hover: #b45309;
-  --color-accent-subtle: rgba(217, 119, 6, 0.12);
-}
-[data-accent="cyan"] {
-  --color-accent: #06b6d4;
-  --color-accent-hover: #0891b2;
-  --color-accent-subtle: rgba(6, 182, 212, 0.1);
-  --color-accent-shadow: rgba(6, 182, 212, 0.2);
-  --color-accent-glow: rgba(6, 182, 212, 0.35);
-}
-[data-theme="light"][data-accent="cyan"] {
-  --color-accent: #0891b2;
-  --color-accent-hover: #0e7490;
-  --color-accent-subtle: rgba(8, 145, 178, 0.1);
-}
-[data-accent="rose"] {
-  --color-accent: #f43f5e;
-  --color-accent-hover: #e11d48;
-  --color-accent-subtle: rgba(244, 63, 94, 0.1);
-  --color-accent-shadow: rgba(244, 63, 94, 0.2);
-  --color-accent-glow: rgba(244, 63, 94, 0.35);
-}
-[data-theme="light"][data-accent="rose"] {
-  --color-accent: #e11d48;
-  --color-accent-hover: #be123c;
-  --color-accent-subtle: rgba(225, 29, 72, 0.1);
-}
-
-/* ── Motion tokens ─────────────────────────────────────────────────── */
 :root {
+  /* ── Motion tokens + tactical micro-interactions ────────────────── */
+  --ease-tactical: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --duration-fast: 150ms;
-  --duration-base: 250ms;
-  --duration-slow: 400ms;
+  --duration-fast: 100ms;
+  --duration-base: 180ms;
+  --duration-slow: 300ms;
+
+  /* Tactical geometry */
+  --focus-ring: 0 0 0 2px var(--color-accent-glow);
+  --button-press-y: 1px;
+  --shadow-tactical: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Motion speed overrides via data-motion attribute */
+[data-motion="instant"] {
+  --duration-fast: 0ms;
+  --duration-base: 0ms;
+  --duration-slow: 0ms;
+}
+[data-motion="expressive"] {
+  --duration-fast: 200ms;
+  --duration-base: 350ms;
+  --duration-slow: 500ms;
 }
 
 /* ── Map Tailwind tokens to CSS variables ───────────────────────────── */
@@ -132,6 +50,7 @@
 
   html, body { height: 100%; }
 
+  /* Subtle accent ambient glow on canvas */
   body::before {
     content: '';
     position: fixed;
@@ -146,7 +65,7 @@
       ),
       radial-gradient(
         ellipse at 70% 80%,
-        rgba(5, 150, 105, 0.04) 0%,
+        var(--color-accent-subtle) 0%,
         transparent 50%
       );
     pointer-events: none;
@@ -167,15 +86,16 @@
   h1 { @apply text-2xl; }
   h2 { @apply text-xl; }
   h3 { @apply text-lg; }
-  a { @apply text-vault-400 hover:text-vault-300 transition-colors; }
 }
 
 @layer components {
   .btn-primary {
-    @apply font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    @apply font-medium py-2.5 px-5 rounded-lg;
     background: var(--color-accent);
     color: var(--color-accent-contrast, #fff);
     box-shadow: 0 1px 3px var(--color-accent-shadow);
+    transition: transform var(--duration-fast) var(--ease-tactical),
+                box-shadow var(--duration-fast) var(--ease-tactical);
   }
   .btn-primary:hover {
     background: var(--color-accent-hover);
@@ -183,8 +103,8 @@
     transform: translateY(-1px);
   }
   .btn-primary:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 3px var(--color-accent-shadow);
+    transform: translateY(var(--button-press-y));
+    box-shadow: 0 1px 2px var(--color-accent-shadow);
   }
   .btn-primary:disabled {
     opacity: 0.5;
@@ -192,72 +112,93 @@
     transform: none;
     box-shadow: none;
   }
+
   .input-field {
-    @apply rounded-lg px-4 py-2 transition-all duration-200;
+    @apply rounded-lg px-4 py-2.5;
     background: var(--color-input-bg);
     border: 1px solid var(--color-border-strong);
     color: var(--color-text);
+    transition: border-color var(--duration-fast) var(--ease-tactical),
+                box-shadow var(--duration-fast) var(--ease-tactical);
   }
   .input-field::placeholder { color: var(--color-text-muted); }
   .input-field:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent-glow), 0 0 12px -4px var(--color-accent-glow);
+    box-shadow: var(--focus-ring), 0 0 12px -4px var(--color-accent-glow);
     outline: none;
   }
   .input-field:disabled {
     opacity: 0.6;
-    background: var(--color-surface-dim);
     cursor: not-allowed;
   }
+
   .btn-secondary {
-    @apply font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    @apply font-medium py-2.5 px-5 rounded-lg;
     background: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
+    transition: background var(--duration-fast) var(--ease-tactical),
+                border-color var(--duration-fast) var(--ease-tactical),
+                transform var(--duration-fast) var(--ease-tactical);
   }
   .btn-secondary:hover {
     background: var(--color-surface-hover);
     border-color: var(--color-border-hover);
   }
+  .btn-secondary:active {
+    transform: translateY(var(--button-press-y));
+  }
   .btn-secondary:disabled {
     opacity: 0.5;
     pointer-events: none;
   }
+
   .btn-ghost {
-    @apply font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    @apply font-medium py-2.5 px-5 rounded-lg;
     color: var(--color-text-secondary);
     background: transparent;
     border: 1px solid transparent;
+    transition: color var(--duration-fast) var(--ease-tactical),
+                background var(--duration-fast) var(--ease-tactical),
+                transform var(--duration-fast) var(--ease-tactical);
   }
   .btn-ghost:hover {
     color: var(--color-text);
     background: var(--color-accent-subtle);
     border-color: var(--color-border);
   }
+  .btn-ghost:active {
+    transform: translateY(var(--button-press-y));
+  }
   .btn-ghost:disabled {
     opacity: 0.5;
     pointer-events: none;
   }
+
   .btn-danger {
-    @apply font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    @apply font-medium py-2.5 px-5 rounded-lg;
     background: var(--color-danger, #dc2626);
     color: #fff;
+    transition: background var(--duration-fast) var(--ease-tactical),
+                transform var(--duration-fast) var(--ease-tactical);
   }
   .btn-danger:hover {
     background: var(--color-danger-hover, #b91c1c);
-    transform: translateY(-1px);
   }
-  .btn-danger:active { transform: translateY(0); }
+  .btn-danger:active { transform: translateY(var(--button-press-y)); }
   .btn-danger:disabled {
     opacity: 0.5;
     pointer-events: none;
   }
+
   .card {
-    @apply rounded-xl p-6 transition-all duration-200;
+    @apply rounded-xl p-6;
     background: var(--color-card-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--color-border);
+    transition: border-color var(--duration-fast) var(--ease-tactical),
+                background var(--duration-fast) var(--ease-tactical);
   }
   .card:hover {
     border-color: var(--color-border-hover);
@@ -327,12 +268,29 @@
   }
   select:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 1px var(--color-accent);
     outline: none;
   }
   select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* ── Density modes ─────────────────────────────────────────────- */
+  [data-density="compact"] {
+    --card-padding: 1rem;
+    --card-gap: 0.75rem;
+  }
+  [data-density="expanded"] {
+    --card-padding: 1.5rem;
+    --card-gap: 1.5rem;
+  }
+  :root {
+    --card-padding: 1.25rem;
+    --card-gap: 1rem;
+  }
+  .card {
+    padding: var(--card-padding);
   }
 }
 
@@ -355,7 +313,6 @@
   flex-direction: column;
 }
 
-/* Bottom safe-area padding for scrollable containers */
 .pb-safe {
   padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
 }

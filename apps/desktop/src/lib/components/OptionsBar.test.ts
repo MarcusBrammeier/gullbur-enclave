@@ -28,33 +28,18 @@ describe('OptionsBar.svelte', () => {
     cleanup();
   });
 
-  it('renders theme options for dark, light, and system', () => {
+  it('renders theme options for obsidian, dark-slate, and light-studio', () => {
     render(OptionsBar);
+    expect(screen.getAllByText('🪨').length).toBeGreaterThan(0);
     expect(screen.getAllByText('🌙').length).toBeGreaterThan(0);
     expect(screen.getAllByText('☀️').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('💻').length).toBeGreaterThan(0);
   });
 
-  it('highlights the current theme button', () => {
-    mockVault.theme = 'light';
-    flushSync();
+  it('renders accent color dot buttons', () => {
     render(OptionsBar);
-    expect(screen.getAllByText('☀️').length).toBeGreaterThan(0);
-  });
-
-  it('calls setTheme when a theme button is clicked', async () => {
-    render(OptionsBar);
-    const darkBtns = screen.getAllByText('🌙');
-    await fireEvent.click(darkBtns[0]);
-    expect(setThemeMock).toHaveBeenCalledWith('dark');
-
-    const lightBtns = screen.getAllByText('☀️');
-    await fireEvent.click(lightBtns[0]);
-    expect(setThemeMock).toHaveBeenCalledWith('light');
-
-    const systemBtns = screen.getAllByText('💻');
-    await fireEvent.click(systemBtns[0]);
-    expect(setThemeMock).toHaveBeenCalledWith('system');
+    // There should be 5 accent dots
+    const accentBtns = screen.getAllByTitle(/Accent:/i);
+    expect(accentBtns.length).toBe(5);
   });
 
   it('renders the testnet-only toggle switch', () => {

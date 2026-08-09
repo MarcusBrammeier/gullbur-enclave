@@ -130,7 +130,7 @@ c36a865 chore: pre-shrink sweep fixes
 
 ---
 
-## Sweep Status (2026-08-08)
+## Sweep Status (2026-08-08 — Stage 1+2 complete)
 
 | Gate | Status |
 |------|--------|
@@ -141,7 +141,7 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
-| **IPC e2e handshake: e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle** | ✅ (3 tests) — wired into sweep as Layer 4b |
+| **IPC e2e handshake: e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle** | ✅ (3 tests) |
 | `cargo deny check` | ✅ |
 | `bash scripts/audit.sh` | ✅ (advisories suppressed for 17 known Tauri transitive) |
 | `cargo +nightly fuzz build` | ✅ |
@@ -149,7 +149,23 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo tauri android build --target aarch64` | ✅ (APK 12M universal, **AAB 7.1M**) |
 | `scripts/cli-binary-sweep.sh` | ✅ (12 checks incl. **real WS handshake probe**) |
 | `scripts/android-sweep.sh` | ✅ (added **on-device adb-forward WS handshake**) |
-| **scripts/full-functional-sweep.py** | ✅ **33/33 checks** — every vault IPC method exercised against real binary |
+| **scripts/full-functional-sweep.py** | ✅ **33/33 checks** |
+| **— Stage 1: Testing Upgrades (2026-08-08) —** | |
+| **Svelte component tests** | ✅ **118 tests** (97 original + 8 fuzz + 21 theme engine) |
+| **scripts/e2e-full-stack-sweep.py** | ✅ **20-account concurrent balance + tx-history stress** |
+| **scripts/disconnect-recovery-test.py** | ✅ **Daemon crash → restart → reconnect lifecycle** |
+| **Edge-case input fuzzing** | ✅ **8 fuzz tests** (zero-width chars, homoglyphs, XSS, path traversal, amount fuzzing) |
+| **— Stage 2: Theme Engine (2026-08-08) —** | |
+| **themeEngine.svelte.ts** | ✅ Zod-validated, reactive Svelte 5 $state, immutable builtins |
+| **Built-in themes** | ✅ `legacy-emerald` (fallback), `dark-slate`, `light-slate` |
+| **Security boundary** | ✅ Rejects url(), javascript:, HTML injection, eval, path traversal |
+| **Theme import/export** | ✅ JSON export/import with Zod validation |
+| **— Stage 3: Tactical UI Polish (2026-08-08) —** | |
+| **Tactical button press** | ✅ 1px compression on active, split CSS transitions |
+| **Focus rings** | ✅ `--focus-ring` token on all interactive elements |
+| **Motion speed presets** | ✅ instant / normal / expressive via data-motion attribute |
+| **Accent selector** | ✅ 5 presets via themeEngine in OptionsBar |
+| **Card hover effect** | ✅ Restored (.card:hover) after CSS refactor |
 
 ### Fixes Applied This Batch (beta.5 + beta.6)
 

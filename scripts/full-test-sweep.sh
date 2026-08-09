@@ -119,6 +119,44 @@ else
   echo "  (skipped — binary or sweep script missing)"
 fi
 
+# ── Layer 9: E2E full-stack sweep (20+ accounts, concurrent stress) ─────
+echo "▸ Layer 9: E2E full-stack sweep (20 accounts, concurrent stress)"
+SWEEP_E2E="$ROOT/scripts/e2e-full-stack-sweep.py"
+if [ -f "$CLI" ] && [ -f "$SWEEP_E2E" ]; then
+  TMPDIR=$(mktemp -d /tmp/full-sweep-layer9-XXXX)
+  "$CLI" --port 19892 launch >/dev/null 2>&1 &
+  SRV=$!
+  sleep 2
+  if python3 "$SWEEP_E2E" 19892 2>&1 | grep -q "ALL.*CHECKS PASSED"; then
+    pass "E2E full-stack sweep"
+  else
+    fail "E2E full-stack sweep"
+  fi
+  kill $SRV 2>/dev/null || true
+  rm -rf "$TMPDIR"
+else
+  echo "  (skipped — binary or e2e sweep script missing)"
+fi
+
+# ── Layer 10: Disconnect recovery test ──────────────────────────────────
+echo "▸ Layer 10: Disconnect recovery (daemon crash + restart)"
+RECOVERY="$ROOT/scripts/disconnect-recovery-test.py"
+if [ -f "$CLI" ] && [ -f "$RECOVERY" ]; then
+  TMPDIR=$(mktemp -d /tmp/full-sweep-layer10-XXXX)
+  "$CLI" --port 19893 launch >/dev/null 2>&1 &
+  SRV=$!
+  sleep 2
+  if python3 "$RECOVERY" 19893 2>&1 | grep -q "ALL.*CHECKS PASSED"; then
+    pass "Disconnect recovery"
+  else
+    fail "Disconnect recovery"
+  fi
+  kill $SRV 2>/dev/null || true
+  rm -rf "$TMPDIR"
+else
+  echo "  (skipped — binary or recovery script missing)"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
 if [ $FAIL -eq 0 ]; then
