@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 /* ── Theme Variables ────────────────────────────────────────────────── */
-/* Applied via CSS custom properties set by ThemeEngine. Tailwind classes
-   still work because we use CSS custom properties for dynamic theme colors. */
+/* Deep jewel-tone palette — indigo canvas, subtle surface separation via luminosity, no harsh borders. */
 
 :root {
   /* ── Motion tokens + tactical micro-interactions ────────────────── */
@@ -16,9 +15,10 @@
   --duration-slow: 300ms;
 
   /* Tactical geometry */
-  --focus-ring: 0 0 0 2px var(--color-accent-glow);
   --button-press-y: 1px;
-  --shadow-tactical: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
 
   /* ── Rhythm spacing tokens ───────────────────────────────────────── */
   --rhythm-xs: 0.25rem;
@@ -29,30 +29,91 @@
   --rhythm-2xl: 3rem;
 
   /* ── Expressive type scale ────────────────────────────────────────── */
-  --text-xs: 0.75rem;
+  --text-xs: 0.6875rem;
   --text-xs-lh: 1rem;
-  --text-sm: 0.875rem;
+  --text-sm: 0.8125rem;
   --text-sm-lh: 1.25rem;
-  --text-base: 1rem;
+  --text-base: 0.9375rem;
   --text-base-lh: 1.5rem;
-  --text-lg: 1.125rem;
-  --text-lg-lh: 1.625rem;
+  --text-lg: 1.0625rem;
+  --text-lg-lh: 1.5rem;
   --text-xl: 1.25rem;
-  --text-xl-lh: 1.75rem;
+  --text-xl-lh: 1.625rem;
   --text-2xl: 1.5rem;
-  --text-2xl-lh: 2rem;
-  --text-3xl: 1.875rem;
+  --text-2xl-lh: 1.875rem;
+  --text-3xl: 2rem;
   --text-3xl-lh: 2.375rem;
 
-  /* ── Glass surface ───────────────────────────────────────────────── */
-  --glass-bg: rgba(22, 27, 34, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-blur: 16px;
+  /* ── Category accent colors (jewel tones) ─────────────────────────── */
+  --jewel-btc: #f7931a;
+  --jewel-eth: #627eea;
+  --jewel-xmr: #ff6600;
+  --jewel-ltc: #bfbbbb;
+  --jewel-net: #34d399;
+  --jewel-danger: #f43f5e;
 }
 
+/* ── Dark theme (default) — deep indigo canvas ──────────────────────── */
+:root,
+[data-theme="dark"] {
+  --canvas: #0f111a;
+  --canvas-elevated: #161823;
+  --surface: #1c1e2d;
+  --surface-hover: #242640;
+  --surface-raised: #2a2d48;
+  --text: #e8eaf0;
+  --text-secondary: #9598b0;
+  --text-muted: #5c5f7a;
+  --accent: #818cf8;
+  --accent-hover: #6366f1;
+  --accent-subtle: rgba(129, 140, 248, 0.08);
+  --accent-glow: rgba(129, 140, 248, 0.25);
+  --accent-shadow: rgba(129, 140, 248, 0.15);
+  --accent-contrast: #ffffff;
+  --danger: #f43f5e;
+  --danger-hover: #e11d48;
+  --focus-ring: 0 0 0 2px rgba(129, 140, 248, 0.4);
+  --shadow-tactical: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --glass-bg: rgba(15, 17, 26, 0.8);
+  --glass-border: rgba(129, 140, 248, 0.06);
+  --glass-blur: 20px;
+  --card-bg: rgba(28, 30, 45, 0.6);
+  --card-bg-hover: rgba(28, 30, 45, 0.8);
+  --input-bg: rgba(36, 38, 64, 0.6);
+  --border-default: rgba(129, 140, 248, 0.06);
+  --border-hover: rgba(129, 140, 248, 0.12);
+  --border-strong: rgba(129, 140, 248, 0.1);
+}
+
+/* ── Light theme — warm studio-slate ────────────────────────────────── */
 [data-theme="light"] {
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(0, 0, 0, 0.06);
+  --canvas: #f0f2f7;
+  --canvas-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f8;
+  --surface-raised: #e8eaf0;
+  --text: #1a1c2e;
+  --text-secondary: #6b6f8a;
+  --text-muted: #9ca0b8;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-subtle: rgba(99, 102, 241, 0.06);
+  --accent-glow: rgba(99, 102, 241, 0.2);
+  --accent-shadow: rgba(99, 102, 241, 0.12);
+  --accent-contrast: #ffffff;
+  --danger: #e11d48;
+  --danger-hover: #be123c;
+  --focus-ring: 0 0 0 2px rgba(99, 102, 241, 0.35);
+  --shadow-tactical: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(99, 102, 241, 0.06);
+  --glass-blur: 20px;
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --card-bg-hover: rgba(255, 255, 255, 0.9);
+  --input-bg: rgba(243, 244, 248, 0.8);
+  --border-default: rgba(99, 102, 241, 0.06);
+  --border-hover: rgba(99, 102, 241, 0.12);
+  --border-strong: rgba(99, 102, 241, 0.1);
 }
 
 /* Motion speed overrides via data-motion attribute */
@@ -67,19 +128,33 @@
   --duration-slow: 500ms;
 }
 
-/* ── Map Tailwind tokens to CSS variables ───────────────────────────── */
+/* ── Density modes ────────────────────────────────────────────────────── */
+[data-density="compact"] {
+  --card-padding: 0.875rem;
+  --card-gap: 0.625rem;
+}
+[data-density="expanded"] {
+  --card-padding: 1.5rem;
+  --card-gap: 1.25rem;
+}
+:root {
+  --card-padding: 1.125rem;
+  --card-gap: 0.875rem;
+}
+
+/* ── Base layer ──────────────────────────────────────────────────────── */
 @layer base {
-  * { border-color: var(--color-border-strong); }
+  * { border-color: transparent; }
 
   html { scroll-behavior: smooth; }
 
   body {
     @apply antialiased;
     font-family: "Inter", system-ui, -apple-system, sans-serif;
-    background: var(--color-bg-primary);
+    background: var(--canvas);
     background-attachment: fixed;
     min-height: 100vh;
-    color: var(--color-text);
+    color: var(--text);
   }
 
   html, body { height: 100%; }
@@ -92,34 +167,22 @@
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(
-        ellipse at 30% 20%,
-        var(--color-accent-subtle) 0%,
-        transparent 60%
-      ),
-      radial-gradient(
-        ellipse at 70% 80%,
-        var(--color-accent-subtle) 0%,
-        transparent 50%
-      );
+    background:
+      radial-gradient(ellipse at 25% 15%, var(--accent-subtle) 0%, transparent 55%),
+      radial-gradient(ellipse at 75% 85%, rgba(99, 102, 241, 0.03) 0%, transparent 50%);
     pointer-events: none;
     z-index: -1;
   }
 
   ::selection {
-    background-color: rgba(16, 185, 129, 0.3);
-    color: #d1fae5;
+    background: var(--accent-subtle);
+    color: var(--text);
   }
 
-  [data-theme="light"] ::selection {
-    background-color: rgba(5, 150, 105, 0.25);
-    color: #022c22;
-  }
-
-  h1, h2, h3, h4, h5, h6 { @apply font-semibold tracking-tight; letter-spacing: -0.025em; }
-  h1 { @apply text-2xl; font-size: var(--text-2xl); line-height: var(--text-2xl-lh); }
-  h2 { @apply text-xl; font-size: var(--text-xl); line-height: var(--text-xl-lh); font-weight: 600; }
-  h3 { font-size: var(--text-lg); line-height: var(--text-lg-lh); font-weight: 500; }
+  h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; }
+  h1 { font-size: var(--text-2xl); line-height: var(--text-2xl-lh); }
+  h2 { font-size: var(--text-xl); line-height: var(--text-xl-lh); font-weight: 600; letter-spacing: -0.015em; }
+  h3 { font-size: var(--text-base); line-height: var(--text-base-lh); font-weight: 500; letter-spacing: -0.01em; }
 
   /* ── Glass utility ──────────────────────────────────────────────── */
   .glass {
@@ -130,216 +193,158 @@
   }
 }
 
+/* ── Components layer ──────────────────────────────────────────────────── */
 @layer components {
   .btn-primary {
     @apply font-medium py-2.5 px-5 rounded-lg;
-    background: var(--color-accent);
-    color: var(--color-accent-contrast, #fff);
-    box-shadow: 0 1px 3px var(--color-accent-shadow);
+    background: var(--accent);
+    color: var(--accent-contrast, #fff);
+    box-shadow: 0 1px 3px var(--accent-shadow);
     transition: transform var(--duration-fast) var(--ease-tactical),
                 box-shadow var(--duration-fast) var(--ease-tactical);
   }
   .btn-primary:hover {
-    background: var(--color-accent-hover);
-    box-shadow: 0 4px 12px var(--color-accent-glow);
-    transform: translateY(-1px);
+    background: var(--accent-hover);
+    box-shadow: 0 4px 16px var(--accent-glow);
+    transform: translateY(-2px);
   }
   .btn-primary:active {
     transform: translateY(var(--button-press-y));
-    box-shadow: 0 1px 2px var(--color-accent-shadow);
+    box-shadow: 0 1px 2px var(--accent-shadow);
   }
   .btn-primary:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     pointer-events: none;
     transform: none;
     box-shadow: none;
   }
 
   .input-field {
-    @apply rounded-lg px-4 py-2.5;
-    background: var(--color-input-bg);
-    border: 1px solid var(--color-border-strong);
-    color: var(--color-text);
+    @apply rounded-xl px-4 py-2.5;
+    background: var(--input-bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: var(--text-sm);
     transition: border-color var(--duration-fast) var(--ease-tactical),
                 box-shadow var(--duration-fast) var(--ease-tactical);
   }
-  .input-field::placeholder { color: var(--color-text-muted); }
+  .input-field::placeholder { color: var(--text-muted); }
   .input-field:focus {
-    border-color: var(--color-accent);
-    box-shadow: var(--focus-ring), 0 0 12px -4px var(--color-accent-glow);
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
     outline: none;
   }
-  .input-field:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+  .input-field:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-secondary {
-    @apply font-medium py-2.5 px-5 rounded-lg;
-    background: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
+    @apply font-medium py-2 px-4 rounded-lg text-sm;
+    background: var(--surface);
+    color: var(--text-secondary);
     transition: background var(--duration-fast) var(--ease-tactical),
-                border-color var(--duration-fast) var(--ease-tactical),
+                color var(--duration-fast) var(--ease-tactical),
                 transform var(--duration-fast) var(--ease-tactical);
   }
   .btn-secondary:hover {
-    background: var(--color-surface-hover);
-    border-color: var(--color-border-hover);
+    background: var(--surface-hover);
+    color: var(--text);
   }
-  .btn-secondary:active {
-    transform: translateY(var(--button-press-y));
-  }
-  .btn-secondary:disabled {
-    opacity: 0.5;
-    pointer-events: none;
-  }
+  .btn-secondary:active { transform: translateY(var(--button-press-y)); }
+  .btn-secondary:disabled { opacity: 0.4; pointer-events: none; }
 
   .btn-ghost {
-    @apply font-medium py-2.5 px-5 rounded-lg;
-    color: var(--color-text-secondary);
+    @apply font-medium py-2 px-4 rounded-lg text-sm;
+    color: var(--text-muted);
     background: transparent;
-    border: 1px solid transparent;
     transition: color var(--duration-fast) var(--ease-tactical),
                 background var(--duration-fast) var(--ease-tactical),
                 transform var(--duration-fast) var(--ease-tactical);
   }
   .btn-ghost:hover {
-    color: var(--color-text);
-    background: var(--color-accent-subtle);
-    border-color: var(--color-border);
+    color: var(--text);
+    background: var(--accent-subtle);
   }
-  .btn-ghost:active {
-    transform: translateY(var(--button-press-y));
-  }
-  .btn-ghost:disabled {
-    opacity: 0.5;
-    pointer-events: none;
-  }
+  .btn-ghost:active { transform: translateY(var(--button-press-y)); }
+  .btn-ghost:disabled { opacity: 0.4; pointer-events: none; }
 
   .btn-danger {
-    @apply font-medium py-2.5 px-5 rounded-lg;
-    background: var(--color-danger, #dc2626);
+    @apply font-medium py-2 px-4 rounded-lg text-sm;
+    background: var(--danger);
     color: #fff;
     transition: background var(--duration-fast) var(--ease-tactical),
                 transform var(--duration-fast) var(--ease-tactical);
   }
-  .btn-danger:hover {
-    background: var(--color-danger-hover, #b91c1c);
-  }
+  .btn-danger:hover { background: var(--danger-hover); }
   .btn-danger:active { transform: translateY(var(--button-press-y)); }
-  .btn-danger:disabled {
-    opacity: 0.5;
-    pointer-events: none;
-  }
+  .btn-danger:disabled { opacity: 0.4; pointer-events: none; }
 
   .card {
-    @apply rounded-xl;
+    @apply rounded-2xl;
     padding: var(--card-padding);
-    background: var(--color-card-bg);
+    background: var(--card-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--color-border);
-    transition: border-color var(--duration-fast) var(--ease-tactical),
-                background var(--duration-fast) var(--ease-tactical);
+    box-shadow: var(--shadow-sm);
+    transition: background var(--duration-fast) var(--ease-tactical),
+                box-shadow var(--duration-fast) var(--ease-tactical);
   }
   .card:hover {
-    border-color: var(--color-border-hover);
-    background: var(--color-card-bg-hover);
+    background: var(--card-bg-hover);
+    box-shadow: var(--shadow-md);
   }
 
-  /* Unified focus-visible ring for keyboard accessibility */
+  /* Unified focus-visible ring */
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible,
   .btn-ghost:focus-visible,
   .btn-danger:focus-visible,
   .card:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
-  /* ── Semantic theme-aware utilities ───────────────────────────── */
-  .bg-surface-elevated { background: var(--color-bg-primary); }
-  .bg-surface-dim      { background: var(--color-bg-secondary); }
-  .bg-surface          { background: var(--color-surface); }
-  .bg-surface-hover    { background: var(--color-surface-hover); }
-  .bg-surface-card     { background: var(--color-card-bg); }
+  /* ── Semantic theme-aware utilities (jewel-tone overrides) ──────── */
+  .bg-surface-elevated { background: var(--canvas-elevated); }
+  .bg-surface-dim      { background: var(--canvas); }
+  .bg-surface          { background: var(--surface); }
+  .bg-surface-hover    { background: var(--surface-hover); }
+  .bg-surface-card     { background: var(--card-bg); }
+  .text-primary        { color: var(--text); }
+  .text-secondary      { color: var(--text-secondary); }
+  .text-muted          { color: var(--text-muted); }
+  .text-accent         { color: var(--accent); }
+  .text-accent-hover   { color: var(--accent-hover); }
+  .text-danger         { color: var(--danger); }
+  .bg-accent           { background: var(--accent); }
+  .bg-accent-hover     { background: var(--accent-hover); }
+  .bg-accent-subtle    { background: var(--accent-subtle); }
 
-  .text-primary        { color: var(--color-text); }
-  .text-secondary      { color: var(--color-text-secondary); }
-  .text-muted          { color: var(--color-text-muted); }
-
-  .border-default      { border-color: var(--color-border); }
-  .border-strong       { border-color: var(--color-border-strong); }
-  .border-hover        { border-color: var(--color-border-hover); }
-
-  .hover\:bg-surface-hover:hover    { background: var(--color-surface-hover); }
-  .hover\:text-primary:hover        { color: var(--color-text); }
-  .hover\:border-hover:hover        { border-color: var(--color-border-hover); }
-
-  /* ── Accent-aware utilities (follow data-accent theme) ───────────── */
-  .bg-accent        { background: var(--color-accent); }
-  .bg-accent-hover  { background: var(--color-accent-hover); }
-  .bg-accent-subtle { background: var(--color-accent-subtle); }
-  .text-accent      { color: var(--color-accent); }
-  .text-accent-hover{ color: var(--color-accent-hover); }
-  .border-accent    { border-color: var(--color-accent); }
-  .ring-accent      { box-shadow: 0 0 0 1px var(--color-accent); }
-  .hover\:bg-accent:hover        { background: var(--color-accent); }
-  .hover\:bg-accent-hover:hover  { background: var(--color-accent-hover); }
-  .hover\:text-accent:hover      { color: var(--color-accent); }
-  .hover\:border-accent:hover    { border-color: var(--color-accent); }
+  /* Jewel-tone network badges */
+  .badge-btc { background: rgba(247, 147, 26, 0.12); color: #f7931a; }
+  .badge-eth { background: rgba(98, 126, 234, 0.12); color: #627eea; }
+  .badge-xmr { background: rgba(255, 102, 0, 0.12); color: #ff6600; }
+  .badge-ltc { background: rgba(191, 187, 187, 0.12); color: #bfbbbb; }
+  .badge-net { background: rgba(52, 211, 153, 0.12); color: #34d399; }
 
   button, a, input, select, textarea { @apply transition-all duration-200; }
 
-  /* ── Styled dropdowns (native select popup) ──────────────────────── */
+  /* ── Styled selects (native popup) ──────────────────────────────── */
   select {
-    background: var(--color-surface);
-    color: var(--color-text);
-    border-color: var(--color-border-strong);
+    background: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 0.75rem;
+    padding: 0.625rem 1rem;
+    font-size: var(--text-sm);
     appearance: auto;
     -webkit-appearance: auto;
   }
-  select option,
-  select optgroup {
-    background: var(--color-bg-secondary);
-    color: var(--color-text);
-  }
-  select optgroup {
-    font-weight: 600;
-    color: var(--color-text-secondary);
-  }
   select:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
     outline: none;
   }
-  select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* ── Density modes ─────────────────────────────────────────────- */
-  [data-density="compact"] {
-    --card-padding: 1rem;
-    --card-gap: 0.75rem;
-  }
-  [data-density="expanded"] {
-    --card-padding: 1.5rem;
-    --card-gap: 1.5rem;
-  }
-  :root {
-    --card-padding: 1.25rem;
-    --card-gap: 1rem;
-  }
-  .card {
-    padding: var(--card-padding);
-  }
+  select:disabled { opacity: 0.5; cursor: not-allowed; }
 }
-
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.5); border-radius: 3px; }
 
 /* ── Animations ──────────────────────────────────────────────── */
 @keyframes fade-up {

@@ -233,7 +233,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="w-full max-w-lg mx-4 rounded-xl shadow-2xl border border-strong/50 overflow-hidden"
-      style="background: var(--color-surface)"
+      style="background: var(--surface)"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Search input -->

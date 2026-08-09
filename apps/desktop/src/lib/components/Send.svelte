@@ -624,8 +624,8 @@
         {:else}
           <div class="text-4xl mb-3">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="var(--color-accent)" stroke-width="2" fill="none" opacity="0.3"/>
-              <path class="checkmark-path" d="M7 12l3 3 7-7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="2" fill="none" opacity="0.3"/>
+              <path class="checkmark-path" d="M7 12l3 3 7-7" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             </svg>
           </div>
           <h3 class="text-lg font-semibold text-vault-400 mb-2">Transaction Sent</h3>
