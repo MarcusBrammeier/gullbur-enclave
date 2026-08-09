@@ -12,6 +12,7 @@
   import OptionsBar from './lib/components/OptionsBar.svelte';
   import Toasts from './lib/components/Toasts.svelte';
   import { iconHtml } from './lib/icons';
+  import { IS_DEMO } from './lib/constants';
 
   let showSettings = $state(false);
   let errorMessage = $state<string | null>(null);
@@ -98,6 +99,19 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <main class="min-h-screen flex flex-col">
+  <!-- Demo mode warning banner -->
+  {#if IS_DEMO}
+    <div class="bg-amber-600/20 border-b border-amber-600/30 px-4 py-1.5 text-xs text-amber-400 text-center flex items-center justify-center gap-2 sticky top-0 z-40" style="backdrop-filter: blur(8px);">
+      <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+      <span><strong>GUI Test Mode</strong> — Core engine not connected. Mock data for visual review only.</span>
+      <button
+        class="text-amber-400/60 hover:text-amber-300 ml-2"
+        onclick={() => { localStorage.removeItem('gullbur_demo'); (window as any).__DEMO__ = false; location.reload(); }}
+        title="Exit demo mode"
+      >✕</button>
+    </div>
+  {/if}
+
   <!-- Global toast notifications -->
   <Toasts />
 

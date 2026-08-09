@@ -16,8 +16,7 @@
 
   async connect(): Promise<void> {
     this.connected = true;
-    // Simulate a brief connection delay
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 200));
   }
 
   disconnect(): void {
@@ -46,18 +45,25 @@
           connected: true,
           status: 'Connected',
           tor_enabled: false,
-          active_plugins: ['btc', 'evm', 'xmr'],
+          is_demo: true,
+          active_plugins: ['btc', 'evm', 'xmr', 'ltc'],
           networks: [
             { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
             { id: 'arbitrum', name: 'Arbitrum One', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
             { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, is_testnet: false, active: true, unit: 'ETH' },
             { id: 'polygon', name: 'Polygon', symbol: 'POL', decimals: 18, is_testnet: false, active: true, unit: 'POL' },
+            { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', decimals: 8, is_testnet: false, active: true, unit: 'BTC' },
+            { id: 'monero', name: 'Monero', symbol: 'XMR', decimals: 12, is_testnet: false, active: true, unit: 'XMR' },
+            { id: 'litecoin', name: 'Litecoin', symbol: 'LTC', decimals: 8, is_testnet: false, active: true, unit: 'LTC' },
             { id: 'sepolia', name: 'Sepolia', symbol: 'ETH', decimals: 18, is_testnet: true, active: true, unit: 'ETH' },
           ],
           accounts: [
-            { id: 'ethereum-0', network: 'ethereum', address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', balance: { confirmed: '3.452', unconfirmed: '0' }, index: 0, path: "m/44'/60'/0'/0/0" },
-            { id: 'ethereum-1', network: 'ethereum', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', balance: { confirmed: '0.001', unconfirmed: '0' }, index: 1, path: "m/44'/60'/0'/0/1" },
-            { id: 'polygon-0', network: 'polygon', address: '0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97', balance: { confirmed: '12.8', unconfirmed: '0' }, index: 0, path: "m/44'/60'/0'/0/0" },
+            { id: 'ethereum-0', network: 'ethereum', address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', balance: { confirmed: '12.452', unconfirmed: '0' }, index: 0, path: "m/44'/60'/0'/0/0" },
+            { id: 'ethereum-1', network: 'ethereum', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', balance: { confirmed: '0.08', unconfirmed: '0.01' }, index: 1, path: "m/44'/60'/0'/0/1" },
+            { id: 'bitcoin-0', network: 'bitcoin', address: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', balance: { confirmed: '0.345', unconfirmed: '0' }, index: 0, path: "m/84'/0'/0'/0/0" },
+            { id: 'monero-0', network: 'monero', address: '44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A', balance: { confirmed: '8.52', unconfirmed: '0' }, index: 0, path: "m/44'/128'/0'/0/0" },
+            { id: 'litecoin-0', network: 'litecoin', address: 'ltc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', balance: { confirmed: '42.1', unconfirmed: '0' }, index: 0, path: "m/84'/2'/0'/0/0" },
+            { id: 'polygon-0', network: 'polygon', address: '0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97', balance: { confirmed: '128.45', unconfirmed: '0' }, index: 0, path: "m/44'/60'/0'/0/0" },
             { id: 'sepolia-0', network: 'sepolia', address: '0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', balance: { confirmed: '0.5', unconfirmed: '0.01' }, index: 0, path: "m/44'/60'/0'/0/0" },
           ],
         };

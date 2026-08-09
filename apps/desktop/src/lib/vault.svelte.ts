@@ -27,6 +27,7 @@ import { pushError } from './toasts.svelte.ts';
 export const vault = $state({
   connected: false,
   initialized: false,
+  isDemo: IS_DEMO,
   vaultStatus: 'Disconnected' as string,
   networks: [] as NetworkSpec[],
   accounts: [] as Account[],
