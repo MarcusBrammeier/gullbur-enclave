@@ -2,8 +2,8 @@
 
 > **Version:** 0.0.8 (pre-beta, internal)
 > **Last updated:** 2026-08-09  
-> **HEAD:** `a093f80` (2026-08-09)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
+> **HEAD:** `___` (2026-08-09)  
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (89+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | AAB 7.1MB ✅ | APK 12M ✅
 
 ### Security hardening (2026-08-08)
 

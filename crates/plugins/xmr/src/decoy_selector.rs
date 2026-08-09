@@ -29,8 +29,9 @@ pub const RING_SIZE: usize = 11;
 
 /// Select real decoy output keys from the blockchain and build a ring.
 ///
-/// Returns `(signer_ring_member, ring)` where `ring` is `RING_SIZE` entries of
-/// `[public_key, commitment]` — same shape as the legacy `build_decoy_ring`.
+/// Returns `(signer_ring_member, ring, offsets)` where `ring` is `RING_SIZE` entries of
+/// `[public_key, commitment]` — same shape as the legacy `build_decoy_ring` —
+/// and `offsets` contains the actual blockchain output indices for `Decoys::new`.
 ///
 /// `signer_public` is the real signer's public spend key.
 ///
@@ -42,7 +43,7 @@ pub async fn fetch_and_build_ring(
     client: &reqwest::Client,
     network: &str,
     signer_public: &EdwardsPoint,
-) -> Result<([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>), PluginError> {
+) -> Result<([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>, Vec<u64>), PluginError> {
     // 1. Fetch output distribution to know which indices exist
     let distribution = fetch_output_distribution(client, network).await?;
 
@@ -75,7 +76,7 @@ pub async fn fetch_and_build_ring(
         )));
     }
 
-    // 4. Insert the real signer at a random position in the ring
+    // 4. Insert the real signer at a random position in the ring, tracking indices
     let mut rng = rand::rng();
     let signer_index = rng.random_range(0..RING_SIZE) as u8;
 
@@ -83,19 +84,23 @@ pub async fn fetch_and_build_ring(
     let signer_member = [*signer_public, signer_commitment];
 
     let mut ring = Vec::with_capacity(RING_SIZE);
+    let mut ring_indices: Vec<u64> = Vec::with_capacity(RING_SIZE);
     let mut decoy_iter = real_outputs.into_iter();
 
     for i in 0..RING_SIZE {
         if i as u8 == signer_index {
             ring.push(signer_member);
+            ring_indices.push(decoy_indices[0]); // placeholder — real signer has no real index
         } else {
-            ring.push(decoy_iter.next().ok_or_else(|| {
+            let entry = decoy_iter.next().ok_or_else(|| {
                 PluginError::Internal("decoy iterator exhausted early".into())
-            })?);
+            })?;
+            ring.push(entry);
+            ring_indices.push(decoy_indices[ring.len() - 1]);
         }
     }
 
-    Ok((signer_member, ring))
+    Ok((signer_member, ring, ring_indices))
 }
 
 /// Fetch cumulative output distribution from the Monero daemon.

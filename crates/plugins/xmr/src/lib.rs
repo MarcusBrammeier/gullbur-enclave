@@ -17,9 +17,9 @@ use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, edwards::EdwardsPoint
 use monero_clsag_mirror::{Clsag, ClsagContext};
 use monero_serai_mirror::generators::hash_to_point;
 use monero_serai_mirror::primitives::{Commitment, Decoys, INV_EIGHT, keccak256_to_scalar};
+use crate::decoy_selector::fetch_and_build_ring;
 use zeroize::Zeroizing;
 
-#[allow(dead_code)]
 mod decoy_selector;
 
 pub struct XmrPlugin {
@@ -241,7 +241,11 @@ fn compute_sighash(tx_bytes: &[u8]) -> [u8; 32] {
 
 /// Sign a Monero transaction using CLSAG ring signatures.
 ///
-/// Accepts a JSON-encoded unsigned transaction:
+/// Accepts a JSON-encoded unsigned transaction and an optional daemon client.
+/// When `client` is `Some`, real blockchain decoys are fetched via the daemon RPC.
+/// When `None` (or the fetch fails), falls back to synthetic random decoys
+/// (safe for testnets; mainnet should always provide a client).
+///
 /// ```json
 /// {
 ///   "version": 2,
@@ -252,9 +256,11 @@ fn compute_sighash(tx_bytes: &[u8]) -> [u8; 32] {
 /// ```
 ///
 /// Returns the signed transaction as JSON with CLSAG signatures and pseudo-outputs.
-fn sign_monero_tx(
+async fn sign_monero_tx(
     spend_key: &SpendKey,
     tx_json: &serde_json::Value,
+    client: Option<&reqwest::Client>,
+    network: &str,
 ) -> Result<Vec<u8>, PluginError> {
     let inputs = tx_json
         .get("inputs")
@@ -281,12 +287,24 @@ fn sign_monero_tx(
 
     for (i, input) in inputs.iter().enumerate() {
         let _amount = input.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
-
         let signer_index = (i % RING_SIZE) as u8;
-        let (_signer_ring_member, ring) = build_decoy_ring(&signer_key, signer_index);
 
-        // Build offsets (all zero for dummy decoys — real impl would use blockchain positions)
-        let offsets: Vec<u64> = (0..RING_SIZE).map(|_| 0u64).collect();
+        let (_signer_ring_member, ring, offsets): ([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>, Vec<u64>) =
+            if let Some(c) = client {
+                // Try real decoys from the daemon; on failure fall back
+                match fetch_and_build_ring(c, network, &signer_key).await {
+                    Ok((member, r, o)) => (member, r, o),
+                    Err(e) => {
+                        tracing::warn!("Real decoy selection failed ({e}), falling back to synthetic");
+                        let (m, r) = build_decoy_ring(&signer_key, signer_index);
+                        (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
+                    }
+                }
+            } else {
+                // No daemon client — synthetic decoys (test/dev path)
+                let (m, r) = build_decoy_ring(&signer_key, signer_index);
+                (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
+            };
 
         let decoys = Decoys::new(offsets, signer_index, ring)
             .ok_or_else(|| PluginError::Internal("failed to build decoys".into()))?;
@@ -496,7 +514,7 @@ impl WalletPlugin for XmrPlugin {
         tx: &[u8],
         seed: &[u8],
         account_index: u32,
-        _network: &str,
+        network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         // Parse the unsigned transaction JSON
         let tx_json: serde_json::Value = serde_json::from_slice(tx)
@@ -505,8 +523,11 @@ impl WalletPlugin for XmrPlugin {
         // Derive the spend key from the seed directly (never exposed through IPC)
         let spend_key = SpendKey::from_seed(seed, account_index);
 
-        // Sign using CLSAG
-        sign_monero_tx(&spend_key, &tx_json)
+        // Build a daemon client for real decoy selection (best-effort)
+        let client = self.build_client().ok();
+
+        // Sign using CLSAG with real decoys when daemon is reachable
+        sign_monero_tx(&spend_key, &tx_json, client.as_ref(), network).await
     }
 
     async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
