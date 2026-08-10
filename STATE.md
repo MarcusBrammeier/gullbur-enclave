@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
-> **Version:** 0.0.8 (pre-beta, internal)
-> **Last updated:** 2026-08-09  
-> **HEAD:** `1dba49a` (2026-08-09)  
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (304+ passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (136+)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **Linux AppImage .deb ✅** | **Android APK 23M + AAB 12M ✅**
+> **Version:** 0.1.0-beta.1 (public staging)
+> **Last updated:** 2026-08-10
+> **HEAD:** `c6bd497` (2026-08-10)
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (307 passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (192)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 10-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
 
 ### Security hardening (2026-08-08)
 
@@ -106,6 +106,29 @@
 
 ---
 
+### Pre-Beta Readiness (2026-08-10 — for v0.1.0-beta.1)
+
+- **EIP-55 checksum hardening** — EVM `validate_address` now performs full
+  mixed-case keccak checksum verification (accepts all-lower/all-upper/correct
+  mixed-case; rejects invalid mixed-case). Regression tests incl. all-uppercase.
+- **XMR disconnected UX** — when `monero-wallet-rpc` is unconfigured, the UI
+  shows a yellow "Wallet-RPC disconnected — balance unavailable" badge instead
+  of a misleading silent 0 XMR (Dashboard + Portfolio).
+- **Live-network nightly CI** — `.github/workflows/live-network.yml`: nightly
+  03:17 UTC + manual + tag triggers; runs `#[ignore]`d live tests (EVM RPC,
+  Tor real-circuit, funded-wallet broadcasts gated on secrets).
+- **UI input fuzzing** — `Send.fuzz.test.ts` (18 cases): zero-width unicode,
+  homoglyph addresses, malformed amounts, XSS/path-traversal injection on the
+  send wizard. Confirms the `type="number"` amount field sanitizes non-numeric
+  input (Continue stays disabled).
+- **GUI workflow tests** — `QrScanner.test.ts` (camera error/stream wiring) +
+  expanded `addressBook.test.ts` (round-trip, corrupt-data recovery, malformed
+  entry filtering).
+- **Full 10-layer sweep green** — Layers 8-10 (full functional sweep, 20-account
+  E2E stress, daemon crash→restart→reconnect recovery) fixed: headless CLI
+  build (un-gated `with_no_encrypt`), numeric JSON-RPC IDs, inode-based PID
+  resolution, correct crash-recovery contract. **ALL TESTS PASSED.**
+
 ## Project Overview
 
 **Gullbúr Enclave** (formerly FOSS Crypto Core) is a modular, open-source multi-chain cryptocurrency wallet — pure Rust, zero `unsafe`, WASM-isolated crypto.
@@ -113,7 +136,7 @@
 | Property | Value |
 |----------|-------|
 | **Language** | Rust 2024 edition, TypeScript (Svelte 5) |
-| **Version** | 0.1.0 |
+| **Version** | 0.1.0-beta.1 |
 | **Workspace members** | 20 crates/apps |
 | **Chains** | Bitcoin (BIP-84), Ethereum/EVM (EIP-1559), Monero (CLSAG), Litecoin (BIP-84) |
 | **Desktop shell** | Tauri v2 + Svelte 5 + Tailwind CSS |

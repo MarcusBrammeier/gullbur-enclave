@@ -1,6 +1,6 @@
 # Gullbúr Enclave — FOSS / Premium Boundary
 
-> **Status:** Pre-Beta v0.0.7 (internal, private repo)
+> **Status:** v0.1.0-beta.1 (public staging)
 > **Purpose:** Defines what ships in the public **FOSS** release (v0.1 Beta → 1.0)
 > vs. what stays proprietary as **Pro/Enterprise** features.
 > This document is INTERNAL. Do not commit to a public repo.
@@ -74,4 +74,4 @@ a **Pro/Enterprise** feature — it is NOT part of the public FOSS repo/tree.
 
 ---
 
-*Last updated: 2026-08-03 (v0.0.7 pre-beta).*
+*Last updated: 2026-08-10 (v0.1.0-beta.1 staging).*
