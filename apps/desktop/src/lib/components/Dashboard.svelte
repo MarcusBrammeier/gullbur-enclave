@@ -87,6 +87,15 @@
     return getAccountLabel(acct.address) ?? truncateAddress(acct.address);
   }
 
+  /**
+   * Detect the XMR "wallet-rpc not configured / daemon disconnected" state so we
+   * can render an explicit status badge instead of a misleading 0 balance.
+   */
+  function isXmrDisconnected(acct: Account): boolean {
+    if (!/^monero(-|\b)/.test(acct.network) || !acct.balanceError) return false;
+    return /wallet-rpc|daemon|disconnected|unavailable/i.test(acct.balanceError);
+  }
+
   /** Accounts filtered by the selected network */
   let filteredAccounts = $derived(
     vault.accounts.filter((a: Account) => a.network === vault.selectedNetwork)
@@ -270,7 +279,12 @@
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium {badge.color}">{badge.label}</span>
               </div>
               <div class="text-sm text-secondary">
-                {#if account.balanceError}
+                {#if isXmrDisconnected(account)}
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/30" title={account.balanceError}>
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                    Wallet-RPC disconnected — balance unavailable
+                  </span>
+                {:else if account.balanceError}
                   <span class="text-red-400 text-xs">⚠ {account.balanceError}</span>
                 {:else}
                   <span class="font-mono" style="font-size: var(--text-xl); font-weight: 200; letter-spacing: -0.02em; color: var(--accent);">{formatBalance(account.balance)} <span style="font-size: var(--text-sm); font-weight: 400; color: var(--text-muted);">{getNetworkUnit(account.network)}</span></span>

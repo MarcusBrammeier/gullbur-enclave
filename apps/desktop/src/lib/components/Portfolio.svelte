@@ -74,6 +74,15 @@
     }
     refreshing = false;
   }
+
+  /**
+   * Detect the XMR "wallet-rpc not configured / daemon disconnected" state so we
+   * can render an explicit status badge instead of a misleading 0 balance.
+   */
+  function isXmrDisconnected(acct: Account): boolean {
+    if (!/^monero(-|\b)/.test(acct.network) || !acct.balanceError) return false;
+    return /wallet-rpc|daemon|disconnected|unavailable/i.test(acct.balanceError);
+  }
 </script>
 
 <div class="flex flex-col gap-6">
@@ -155,15 +164,22 @@
               </div>
             </div>
             <div class="text-right shrink-0">
-              <div class="font-mono text-sm font-medium text-vault-400">
-                {account.balanceError
-                  ? '⚠' 
-                  : formatBalance(account.balance)} {account.balanceError ? '' : getNetworkUnit(account.network)}
-              </div>
-              {#if account.balanceError}
-                <div class="text-xs text-red-400 max-w-[200px] truncate" title={account.balanceError}>balance error</div>
-              {:else if account.balance?.unconfirmed && parseFloat(account.balance.unconfirmed) > 0}
-                <div class="text-xs text-yellow-400">+{account.balance.unconfirmed} pending</div>
+              {#if isXmrDisconnected(account)}
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/30" title={account.balanceError}>
+                  <span class="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                  Unavailable
+                </span>
+              {:else}
+                <div class="font-mono text-sm font-medium text-vault-400">
+                  {account.balanceError
+                    ? '⚠'
+                    : formatBalance(account.balance)} {account.balanceError ? '' : getNetworkUnit(account.network)}
+                </div>
+                {#if account.balanceError}
+                  <div class="text-xs text-red-400 max-w-[200px] truncate" title={account.balanceError}>balance error</div>
+                {:else if account.balance?.unconfirmed && parseFloat(account.balance.unconfirmed) > 0}
+                  <div class="text-xs text-yellow-400">+{account.balance.unconfirmed} pending</div>
+                {/if}
               {/if}
             </div>
           </button>

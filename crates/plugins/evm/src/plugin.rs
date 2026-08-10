@@ -624,8 +624,11 @@ impl WalletPlugin for EvmPlugin {
             })
             .collect();
 
-        // All-lowercase and all-uppercase are also accepted (no EIP-55 protection)
-        if addr[2..] == *lower || addr[2..] == expected {
+        // EIP-55: all-lowercase, all-uppercase, and correct mixed-case are all
+        // accepted (all-lower/all-upper carry no checksum protection; only a
+        // non-uniform casing must match the keccak checksum exactly).
+        let upper = lower.to_ascii_uppercase();
+        if addr[2..] == *lower || addr[2..] == upper || addr[2..] == expected {
             return Ok(true);
         }
         Ok(false)
@@ -729,6 +732,17 @@ mod tests {
         // All-lowercase is accepted by EIP-55 (no checksum protection).
         let result = plugin
             .validate_address("0xd8da6bf26964af9d7eed9e03e53415d37aa96045", "ethereum")
+            .await;
+        assert!(result.expect("test invariant"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_address_accepts_all_uppercase() {
+        let plugin = EvmPlugin::new();
+        // All-uppercase hex body (with lowercase 0x prefix) is accepted by
+        // EIP-55 as a no-checksum form.
+        let result = plugin
+            .validate_address("0xD8DA6BF26964AF9D7EED9E03E53415D37AA96045", "ethereum")
             .await;
         assert!(result.expect("test invariant"));
     }

@@ -1,0 +1,105 @@
+name: Live Network Integration (Nightly)
+
+# Runs the #[ignore]d live-network integration tests that require real external
+# services (public RPCs, Tor circuits, funded testnet wallets). These are never
+# part of the normal CI gate; they run here so connectivity / plugin behavior
+# regressions surface without blocking day-to-day pushes.
+#
+# Triggered:
+#   - nightly at 03:17 UTC
+#   - manually via the Actions tab (workflow_dispatch)
+#   - on tag pushes for release confidence
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Non-secret live tests: RPC reachability, Sepolia reads, Tor real circuit ──
+  live-read-net:
+    name: Live Read / Tor Circuit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      # Latest stable arti; if it can't install, the tor test self-skips.
+      - name: Install Tor (arti)
+        run: |
+          mkdir -p "$HOME/.cargo/bin"
+          cargo install arti --locked || echo "::warning::arti install failed — tor circuit test will self-skip"
+          "$HOME/.cargo/bin/arti" --version || true
+
+      # EVM live reads: mainnet/sep/arb/etc eth_blockNumber + Sepolia get_balance
+      - name: EVM live read tests (sepolia + endpoint sweep)
+        run: cargo test -p plugin-evm --test sepolia_live -- --ignored --nocapture
+        timeout-minutes: 15
+
+      # Tor real-circuit proof through the live Tor network
+      - name: Tor real-circuit test
+        run: cargo test -p tor-daemon --test tor_real_circuit -- --ignored --nocapture
+        timeout-minutes: 20
+
+  # ── Funded-wallet broadcast tests (skipped when the secret is absent) ──
+  # Each needs a funded testnet / stagenet wallet. We safeguard funds by
+  # requiring the secret to be present; with no secret, the step reports the
+  # skip rather than panic-failing the suite.
+  live-broadcast:
+    name: Live Broadcast (funded wallets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      # BTC testnet broadcast — SECRET: BTC_TESTNET_SEED (hex, funded UTXO)
+      - name: BTC testnet live broadcast
+        if: ${{ secrets.BTC_TESTNET_SEED != '' }}
+        env:
+          BTC_TESTNET_SEED: ${{ secrets.BTC_TESTNET_SEED }}
+        run: cargo test -p plugin-btc --test live_broadcast -- --ignored --nocapture
+        timeout-minutes: 20
+
+      - name: BTC broadcast skipped (no BTC_TESTNET_SEED configured)
+        if: ${{ secrets.BTC_TESTNET_SEED == '' }}
+        run: echo "::warning::BTC_TESTNET_SEED not set — skipping BTC live broadcast"
+
+      # EVM Sepolia broadcast — SECRET: SEPOLIA_PRIVATE_KEY (funded)
+      - name: EVM Sepolia live broadcast
+        if: ${{ secrets.SEPOLIA_PRIVATE_KEY != '' }}
+        env:
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+        run: cargo test -p plugin-evm --test live_broadcast -- --ignored --nocapture
+        timeout-minutes: 20
+
+      - name: EVM broadcast skipped (no SEPOLIA_PRIVATE_KEY configured)
+        if: ${{ secrets.SEPOLIA_PRIVATE_KEY == '' }}
+        run: echo "::warning::SEPOLIA_PRIVATE_KEY not set — skipping EVM Sepolia broadcast"
+
+      # XMR stagenet broadcast — SECRET: XMR_STAGENET_SEED (funded)
+      - name: XMR stagenet live broadcast
+        if: ${{ secrets.XMR_STAGENET_SEED != '' }}
+        env:
+          XMR_STAGENET_SEED: ${{ secrets.XMR_STAGENET_SEED }}
+        run: cargo test -p plugin-xmr --test live_broadcast -- --ignored --nocapture
+        timeout-minutes: 25
+
+      - name: XMR broadcast skipped (no XMR_STAGENET_SEED configured)
+        if: ${{ secrets.XMR_STAGENET_SEED == '' }}
+        run: echo "::warning::XMR_STAGENET_SEED not set — skipping XMR stagenet broadcast"

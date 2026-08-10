@@ -59,24 +59,26 @@
 
 ## Findings / notes (not blockers)
 
-1. **EVM `validate_address` does format-only validation** (0x + 42 hex chars), no
-   EIP-55 mixed-case checksum. This is acceptable for most use (EVM addresses have
-   no on-chain checksum enforcement), but a strict EIP-55 check would catch
-   copy-paste errors. **Optional hardening** — low priority.
-2. **XMR `get_balance` returns 0 when no wallet-rpc configured.** Intentional (avoids
-   mobile "2 networks failed" toast), but means a user without wallet-rpc sees 0 XMR
-   even if they hold funds. **Documented, by design** — but worth a UI note.
+1. **EVM `validate_address` — RESOLVED.** Now performs full EIP-55 mixed-case
+   checksum verification (accepts all-lowercase, all-uppercase, and correct
+   mixed-case; rejects invalid mixed-case). Regression tests added in
+   `crates/plugins/evm/src/plugin.rs` including all-uppercase acceptance.
+2. **XMR unstyled 0-balance — RESOLVED.** Backend returns an explicit
+   `NetworkError` ("no monero-wallet-rpc daemon configured") when wallet-rpc is
+   unset; frontend now renders a yellow "Wallet-RPC disconnected — balance
+   unavailable" status badge on the account card instead of a bare 0 XMR or
+   plain red text (Dashboard + Portfolio).
 3. **Live-network integration tests are `#[ignore]`d by default** (live_broadcast,
    wallet-rpc live, tor real-circuit). They're real and runnable with `--ignored` +
    network, but not in CI. **Recommend** adding a manual/nightly live-network job.
-4. **Empty `vault_file_tests` module** in `commands.rs` — a placeholder test module
-   with a comment ("method builder not yet implemented"). Harmless but should be
-   removed or filled before audit.
+4. **Empty `vault_file_tests` module — RESOLVED/stale.** `commands.rs` no longer
+   exists in `vault-core` (pruned in `a093f80` sweep); no placeholder test module
+   remains in the crate. List item was stale audit text, not a live issue.
 
 ## Conclusion
 The engine is **real and functional** — no placeholder crypto, no fake network calls,
 no dead stubs. The code sweep confirms the earlier test-suite confidence: the backend
-is genuinely implemented, not scaffolded. Remaining items are optional hardening
-(EIP-55), a UX note (XMR 0-balance), and CI polish (live-network job, empty test module).
+is genuinely implemented, not scaffolded. Remaining items are CI polish (live-network
+job) and the planned beta release flow.
 
 *Internal doc — scrub before public repo release (FOSS_BOUNDARY.md).*
