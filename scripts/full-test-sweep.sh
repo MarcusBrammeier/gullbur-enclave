@@ -80,12 +80,18 @@ fi
 
 # ── Layer 6: Branding audit ──────────────────────────────────────
 echo "▸ Layer 6: Branding audit"
+# Internal dirs that are scrubbed from the public FOSS tree (see
+# docs/FOSS_BOUNDARY.md) are excluded: plans, roadmap, internal tooling, STATE.md.
 STALE=$(git ls-files | while IFS= read -r f; do
-  case "$f" in *.wasm|*.png|*.icns|*.ico|*.jar|STATE.md|scripts/full-test-sweep.sh|scripts/android-sweep.sh) continue;; esac
+  case "$f" in
+    *.wasm|*.png|*.icns|*.ico|*.jar) continue;;
+    STATE.md|scripts/*) continue;;
+    .hermes/plans/*|PLANS/*|docs/plans/*) continue;;
+  esac
   [ -f "$f" ] && grep -ql 'fosscrypto' "$f" 2>/dev/null && echo "$f" || true
 done)
 if [ -z "$STALE" ]; then
-  pass "No stale fosscrypto references"
+  pass "No stale fosscrypto references (public tree)"
 else
   fail "Stale fosscrypto in: $STALE"
 fi

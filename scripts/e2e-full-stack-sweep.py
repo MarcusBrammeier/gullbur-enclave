@@ -16,7 +16,6 @@ import os
 import signal
 import subprocess
 import sys
-import time
 from websockets.sync.client import connect
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 19876
@@ -137,16 +136,19 @@ ws = ws_connect()
 # balance call returns AFTER account B's, overwriting B's data.
 
 batch_send_times = []
+_next_id = [1000]  # module-scale counter to guarantee unique numeric IDs
 for chain, accts in created_accounts.items():
     for acct in accts:
+        _next_id[0] += 1
+        rid = _next_id[0]  # JSON-RPC 2.0 id must be Number per IPC server (u64)
         req = {
             "jsonrpc": "2.0",
             "method": "vault.get_balance",
             "params": {"network": chain, "address": acct["address"]},
-            "id": f"bal_{chain}_{acct['index']}_{time.time_ns()}",
+            "id": rid,
         }
         ws.send(json.dumps(req))
-        batch_send_times.append((chain, acct["index"], req["id"]))
+        batch_send_times.append((chain, acct["index"], rid))
 
 # Now collect all responses (may arrive out of order)
 response_map = {}
@@ -197,14 +199,16 @@ ws = ws_connect()
 history_requests = []
 for chain, accts in created_accounts.items():
     for acct in accts[:2]:  # first 2 accounts per chain = 8 requests
+        _next_id[0] += 1
+        rid = _next_id[0]  # numeric ID (IPC server requires u64)
         req = {
             "jsonrpc": "2.0",
             "method": "vault.get_transaction_history",
             "params": {"network": chain, "address": acct["address"], "limit": 5},
-            "id": f"hist_{chain}_{acct['index']}_{time.time_ns()}",
+            "id": rid,
         }
         ws.send(json.dumps(req))
-        history_requests.append((chain, acct["index"], req["id"]))
+        history_requests.append((chain, acct["index"], rid))
 
 hist_responses = {}
 for _ in history_requests:
@@ -244,8 +248,10 @@ check("validate_address: invalid BTC address rejected", vb.get("valid") is False
 # ETH valid
 ve = ws_call(ws, "vault.validate_address", {"network": "ethereum", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"})
 check("validate_address: valid ETH address accepted", ve.get("valid") is True, str(ve))
-# XMR valid
-vx = ws_call(ws, "vault.validate_address", {"network": "monero", "address": "4A1MfvYsGzdtohZ7NcXxE1N5b3Kq3s8RMLkNf1aLK7LNgLpDhq5xbHxqPGxwN3xFKnfLDKPBJW5f5qeVcEMhPHRxGPLmUc"})
+# XMR valid — use a real generated monero account address (created above)
+xmr_acct = (created_accounts.get("monero") or [{}])[0]
+xmr_addr = xmr_acct.get("address", "")
+vx = ws_call(ws, "vault.validate_address", {"network": "monero", "address": xmr_addr}) if xmr_addr else {"valid": False}
 check("validate_address: valid XMR address accepted", vx.get("valid") is True, str(vx))
 ws.close()
 
@@ -284,15 +290,22 @@ ws.close()
 
 # ── PHASE 10: Disconnect → Reconnect lifecycle ────────────────────────────
 print("\n▸ [10] Disconnect → reconnect lifecycle")
+# The vault is process-global and was initialized in PHASE 2. A reconnecting
+# client must observe that already-initialized state on a FRESH connection
+# (multi-session lifecycle), and a repeat initialize must be rejected.
 ws1 = ws_connect()
+st1 = ws_call(ws1, "vault.status", {})
+check("reconnect: status shows initialized on fresh ws1", st1.get("initialized") is True, str(st1)[:80])
 mn2 = ws_call(ws1, "vault.generate_mnemonic", {})
 check("reconnect: generate mnemonic on ws1", "mnemonic" in mn2, str(mn2)[:80])
 ws1.close()
 
-# Reconnect on a new connection and initialize
+# Reconnect on a new connection — must NOT be able to re-initialize an
+# already-initialized vault (correct single-initialization invariant).
 ws2 = ws_connect()
 init2 = ws_call(ws2, "vault.initialize", {"seed_phrase": mn2.get("mnemonic", ""), "passphrase": ""})
-check("reconnect: initialize on ws2", init2.get("success") is True, str(init2))
+init_code = init2.get("error", {}).get("code", 0) if "error" in init2 else 0
+check("reconnect: re-initialize rejected (already initialized)", init_code == -32000, str(init2)[:80])
 st2 = ws_call(ws2, "vault.status", {})
 check("reconnect: status after init on ws2", st2.get("initialized") is True, str(st2))
 ws2.close()

@@ -53,7 +53,10 @@ impl LifecycleManager {
         self
     }
 
-    #[cfg(test)]
+    // NOT test-only: the headless CLI (`gullbur-cli --features headless`)
+    // launches the vault engine without on-disk encryption for the functional
+    // sweep / test harness. The `no_encrypt` field is a production struct
+    // member; keep the accessor available beyond #[cfg(test)].
     pub fn with_no_encrypt(mut self) -> Self {
         self.no_encrypt = true;
         self
