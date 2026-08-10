@@ -51,19 +51,20 @@ This gameplan defines the remaining phases to transition Gullbúr Enclave from p
 
 ---
 
-## Phase 3 — Public Staging & Beta Release (v0.1 Beta)
+## Phase 3 — Public Staging & Beta Release (v0.1.0-beta.1)
 
-1. **Documentation Refresh**
-   - Update `STATE.md` and `FOSS_BOUNDARY.md` to reflect current HEAD, test coverage, and pre-release status.
-
-2. **Clean FOSS Tree Staging**
-   - Prepare clean public staging repository per `FOSS_BOUNDARY.md` rules (exclude `apps/cli`, internal plans, debug logs, private scripts).
-
-3. **Release Artifact Build & Deploy**
-   - Build and verify release binaries:
-     - Linux AppImage & `.deb` package
-     - Android arm64 `.apk` & `.aab`
-   - Draft GitHub Release `v0.1.0-beta.1` with release notes, checksums, and artifact downloads.
+1. **Documentation Refresh** ✅ — `STATE.md` + (internal) `FOSS_BOUNDARY.md` bumped to
+   0.1.0-beta.1, current HEAD, 307 unit + 192 component tests, 10-layer sweep green.
+2. **Clean FOSS Tree Staging** ✅ — `scripts/stage-foss-tree.sh` clones the private repo,
+   drops dev tags, excludes internal paths (apps/cli, .hermes, PLANS, docs/plans,
+   STATE.md, FOSS_BOUNDARY, scripts), commits + tags a clean public tree (verified: 308
+   files, no internal paths, only v0.1.0-beta.1 tag).
+3. **Release Artifact Build & Deploy** — 🔄 in progress:
+   - Linux AppImage + `.deb` built (version bumped 0.0.8 → 0.1.0).
+   - Android APK/AAB built by CI on tag push (`release.yml` android job).
+   - `release.yml` publish job added → drafts GitHub Release on tag push.
+   - `build-all.sh` added as the canonical all-variants build gate.
+   - Remaining: final `v0.1.0-beta.1` tag push to trigger CI + release draft.
 
 ---
 
