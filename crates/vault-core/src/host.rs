@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use keystore_core::vault;
 use keystore_core::DeviceKeyProvider;
 use wallet_plugin::{
-    Account, Balance, FeeEstimate, KeyHandle, PluginError, TxRecord, WalletPlugin,
+    Account, Balance, FeeEstimate, PluginError, TxRecord, WalletPlugin,
 };
 
 /// Path for persisted accounts, relative to ~/.gullbur/

@@ -53,7 +53,21 @@
       setTimeout(() => { if (copiedAddr === currentAccount!.address) copiedAddr = null; }, 2000);
     }
   }
+
+  function handleBackdropClick(e: MouseEvent) {
+    if (e.target === e.currentTarget) {
+      onclose();
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      onclose();
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div
   class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -62,7 +76,7 @@
   aria-modal="true"
   aria-label="Receive funds"
   tabindex="-1"
-  onclick={onclose}
+  onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
   <div class="bg-surface-dim border border-default rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6"

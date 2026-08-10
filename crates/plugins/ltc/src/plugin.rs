@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use bitcoin::hashes::Hash;
 use std::sync::LazyLock;
 use wallet_plugin::{
-    Account, Balance, Capability, FeeEstimate, KeyHandle, NetworkSpec, PluginError, PluginMetadata,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata,
     TxRecord, WalletPlugin,
 };
 
@@ -764,7 +764,7 @@ mod tests {
         let psbt_bytes = psbt.serialize();
 
         // LTC's sign_transaction parses key_id as "hexseed@index".
-        let key = KeyHandle {
+        let key = wallet_plugin::KeyHandle {
             key_id: format!("{seed_hex}@0"),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],

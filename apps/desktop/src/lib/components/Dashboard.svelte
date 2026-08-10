@@ -92,6 +92,9 @@
     vault.accounts.filter((a: Account) => a.network === vault.selectedNetwork)
   );
 
+  /** Guard against undefined or null account ids that would cause `each_key_duplicate` */
+  let accountKey = $derived((a: Account) => a.id ?? `fallback-${a.network}-${a.index}`);
+
   /** Next available account index for the selected network */
   let nextIndex = $derived(
     filteredAccounts.length === 0
@@ -241,7 +244,7 @@
       </div>
     {:else}
       <div style="display: flex; flex-direction: column; gap: var(--rhythm-sm);">
-        {#each filteredAccounts as account, i (account.id)}
+        {#each filteredAccounts as account, i (accountKey(account))}
           {@const badge = getNetworkBadge(account.network)}
           <div class="bg-surface/50 border border-strong rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="animation: fade-up 300ms both; animation-delay: {i * 40}ms;">
             <div class="flex-1 min-w-0">

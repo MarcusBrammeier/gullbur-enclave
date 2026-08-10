@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
-use wallet_plugin::{Account, KeyHandle, KeyType};
+use wallet_plugin::{Account, KeyType};
 
 use crate::approval::ApprovalQueue;
 use crate::host::PluginHost;
@@ -432,10 +432,6 @@ pub fn register_vault_handlers(
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?
                     .to_string();
-                let key_type_str = params
-                    .get("key_type")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(RpcError::invalid_params)?;
 
                 // Read the stored seed — sign_transaction needs the raw seed
                 // for plugin-side derivation (matching create_account).
