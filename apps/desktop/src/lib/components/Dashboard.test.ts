@@ -94,4 +94,31 @@ describe('Dashboard.svelte', () => {
     expect(createAccountMock).toHaveBeenCalledWith('litecoin-testnet', 1);
     unmount();
   });
+
+  it('switches shown accounts when the selected network changes (multi-chain)', () => {
+    mockVault.selectedNetwork = 'bitcoin';
+    mockVault.networks = [
+      { id: 'bitcoin', name: 'Bitcoin', is_testnet: false },
+      { id: 'litecoin-testnet', name: 'Litecoin Testnet', is_testnet: true },
+    ];
+    mockVault.accounts = [
+      { id: 'btc-bitcoin-0', network: 'bitcoin', address: 'bc1qbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbzz0', index: 0, balance: { confirmed: '0.5', unconfirmed: '0' } },
+      { id: 'ltc-litecoin-testnet-0', network: 'litecoin-testnet', address: 'tltc1qaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0', index: 0, balance: { confirmed: '1.2', unconfirmed: '0' } },
+    ];
+    flushSync();
+
+    const { unmount } = render(Dashboard);
+    // Selected = bitcoin → only the BTC account shows.
+    expect(screen.getAllByText('bc1qbb...bzz0').length).toBeGreaterThan(0);
+    expect(screen.queryByText('tltc1q...aaa0')).toBeNull();
+    // Account count reflects the filtered set.
+    expect(screen.getAllByText('1 account').length).toBeGreaterThan(0);
+
+    // Switch network → the LTC account shows, BTC hidden.
+    mockVault.selectedNetwork = 'litecoin-testnet';
+    flushSync();
+    expect(screen.getAllByText('tltc1q...aaa0').length).toBeGreaterThan(0);
+    expect(screen.queryByText('bc1qbb...bzz0')).toBeNull();
+    unmount();
+  });
 });
