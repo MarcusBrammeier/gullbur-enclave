@@ -2,7 +2,6 @@
   import type { Account, NetworkSpec } from '../types';
   import { vault, createAccount, refreshBalances, refreshNetworkBalance, setSelectedNetwork, getAccountLabel, setAccountLabel, getNetworkUnit } from '../vault.svelte.ts';
   import { truncateAddress, formatBalance, getNetworkBadge } from '../utils';
-  import { fade } from 'svelte/transition';
   import { iconHtml } from '../icons';
   import Send from './Send.svelte';
   import Receive from './Receive.svelte';
@@ -142,7 +141,12 @@
 
   /** Computed total balance across all accounts */
   let totalBalance = $derived(
-    vault.accounts.reduce((s: number, a: Account) => s + parseFloat(a.balance || '0'), 0)
+    vault.accounts.reduce((s: number, a: Account) => {
+      // balance is a Balance object, not a string — parse its confirmed string.
+      const v = a.balance?.confirmed;
+      const n = v ? parseFloat(v) : 0;
+      return s + (Number.isNaN(n) ? 0 : n);
+    }, 0)
   );
   let formattedTotal = $derived(
     '$' + totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })

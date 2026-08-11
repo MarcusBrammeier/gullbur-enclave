@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { describe, it, expect } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 // ── ECOSYSTEM of unicode/zero-width attacks for fuzzing ──────────────────────
@@ -23,14 +22,6 @@ const BTC_ADDRESSES_VALID = [
   'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
   '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
   '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy',
-];
-
-const BTC_ADDRESSES_INVALID = [
-  'not-an-address',
-  'bc1q',
-  'bc1q0000000000000000000000000000000000000',  // wrong checksum
-  '',
-  '   ',
 ];
 
 const ETH_ADDRESSES_VALID = [

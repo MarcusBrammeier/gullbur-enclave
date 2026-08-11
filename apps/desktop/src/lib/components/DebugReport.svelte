@@ -168,7 +168,7 @@
   onclick={handleBackdropClick}
   onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[85vh] flex flex-col" role="document" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[85vh] flex flex-col" role="document">
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">{@html iconHtml('search', 'w-5 h-5 inline-block mr-1.5')}Debug Report</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={onclose}>&times;</button>
@@ -238,8 +238,9 @@
 
         <!-- User comments -->
         <div>
-          <label class="block text-xs text-secondary mb-1">Add comments for the developer:</label>
+          <label class="block text-xs text-secondary mb-1" for="debug-report-comments">Add comments for the developer:</label>
           <textarea
+            id="debug-report-comments"
             class="input-field w-full h-20 text-sm resize-none"
             placeholder="e.g. I was trying to send LTC on testnet when..."
             bind:value={userComments}

@@ -2,7 +2,7 @@
  * Theme Engine tests — validates security, immutability, Zod validation,
  * theme persistence, and import/export.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // We need to mock localStorage for jsdom tests
 const store = new Map<string, string>();
@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 // Import after mocks
-const { themeEngine, ThemeEngine } = await import('./themeEngine.svelte.ts');
+import { themeEngine } from './themeEngine.svelte.ts';
 
 describe('ThemeEngine', () => {
   // ── Security Guarantees ──────────────────────────────────────────────

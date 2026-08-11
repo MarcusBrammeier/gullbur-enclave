@@ -21,9 +21,6 @@ import { z } from 'zod';
 
 // ── Zod Schema (strict security boundary) ────────────────────────────────────
 
-/** A single CSS custom property key (must start with --) */
-const cssVarKey = z.string().regex(/^--[a-zA-Z][\w-]*$/, 'Must be a valid CSS custom property (--key-name)');
-
 /** Allowed CSS values — prevents URL(), javascript:, expression(), and other XSS vectors */
 const cssSafeValue = z.string()
   .regex(/^(?!.*url\(|javascript:|expression\(|data:|<|>|eval|import|document|cookie|window|on\w+=)/i, 'Unsafe CSS value')

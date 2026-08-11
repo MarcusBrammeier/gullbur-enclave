@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { vault, setTheme } from '../vault.svelte.ts';
+  import { vault } from '../vault.svelte.ts';
   import { themeEngine } from '../themeEngine.svelte.ts';
   import type { AccentTheme } from '../vault.svelte.ts';
   import { iconHtml } from '../icons';
+
+  type IconName = Parameters<typeof iconHtml>[0];
 
   function handleTestnetToggle() {
     if (vault.testnetOnly) {
@@ -32,7 +34,7 @@
 
   const builtinThemeIds = ['obsidian', 'dark-slate', 'light-studio'] as const;
   type BuiltinThemeId = (typeof builtinThemeIds)[number];
-  const themeIcons: Record<BuiltinThemeId, string> = {
+  const themeIcons: Record<BuiltinThemeId, IconName> = {
     obsidian: 'moon',
     'dark-slate': 'moon',
     'light-studio': 'sun',
@@ -67,6 +69,15 @@
   // ── Command Palette (Cmd+K) ───────────────────────────────────────
   let commandPaletteOpen = $state(false);
   let paletteQuery = $state('');
+  let paletteInputEl = $state<HTMLInputElement | null>(null);
+
+  // Focus the palette search when it opens (a11y-clean substitute for autofocus).
+  $effect(() => {
+    if (commandPaletteOpen) {
+      paletteInputEl?.focus();
+      paletteQuery = '';
+    }
+  });
 
   function handleKeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -247,7 +258,7 @@
         <input
           class="flex-1 bg-transparent border-none outline-none text-primary text-sm placeholder:text-muted"
           placeholder="Search accounts, networks, or actions…"
-          autofocus
+          bind:this={paletteInputEl}
           onkeydown={(e) => {
             if (e.key === 'Escape') { commandPaletteOpen = false; paletteQuery = ''; }
           }}

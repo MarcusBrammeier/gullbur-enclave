@@ -108,7 +108,7 @@
           {#if fee}
             <div class="flex items-center justify-between pt-1">
               <span class="text-secondary">Estimated Network Fee</span>
-              <span class="font-mono text-muted">{fee.amount} {fee.unit ?? networkUnit} ({fee.level})</span>
+              <span class="font-mono text-muted">{fee.fee} {networkUnit} ({fee.level})</span>
             </div>
           {/if}
         </div>
@@ -216,7 +216,7 @@
             amount: amount,
             unit: networkUnit,
             feeLevel: fee?.level ?? 'medium',
-            estimatedFee: fee?.amount ?? '0',
+            estimatedFee: String(fee?.fee ?? '0'),
             derivationPath: account.path ?? 'm/44\'/128\'/0\'/0/0',
             timestamp: new Date().toISOString()
           }, null, 2)}</pre>

@@ -65,9 +65,12 @@
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
   role="dialog"
   aria-modal="true"
-  onclick={() => showConsole = false}
+  aria-label="IPC Console"
+  tabindex="-1"
+  onclick={(e) => { if (e.target === e.currentTarget) showConsole = false; }}
+  onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" role="document" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" role="document">
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">📟 IPC Console</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => showConsole = false}>&times;</button>

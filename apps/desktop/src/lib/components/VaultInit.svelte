@@ -8,7 +8,6 @@
   let seedPhrase = $state('');
   let localError = $state<string | null>(null);
   let generating = $state(false);
-  let generatedMnemonic = $state('');
   let wordArray = $state<string[]>([]);
   let shuffledWords = $state<string[]>([]);
   let selectedIndexes = $state<number[]>([]);
@@ -21,7 +20,6 @@
     try {
       await connect();
       const mnemonic = await generateMnemonic();
-      generatedMnemonic = mnemonic;
       wordArray = mnemonic.split(' ');
       shuffledWords = [...wordArray].sort();
       selectedIndexes = [];
@@ -129,7 +127,6 @@
     step = 'input';
     seedPhrase = '';
     localError = null;
-    generatedMnemonic = '';
     wordArray = [];
     shuffledWords = [];
     selectedIndexes = [];
@@ -142,7 +139,6 @@
     seedPhrase = '';
     localError = null;
     generating = false;
-    generatedMnemonic = '';
     wordArray = [];
     shuffledWords = [];
     selectedIndexes = [];

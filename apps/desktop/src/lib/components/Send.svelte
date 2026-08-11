@@ -2,7 +2,7 @@
   import type { Account, FeeEstimate } from '../types';
   import { vault, validateAddress, estimateFee, signTransaction, broadcastTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
   import { formatBalance, getBalanceFloat } from '../utils';
-  import { getAddressBook, saveAddressEntry, removeAddressEntry, isAddressSaved, findAddressEntry } from '../addressBook';
+  import { getAddressBook, saveAddressEntry, removeAddressEntry, isAddressSaved } from '../addressBook';
   import { fade, scale } from 'svelte/transition';
   import { cubicInOut } from 'svelte/easing';
   import QrScanner from './QrScanner.svelte';

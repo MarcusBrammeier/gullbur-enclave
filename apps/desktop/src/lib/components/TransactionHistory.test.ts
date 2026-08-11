@@ -36,7 +36,7 @@ describe('TransactionHistory.svelte', () => {
   });
 
   it('renders all three transaction rows', () => {
-    const { container } = render(TransactionHistory, { props: { transactions: TXS, loading: false } });
+    render(TransactionHistory, { props: { transactions: TXS, loading: false } });
     // Each row contains a button with the truncated txid
     expect(screen.getByText('0xaaa111...ccdddd')).toBeTruthy();
     expect(screen.getByText('0xddd333...ffgggg')).toBeTruthy();
@@ -44,14 +44,14 @@ describe('TransactionHistory.svelte', () => {
   });
 
   it('shows sent amounts with minus and received with plus', () => {
-    const { container } = render(TransactionHistory, { props: { transactions: TXS, loading: false } });
+    render(TransactionHistory, { props: { transactions: TXS, loading: false } });
     // Check for the minus sign (Unicode minus) and plus sign in the amounts
     expect(screen.getByText('−1.5')).toBeTruthy(); // minus sign
     expect(screen.getByText('+2.5')).toBeTruthy(); // plus sign
   });
 
   it('shows status badges for each transaction', () => {
-    const { container } = render(TransactionHistory, { props: { transactions: TXS, loading: false } });
+    render(TransactionHistory, { props: { transactions: TXS, loading: false } });
     expect(screen.getByText('Confirmed')).toBeTruthy();
     expect(screen.getByText('Pending')).toBeTruthy();
     expect(screen.getByText('Failed')).toBeTruthy();
@@ -69,7 +69,7 @@ describe('TransactionHistory.svelte', () => {
   });
 
   it('shows empty state message', () => {
-    const { container } = render(TransactionHistory, { props: { transactions: [], loading: false } });
+    render(TransactionHistory, { props: { transactions: [], loading: false } });
     expect(screen.getByText(/No transactions yet/)).toBeTruthy();
   });
 

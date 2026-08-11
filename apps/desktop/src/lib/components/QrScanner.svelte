@@ -93,7 +93,7 @@
     </div>
 
     <div class="relative bg-black rounded-xl overflow-hidden aspect-square">
-      <video ref={videoRef} class="w-full h-full object-cover" autoplay muted playsinline></video>
+      <video bind:this={videoRef} class="w-full h-full object-cover" autoplay muted playsinline></video>
       {#if scanning && !videoRef?.videoWidth}
         <div class="absolute inset-0 flex items-center justify-center text-sm text-muted">Accessing camera…</div>
       {/if}
