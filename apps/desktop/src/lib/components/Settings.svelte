@@ -1,8 +1,6 @@
 <script lang="ts">
   import { vault } from '../vault.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
-  import { themeEngine } from '../themeEngine.svelte.ts';
-  import { pushError, pushInfo, pushWarning } from '../toasts.svelte.ts';
   import { fade, scale } from 'svelte/transition';
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
@@ -31,11 +29,6 @@
   let showTestnetWarning = $state(false);
   let pendingTestnetToggle = $state(false);
   let showConsole = $state(false);
-  let themeImportRef = $state<HTMLInputElement | null>(null);
-
-  // Reactive theme list — re-evaluates whenever customThemes changes
-  let availableThemes = $derived(themeEngine.getAvailableThemes());
-  let currentThemeId = $derived(themeEngine.currentThemeId);
 
   // Sync auto-lock to localStorage on change
   $effect(() => {
@@ -81,7 +74,7 @@
       // Fetch on demand; clear immediately after the reveal moment (Hide / close)
       // so the seed does not persist in component state longer than needed.
       const phrase = await invoke('get_seed_phrase');
-      seedPhrase = phrase;
+      seedPhrase = typeof phrase === 'string' ? phrase : String(phrase ?? '');
       seedRevealed = false;
     } catch (e) {
       seedError = e instanceof Error ? e.message : String(e);
@@ -122,7 +115,7 @@
 >
   <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6"
     transition:scale={{ start: 0.97, duration: 180 }}
-    role="document" onclick={(e) => e.stopPropagation()}>
+    role="document">
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-lg font-semibold">{@html iconHtml('settings', 'w-5 h-5 inline-block mr-1.5')}Settings</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={handleClose}>&times;</button>
@@ -355,9 +348,12 @@
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
   role="dialog"
   aria-modal="true"
-  onclick={() => showConsole = false}
+  aria-label="IPC Console"
+  tabindex="-1"
+  onclick={(e) => { if (e.target === e.currentTarget) showConsole = false; }}
+  onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}
 >
-  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') showConsole = false; }}>
+  <div class="bg-surface-dim border border-strong rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 h-[80vh] flex flex-col" role="document">
     <div class="flex items-center justify-between mb-4 shrink-0">
       <h2 class="text-lg font-semibold">{@html iconHtml('terminal', 'w-5 h-5 inline-block mr-1.5')}IPC Console</h2>
       <button class="text-muted hover:text-primary text-xl leading-none" onclick={() => showConsole = false}>&times;</button>
@@ -379,7 +375,7 @@
   onclick={() => { if (!pendingTestnetToggle) showTestnetWarning = false; }}
   onkeydown={(e) => { if (e.key === 'Escape') showTestnetWarning = false; }}
 >
-  <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document" onclick={(e) => e.stopPropagation()}>
+  <div class="bg-surface-dim border border-amber-700/50 rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6" role="document">
     <div class="text-center space-y-4">
       <div class="text-4xl">{@html iconHtml('alertTriangle', 'w-10 h-10 inline-block text-amber-400')}</div>
       <h3 class="text-lg font-semibold text-amber-400">Mainnet Access</h3>
