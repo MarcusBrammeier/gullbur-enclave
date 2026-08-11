@@ -70,3 +70,89 @@ async fn all_13_methods_registered() {
         METHODS.len()
     );
 }
+
+/// Build a handler with the given plugin host setup, returning the registered
+/// MessageHandler and the shared Arc<AuthManager> so tests can unlock it before
+/// dispatching (isolates param-validation from the auth gate).
+async fn build_handler() -> (MessageHandler, Arc<auth_core::AuthManager>) {
+    let mut handler = MessageHandler::new();
+    let plugin_host = Arc::new(RwLock::new(PluginHost::new()));
+    let seed: Arc<RwLock<Option<zeroize::Zeroizing<Vec<u8>>>>> = Arc::new(RwLock::new(None));
+    let initialized = Arc::new(AtomicBool::new(false));
+    let approval_queue = Arc::new(RwLock::new(vault_core::approval::ApprovalQueue::new()));
+    let auth = Arc::new(AuthManager::new());
+    let mn = Arc::new(RwLock::new(None::<String>));
+    ipc_handlers::register_vault_handlers(
+        &mut handler,
+        plugin_host,
+        seed,
+        mn,
+        initialized,
+        approval_queue,
+        Arc::clone(&auth),
+    );
+    (handler, auth)
+}
+
+/// Unlock the shared auth manager so protected handlers run their real param
+/// validation rather than short-circuiting on the auth gate.
+fn unlock(auth: &auth_core::AuthManager) {
+    auth.try_biometric().expect("test invariant: biometric unlock");
+}
+
+async fn dispatch_error_code(handler: &MessageHandler, method: &str, params: serde_json::Value) -> i32 {
+    let req = JsonRpcRequest::new(method, Some(params), 1);
+    match handler.dispatch(req).await {
+        DispatchResult::Success(_) => 0,
+        DispatchResult::Error(err) => err.error.code,
+    }
+}
+
+#[tokio::test]
+async fn get_balance_rejects_missing_network_with_invalid_params() {
+    let (handler, auth) = build_handler().await;
+    unlock(&auth);
+    // Missing "network" should be invalid_params (-32602), not silent success.
+    let code = dispatch_error_code(&handler, "vault.get_balance", serde_json::json!({ "address": "0xabc" })).await;
+    assert_eq!(code, -32602, "missing network must be rejected as invalid_params");
+}
+
+#[tokio::test]
+async fn get_balance_rejects_non_string_address_with_invalid_params() {
+    let (handler, auth) = build_handler().await;
+    unlock(&auth);
+    // A non-string address must be rejected, not coerced/panicked.
+    let code = dispatch_error_code(
+        &handler,
+        "vault.get_balance",
+        serde_json::json!({ "network": "bitcoin", "address": 12345 }),
+    ).await;
+    assert_eq!(code, -32602, "non-string address must be rejected as invalid_params");
+}
+
+#[tokio::test]
+async fn sign_transaction_rejects_invalid_params_without_panic() {
+    let (handler, auth) = build_handler().await;
+    unlock(&auth);
+    // Even with a freshly-unlocked vault but NO seed set, sign must not panic and
+    // must return a structured error (vault-not-initialized), never success.
+    let code = dispatch_error_code(
+        &handler,
+        "vault.sign_transaction",
+        serde_json::json!({ "network": "bitcoin", "tx_hex": "!!not-hex!!", "key_id": "x" }),
+    ).await;
+    assert_ne!(code, 0, "sign must not succeed against an uninitialized vault");
+    assert_ne!(code, -32602, "params are present so this should not be a param error");
+}
+
+#[tokio::test]
+async fn protected_handlers_reject_when_vault_locked() {
+    let (handler, _auth) = build_handler().await;
+    // Do NOT unlock — the auth gate must block broadcast.
+    let code = dispatch_error_code(
+        &handler,
+        "vault.broadcast_transaction",
+        serde_json::json!({ "network": "bitcoin", "signed_tx_hex": "abcd" }),
+    ).await;
+    assert_eq!(code, -32002, "locked vault must reject with auth_required (-32002)");
+}

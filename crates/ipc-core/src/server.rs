@@ -410,6 +410,25 @@ impl Drop for IpcServer {
 mod tests {
     use super::*;
 
+    /// Security guard: the production construction path `IpcServer::new` MUST
+    /// always enable response encryption. The unencrypted path is reachable ONLY
+    /// via the explicit `with_encryption(port, false)` opt-out (used by external
+    /// test crates, never by the production LifecycleManager).
+    #[test]
+    fn test_server_new_always_encrypts_responses() {
+        let server = IpcServer::new(0).expect("server construction");
+        assert!(
+            server.encrypt_responses,
+            "IpcServer::new must default to encrypted responses (security invariant)"
+        );
+    }
+
+    #[test]
+    fn test_server_with_encryption_false_is_explicit_optout() {
+        let server = IpcServer::with_encryption(0, false).expect("server construction");
+        assert!(!server.encrypt_responses, "opt-out should disable encryption");
+    }
+
     #[test]
     fn test_server_creates_token_file() -> Result<(), IpcError> {
         let server = IpcServer::new(0)?;
