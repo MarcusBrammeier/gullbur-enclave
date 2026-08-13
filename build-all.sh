@@ -28,8 +28,8 @@ OUT_DIR="${OUT_DIR:-$ROOT/apk-output}"
 mkdir -p "$OUT_DIR"
 
 PASS=0; FAIL=0
-ok()  { echo "  ${GREEN}✓${NC} $1"; ((PASS++)); }
-bad() { echo "  ${RED}✗${NC} $1"; ((FAIL++)); }
+ok()  { echo "  ${GREEN}✓${NC} $1"; PASS=$((PASS+1)); }
+bad() { echo "  ${RED}✗${NC} $1"; FAIL=$((FAIL+1)); }
 GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 
 echo "═══════════════════════════════════════════════════════════"
