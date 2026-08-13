@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  # Manual trigger — build release artifacts on demand (no tag needed), e.g. to
+  # verify a release build before tagging a beta, or to regenerate the APK/.deb.
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: "Also draft a GitHub Release (only meaningful on a tag/versioned run)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   check:
@@ -42,7 +51,7 @@ jobs:
 
   build:
     needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +82,7 @@ jobs:
 
   android:
     needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -112,9 +121,11 @@ jobs:
           path: apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
 
   publish:
-    # Draft a GitHub Release from the built artifacts on tag pushes.
+    # Draft a GitHub Release from the built artifacts.
+    # - On tag pushes: always draft.
+    # - On manual dispatch: only if the workflow_dispatch `draft_release` input is true.
     needs: [build, android]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.draft_release == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
