@@ -34,6 +34,9 @@ dist/
 crates/crypto-wasm/target/
 crates/crypto-wasm/pkg/
 
+# Generated device-test reports (ephemeral)
+test-reports/
+
 # Android APK/AAB output
 apk-output/
 apps/desktop/src-tauri/gen/android/app/build/
