@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use std::sync::LazyLock;
 use wallet_plugin::{
-    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata,
-    TxRecord, TxStatus, WalletPlugin,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata, TxRecord,
+    TxStatus, WalletPlugin,
 };
 
 use reqwest;

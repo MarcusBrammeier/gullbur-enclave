@@ -12,7 +12,12 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    pub fn new() -> Self { Self { windows: HashMap::new(), pending_approvals: HashMap::new() } }
+    pub fn new() -> Self {
+        Self {
+            windows: HashMap::new(),
+            pending_approvals: HashMap::new(),
+        }
+    }
 
     /// Returns Ok(()) if the origin can proceed, Err(msg) if rate-limited.
     pub fn check(&mut self, origin: &str) -> Result<(), String> {
@@ -27,7 +32,10 @@ impl RateLimiter {
     }
 
     pub fn reserve_approval(&mut self, origin: &str) -> Result<(), String> {
-        let count = self.pending_approvals.entry(origin.to_string()).or_insert(0);
+        let count = self
+            .pending_approvals
+            .entry(origin.to_string())
+            .or_insert(0);
         if *count >= MAX_PENDING_APPROVALS {
             return Err(format!("Max {} pending approvals", MAX_PENDING_APPROVALS));
         }

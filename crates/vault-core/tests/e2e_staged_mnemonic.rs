@@ -103,9 +103,7 @@ async fn staged_mnemonic_flow_not_re_submitted() {
 
     // 1. Stage a fresh mnemonic — Rust generates and returns it once.
     let r = client.call("vault.stage_mnemonic", json!({})).await;
-    let staged = r["result"]["mnemonic"]
-        .as_str()
-        .expect("staged mnemonic");
+    let staged = r["result"]["mnemonic"].as_str().expect("staged mnemonic");
     let word_count = staged.split_whitespace().count();
     assert_eq!(word_count, 24, "staged mnemonic should be 24 words");
 

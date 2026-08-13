@@ -163,6 +163,74 @@ else
   echo "  (skipped — binary or recovery script missing)"
 fi
 
+# ── Layer 11: WASM crypto round-trip (shipped blob) ──────────────────────
+# Loads the EXACT .wasm bytes the frontend ships (src/lib/wasm/crypto_wasm_bg.wasm)
+# and round-trips encrypt→decrypt — catches a stale/regenerated blob, ABI
+# mismatch, or getrandom backend breakage that nothing else verifies.
+echo "▸ Layer 11: WASM crypto round-trip (packaged blob)"
+WASM_TEST="src/lib/wasm/crypto_wasm.test.ts"
+if [ -f "apps/desktop/$WASM_TEST" ]; then
+  # Gate on vitest's EXIT CODE (0=pass/1=fail), not grep -q on output: grep -q
+  # closes the pipe the instant it matches, SIGPIPE-kills the upstream vitest,
+  # and under 'set -o pipefail' that makes the whole subshell fail even when
+  # the tests pass. Exit status is race-free and ANSI-immune.
+  if ( cd apps/desktop && npx vitest run "$WASM_TEST" >/dev/null 2>&1 ); then
+    pass "WASM crypto round-trip ($WASM_TEST)"
+  else
+    fail "WASM crypto round-trip ($WASM_TEST)"
+  fi
+else
+  echo "  (skipped — wasm test missing)"
+fi
+
+# ── Layer 12: Frontend Svelte component tests (vitest) ──────────────────
+echo "▸ Layer 12: Frontend component tests (vitest)"
+if [ -f apps/desktop/package.json ]; then
+  # Gate on npm test's EXIT CODE (vitest exits 0=pass / nonzero=fail). Output
+  # parsing is only for a human-readable count, never the gate (vitest wraps
+  # non-TTY output in ANSI codes, so grepping is fragile; exit status is not).
+  # Note: no `|| true` inside the substitution — it would mask the exit code.
+  if FE_OUT=$(cd apps/desktop && npm test 2>&1); then
+    VITEST_RC=0
+  else
+    VITEST_RC=$?
+  fi
+  # Count summary line only if present (guarded so it can't fail the pipeline).
+  FE_TESTS=$(printf '%s\n' "$FE_OUT" | grep -aE "Tests " | tail -1 | tr -s ' ' || true)
+  if [ "$VITEST_RC" -eq 0 ]; then
+    pass "Frontend tests: ${FE_TESTS:-ok}"
+  else
+    fail "Frontend tests (exit $VITEST_RC): ${FE_TESTS:-failed}"
+  fi
+else
+  echo "  (skipped — no apps/desktop/package.json)"
+fi
+
+# ── Layer 13: Static / lint / audit gates ────────────────────────────────
+# Mirrors what .github/workflows/test.yml + audit.yml enforce locally, so a
+# local sweep (green) matches CI (green) — no surprise rejection after push.
+echo "▸ Layer 13: Static gates (fmt + clippy + deny + audit)"
+if cargo fmt --check >/tmp/sweep-fmt.log 2>&1; then
+  pass "cargo fmt --check"
+else
+  fail "cargo fmt --check (run: cargo fmt)"
+fi
+if cargo clippy --workspace --lib -- -D clippy::unwrap_used -A warnings >/tmp/sweep-clippy.log 2>&1; then
+  pass "cargo clippy --lib -D clippy::unwrap_used"
+else
+  fail "cargo clippy (unwrap gate)"
+fi
+if cargo deny check >/tmp/sweep-deny.log 2>&1; then
+  pass "cargo deny check"
+else
+  fail "cargo deny check (deny.toml)"
+fi
+if bash "$ROOT/scripts/audit.sh" >/tmp/sweep-audit.log 2>&1; then
+  pass "cargo audit"
+else
+  fail "cargo audit"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
 if [ $FAIL -eq 0 ]; then

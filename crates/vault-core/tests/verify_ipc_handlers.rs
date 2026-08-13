@@ -97,10 +97,15 @@ async fn build_handler() -> (MessageHandler, Arc<auth_core::AuthManager>) {
 /// Unlock the shared auth manager so protected handlers run their real param
 /// validation rather than short-circuiting on the auth gate.
 fn unlock(auth: &auth_core::AuthManager) {
-    auth.try_biometric().expect("test invariant: biometric unlock");
+    auth.try_biometric()
+        .expect("test invariant: biometric unlock");
 }
 
-async fn dispatch_error_code(handler: &MessageHandler, method: &str, params: serde_json::Value) -> i32 {
+async fn dispatch_error_code(
+    handler: &MessageHandler,
+    method: &str,
+    params: serde_json::Value,
+) -> i32 {
     let req = JsonRpcRequest::new(method, Some(params), 1);
     match handler.dispatch(req).await {
         DispatchResult::Success(_) => 0,
@@ -113,8 +118,16 @@ async fn get_balance_rejects_missing_network_with_invalid_params() {
     let (handler, auth) = build_handler().await;
     unlock(&auth);
     // Missing "network" should be invalid_params (-32602), not silent success.
-    let code = dispatch_error_code(&handler, "vault.get_balance", serde_json::json!({ "address": "0xabc" })).await;
-    assert_eq!(code, -32602, "missing network must be rejected as invalid_params");
+    let code = dispatch_error_code(
+        &handler,
+        "vault.get_balance",
+        serde_json::json!({ "address": "0xabc" }),
+    )
+    .await;
+    assert_eq!(
+        code, -32602,
+        "missing network must be rejected as invalid_params"
+    );
 }
 
 #[tokio::test]
@@ -126,8 +139,12 @@ async fn get_balance_rejects_non_string_address_with_invalid_params() {
         &handler,
         "vault.get_balance",
         serde_json::json!({ "network": "bitcoin", "address": 12345 }),
-    ).await;
-    assert_eq!(code, -32602, "non-string address must be rejected as invalid_params");
+    )
+    .await;
+    assert_eq!(
+        code, -32602,
+        "non-string address must be rejected as invalid_params"
+    );
 }
 
 #[tokio::test]
@@ -140,9 +157,16 @@ async fn sign_transaction_rejects_invalid_params_without_panic() {
         &handler,
         "vault.sign_transaction",
         serde_json::json!({ "network": "bitcoin", "tx_hex": "!!not-hex!!", "key_id": "x" }),
-    ).await;
-    assert_ne!(code, 0, "sign must not succeed against an uninitialized vault");
-    assert_ne!(code, -32602, "params are present so this should not be a param error");
+    )
+    .await;
+    assert_ne!(
+        code, 0,
+        "sign must not succeed against an uninitialized vault"
+    );
+    assert_ne!(
+        code, -32602,
+        "params are present so this should not be a param error"
+    );
 }
 
 #[tokio::test]
@@ -153,6 +177,10 @@ async fn protected_handlers_reject_when_vault_locked() {
         &handler,
         "vault.broadcast_transaction",
         serde_json::json!({ "network": "bitcoin", "signed_tx_hex": "abcd" }),
-    ).await;
-    assert_eq!(code, -32002, "locked vault must reject with auth_required (-32002)");
+    )
+    .await;
+    assert_eq!(
+        code, -32002,
+        "locked vault must reject with auth_required (-32002)"
+    );
 }

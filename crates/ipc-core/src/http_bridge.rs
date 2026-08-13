@@ -126,8 +126,13 @@ async fn handle_rpc(
         "sign_transaction" => {
             let network = params.get("network").and_then(|v| v.as_str()).unwrap_or("");
             let tx_hex = params.get("tx_hex").and_then(|v| v.as_str()).unwrap_or("");
-            let account_index = params.get("account_index").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            bridge.sign_transaction(network, tx_hex, account_index).await
+            let account_index = params
+                .get("account_index")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
+            bridge
+                .sign_transaction(network, tx_hex, account_index)
+                .await
         }
         "broadcast_transaction" => {
             let network = params.get("network").and_then(|v| v.as_str()).unwrap_or("");

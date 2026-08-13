@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use std::sync::LazyLock;
 use wallet_plugin::{
-    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata,
-    TxRecord, TxStatus, WalletPlugin,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata, TxRecord,
+    TxStatus, WalletPlugin,
 };
 
 pub struct EvmPlugin {
@@ -97,7 +97,10 @@ static EVM_NETWORKS: LazyLock<[NetworkSpec; 7]> = LazyLock::new(|| {
 
 /// Derive a k256 secret key from seed bytes and account index.
 /// This ensures sign_transaction produces the same address as create_account.
-fn derive_key_from_seed(seed: &[u8], account_index: u32) -> Result<k256::ecdsa::SigningKey, PluginError> {
+fn derive_key_from_seed(
+    seed: &[u8],
+    account_index: u32,
+) -> Result<k256::ecdsa::SigningKey, PluginError> {
     let index = account_index;
     // Prefer full BIP-44 derivation (64-byte BIP-39 seed), fallback to raw key bytes
     if seed.len() >= 64 {

@@ -5,11 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use keystore_core::vault;
 use keystore_core::DeviceKeyProvider;
-use wallet_plugin::{
-    Account, Balance, FeeEstimate, PluginError, TxRecord, WalletPlugin,
-};
+use keystore_core::vault;
+use wallet_plugin::{Account, Balance, FeeEstimate, PluginError, TxRecord, WalletPlugin};
 
 /// Path for persisted accounts, relative to ~/.gullbur/
 const ACCOUNTS_FILE: &str = "accounts.json";
@@ -285,7 +283,9 @@ impl PluginHost {
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
-        plugin.sign_transaction(tx, seed, account_index, network).await
+        plugin
+            .sign_transaction(tx, seed, account_index, network)
+            .await
     }
 
     pub async fn broadcast_transaction(
@@ -527,7 +527,9 @@ impl PluginHost {
         })?;
 
         // Step 3: Sign the transaction with the seed directly
-        let signed_tx = plugin.sign_transaction(tx, seed, account_index, network).await?;
+        let signed_tx = plugin
+            .sign_transaction(tx, seed, account_index, network)
+            .await?;
 
         // Step 4: Broadcast
         let txid = plugin.broadcast_transaction(&signed_tx, network).await?;

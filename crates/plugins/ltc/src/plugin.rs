@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use bitcoin::hashes::Hash;
 use std::sync::LazyLock;
 use wallet_plugin::{
-    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata,
-    TxRecord, WalletPlugin,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata, TxRecord,
+    WalletPlugin,
 };
 
 pub struct LtcPlugin;

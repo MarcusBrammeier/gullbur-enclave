@@ -283,7 +283,9 @@ mod tests {
         // Tiered must always produce a key: keychain if available, else file.
         let dir = std::env::temp_dir().join(format!("gullbur-tier-{}", std::process::id()));
         let provider = TieredDeviceKeyProvider::new(dir.clone());
-        let k1 = provider.get_or_create_key().expect("tiered must produce a key");
+        let k1 = provider
+            .get_or_create_key()
+            .expect("tiered must produce a key");
         assert_eq!(k1.len(), 32);
         let k2 = provider.get_or_create_key().expect("test invariant");
         assert_eq!(k1, k2);

@@ -110,7 +110,10 @@ async fn send_encrypted(
 
 /// Helper: receive a response and decrypt it, returning the inner JSON.
 async fn recv_decrypted(
-    read: &mut (impl futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin),
+    read: &mut (
+             impl futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+             + Unpin
+         ),
     key: &[u8; 32],
 ) -> serde_json::Value {
     let msg = tokio::time::timeout(Duration::from_secs(5), read.next())
@@ -158,22 +161,17 @@ async fn e2e_isolation_vault_status() {
     let (mut write, mut read, key) = connect_encrypted(ISOLATION_PORT).await;
 
     // Send encrypted request for vault.status
-    send_encrypted(
-        &mut write,
-        &key,
-        "vault.status",
-        serde_json::json!({}),
-        1,
-    )
-    .await;
+    send_encrypted(&mut write, &key, "vault.status", serde_json::json!({}), 1).await;
 
     let decrypted = recv_decrypted(&mut read, &key).await;
     assert_eq!(decrypted["id"], 1, "response id matches");
     // vault.status returns initialized, status, plugin_ids, networks, accounts
-    assert_eq!(decrypted["result"]["initialized"], false, "uninitialized vault");
     assert_eq!(
-        decrypted["result"]["status"],
-        "Connected",
+        decrypted["result"]["initialized"], false,
+        "uninitialized vault"
+    );
+    assert_eq!(
+        decrypted["result"]["status"], "Connected",
         "status should be Connected when not initialized"
     );
 
@@ -187,8 +185,8 @@ async fn e2e_isolation_vault_status() {
 #[tokio::test]
 async fn e2e_isolation_generate_mnemonic() {
     let port = ISOLATION_PORT + 1;
-    let server = ipc_core::server::IpcServer::with_encryption(port, true)
-        .expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
     {
         let mut handler = server.handler().await;
@@ -231,8 +229,8 @@ async fn e2e_isolation_generate_mnemonic() {
 #[tokio::test]
 async fn e2e_isolation_method_not_found() {
     let port = ISOLATION_PORT + 2;
-    let server = ipc_core::server::IpcServer::with_encryption(port, true)
-        .expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
     {
         let mut handler = server.handler().await;
@@ -265,8 +263,7 @@ async fn e2e_isolation_method_not_found() {
         "method-not-found must return an error: {decrypted}"
     );
     assert_eq!(
-        decrypted["error"]["code"],
-        -32601,
+        decrypted["error"]["code"], -32601,
         "method not found error code"
     );
 
@@ -279,8 +276,8 @@ async fn e2e_isolation_method_not_found() {
 #[tokio::test]
 async fn e2e_isolation_tampered_payload_rejected() {
     let port = ISOLATION_PORT + 3;
-    let server = ipc_core::server::IpcServer::with_encryption(port, true)
-        .expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
     {
         let mut handler = server.handler().await;
@@ -364,8 +361,8 @@ async fn e2e_isolation_tampered_payload_rejected() {
 #[tokio::test]
 async fn e2e_isolation_plaintext_request_plaintext_response() {
     let port = ISOLATION_PORT + 4;
-    let server = ipc_core::server::IpcServer::with_encryption(port, true)
-        .expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
     {
         let mut handler = server.handler().await;
@@ -426,8 +423,8 @@ async fn e2e_isolation_plaintext_request_plaintext_response() {
 #[tokio::test]
 async fn e2e_isolation_sequential_calls_same_session() {
     let port = ISOLATION_PORT + 5;
-    let server = ipc_core::server::IpcServer::with_encryption(port, true)
-        .expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
     {
         let mut handler = server.handler().await;
@@ -445,14 +442,7 @@ async fn e2e_isolation_sequential_calls_same_session() {
     let (mut write, mut read, key) = connect_encrypted(port).await;
 
     // Call 1: vault.status
-    send_encrypted(
-        &mut write,
-        &key,
-        "vault.status",
-        serde_json::json!({}),
-        1,
-    )
-    .await;
+    send_encrypted(&mut write, &key, "vault.status", serde_json::json!({}), 1).await;
     let resp1 = recv_decrypted(&mut read, &key).await;
     assert_eq!(resp1["id"], 1);
     assert_eq!(resp1["result"]["initialized"], false);

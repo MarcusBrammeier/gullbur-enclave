@@ -113,7 +113,12 @@ impl IpcServer {
     /// ready.await; // waits until the port is bound
     /// // now connect safely
     /// ```
-    pub fn run(self) -> (tokio::task::JoinHandle<()>, tokio::sync::oneshot::Receiver<Result<(), String>>) {
+    pub fn run(
+        self,
+    ) -> (
+        tokio::task::JoinHandle<()>,
+        tokio::sync::oneshot::Receiver<Result<(), String>>,
+    ) {
         let auth_token = self.auth_token.clone();
         let port = self.port;
         let handler = Arc::clone(&self.handler);
@@ -426,7 +431,10 @@ mod tests {
     #[test]
     fn test_server_with_encryption_false_is_explicit_optout() {
         let server = IpcServer::with_encryption(0, false).expect("server construction");
-        assert!(!server.encrypt_responses, "opt-out should disable encryption");
+        assert!(
+            !server.encrypt_responses,
+            "opt-out should disable encryption"
+        );
     }
 
     #[test]

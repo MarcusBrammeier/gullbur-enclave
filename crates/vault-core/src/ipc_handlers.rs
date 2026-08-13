@@ -126,11 +126,8 @@ pub fn register_vault_handlers(
                     let phrase_str = staged_phrase.to_string();
                     let phrase = crypto_core::keys::mnemonic_from_string(&phrase_str)
                         .map_err(|e| RpcError::new(-32000, format!("Invalid mnemonic: {e}")))?;
-                    let seed = crypto_core::keys::mnemonic_to_seed(
-                        phrase.as_words(),
-                        passphrase,
-                    )
-                    .map_err(|e| {
+                    let seed = crypto_core::keys::mnemonic_to_seed(phrase.as_words(), passphrase)
+                        .map_err(|e| {
                         RpcError::new(-32000, format!("Seed derivation failed: {e}"))
                     })?;
                     (phrase_str, *seed)
@@ -718,7 +715,7 @@ pub fn register_vault_handlers(
             .map_err(|e| RpcError::new(-32000, format!("Encryption failed: {e}")))?;
 
             let blob = serde_json::to_string(
-                &serde_json::json!({"v": 1, "blob": hex::encode(&encrypted)})
+                &serde_json::json!({"v": 1, "blob": hex::encode(&encrypted)}),
             )
             .map_err(|e| RpcError::new(-32000, format!("Serialization failed: {e}")))?;
 
@@ -749,11 +746,10 @@ pub fn register_vault_handlers(
             let key = crate::host::get_device_key()
                 .map_err(|e| RpcError::new(-32000, format!("Device key unavailable: {e}")))?;
 
-            let plaintext = keystore_core::vault::decrypt_file_with_key(
-                &key, &encrypted, aad.as_bytes(),
-            )
-            .map_err(|e| RpcError::new(-32000, format!("Decryption failed: {e}")))?
-            .ok_or_else(|| RpcError::new(-32000, "Invalid encrypted blob format"))?;
+            let plaintext =
+                keystore_core::vault::decrypt_file_with_key(&key, &encrypted, aad.as_bytes())
+                    .map_err(|e| RpcError::new(-32000, format!("Decryption failed: {e}")))?
+                    .ok_or_else(|| RpcError::new(-32000, "Invalid encrypted blob format"))?;
 
             let data = String::from_utf8(plaintext)
                 .map_err(|e| RpcError::new(-32000, format!("Invalid UTF-8: {e}")))?;

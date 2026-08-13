@@ -8,16 +8,16 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use wallet_plugin::{
-    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata,
-    TxRecord, WalletPlugin,
+    Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata, TxRecord,
+    WalletPlugin,
 };
 
 // ── Serai Monero primitives ────────────────────────────────────────────────
+use crate::decoy_selector::fetch_and_build_ring;
 use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, edwards::EdwardsPoint, scalar::Scalar};
 use monero_clsag_mirror::{Clsag, ClsagContext};
 use monero_serai_mirror::generators::hash_to_point;
 use monero_serai_mirror::primitives::{Commitment, Decoys, INV_EIGHT, keccak256_to_scalar};
-use crate::decoy_selector::fetch_and_build_ring;
 use zeroize::Zeroizing;
 
 mod decoy_selector;
@@ -289,22 +289,25 @@ async fn sign_monero_tx(
         let _amount = input.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
         let signer_index = (i % RING_SIZE) as u8;
 
-        let (_signer_ring_member, ring, offsets): ([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>, Vec<u64>) =
-            if let Some(c) = client {
-                // Try real decoys from the daemon; on failure fall back
-                match fetch_and_build_ring(c, network, &signer_key).await {
-                    Ok((member, r, o)) => (member, r, o),
-                    Err(e) => {
-                        tracing::warn!("Real decoy selection failed ({e}), falling back to synthetic");
-                        let (m, r) = build_decoy_ring(&signer_key, signer_index);
-                        (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
-                    }
+        let (_signer_ring_member, ring, offsets): (
+            [EdwardsPoint; 2],
+            Vec<[EdwardsPoint; 2]>,
+            Vec<u64>,
+        ) = if let Some(c) = client {
+            // Try real decoys from the daemon; on failure fall back
+            match fetch_and_build_ring(c, network, &signer_key).await {
+                Ok((member, r, o)) => (member, r, o),
+                Err(e) => {
+                    tracing::warn!("Real decoy selection failed ({e}), falling back to synthetic");
+                    let (m, r) = build_decoy_ring(&signer_key, signer_index);
+                    (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
                 }
-            } else {
-                // No daemon client — synthetic decoys (test/dev path)
-                let (m, r) = build_decoy_ring(&signer_key, signer_index);
-                (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
-            };
+            }
+        } else {
+            // No daemon client — synthetic decoys (test/dev path)
+            let (m, r) = build_decoy_ring(&signer_key, signer_index);
+            (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
+        };
 
         let decoys = Decoys::new(offsets, signer_index, ring)
             .ok_or_else(|| PluginError::Internal("failed to build decoys".into()))?;
@@ -1207,7 +1210,9 @@ mod tests {
         });
         let tx_bytes = serde_json::to_vec(&unsigned_tx).expect("test invariant");
 
-        let result = plugin.sign_transaction(&tx_bytes, seed_bytes, 0, "monero").await;
+        let result = plugin
+            .sign_transaction(&tx_bytes, seed_bytes, 0, "monero")
+            .await;
         assert!(
             result.is_ok(),
             "CLSAG signing should succeed: {:?}",
@@ -1404,7 +1409,11 @@ mod tests {
         // discriminator, not a decode failure).
         let addr = build_valid_xmr_address(18, 77);
         let decoded = base58_decode_bytes(&addr).expect("decodes");
-        assert_eq!(decoded.len(), 77, "integrated/sub-address payload must be 77 bytes");
+        assert_eq!(
+            decoded.len(),
+            77,
+            "integrated/sub-address payload must be 77 bytes"
+        );
     }
 
     #[test]

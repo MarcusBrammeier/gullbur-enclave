@@ -18,8 +18,7 @@ const TEST_PORT: u16 = 19990;
 
 #[tokio::test]
 async fn e2e_plaintext_connect_and_generate_mnemonic() {
-    let server =
-        ipc_core::server::IpcServer::new(TEST_PORT).expect("create IPC server");
+    let server = ipc_core::server::IpcServer::new(TEST_PORT).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
 
     {

@@ -22,7 +22,7 @@ use rand::Rng;
 use serde_json::Value;
 use std::collections::HashSet;
 
-use crate::{daemon_rpc, PluginError};
+use crate::{PluginError, daemon_rpc};
 
 /// Default ring size for Monero transactions (11 = 10 decoys + 1 real).
 pub const RING_SIZE: usize = 11;
@@ -92,9 +92,9 @@ pub async fn fetch_and_build_ring(
             ring.push(signer_member);
             ring_indices.push(decoy_indices[0]); // placeholder — real signer has no real index
         } else {
-            let entry = decoy_iter.next().ok_or_else(|| {
-                PluginError::Internal("decoy iterator exhausted early".into())
-            })?;
+            let entry = decoy_iter
+                .next()
+                .ok_or_else(|| PluginError::Internal("decoy iterator exhausted early".into()))?;
             ring.push(entry);
             ring_indices.push(decoy_indices[ring.len() - 1]);
         }
@@ -133,15 +133,10 @@ async fn fetch_output_distribution(
         .and_then(|d| d.get("data"))
         .and_then(|v| v.as_array())
         .ok_or_else(|| {
-            PluginError::NetworkError(
-                "missing 'data' in get_output_distribution result".into(),
-            )
+            PluginError::NetworkError("missing 'data' in get_output_distribution result".into())
         })?;
 
-    let distribution: Vec<u64> = dist_data
-        .iter()
-        .filter_map(|v| v.as_u64())
-        .collect();
+    let distribution: Vec<u64> = dist_data.iter().filter_map(|v| v.as_u64()).collect();
 
     if distribution.is_empty() {
         return Err(PluginError::NetworkError(
@@ -163,11 +158,7 @@ async fn fetch_output_distribution(
 /// - 50% probability to pick uniformly across the full chain
 /// This ensures a reasonable distribution that won't trivially stand out
 /// on chain analysis.
-fn select_decoy_indices(
-    distribution: &[u64],
-    count: usize,
-    total_outputs: u64,
-) -> Vec<u64> {
+fn select_decoy_indices(distribution: &[u64], count: usize, total_outputs: u64) -> Vec<u64> {
     let mut rng = rand::rng();
     let mut selected: HashSet<u64> = HashSet::new();
     // Prevent picking index 0 (genesis output is a known coinbase that
@@ -179,7 +170,10 @@ fn select_decoy_indices(
     // know the exact block count from the distribution alone, use
     // the last 30% of distribution entries.
     let recent_cutoff = (distribution.len() as f64 * 0.7) as usize;
-    let recent_start_index = distribution.get(recent_cutoff).copied().unwrap_or(total_outputs / 2);
+    let recent_start_index = distribution
+        .get(recent_cutoff)
+        .copied()
+        .unwrap_or(total_outputs / 2);
 
     let max_iterations = count * 20; // safety valve to avoid infinite loops
     let mut iterations = 0;
@@ -240,9 +234,7 @@ async fn fetch_output_keys(
     let outs = result
         .get("outs")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| {
-            PluginError::NetworkError("missing 'outs' in get_outs response".into())
-        })?;
+        .ok_or_else(|| PluginError::NetworkError("missing 'outs' in get_outs response".into()))?;
 
     if outs.is_empty() {
         return Err(PluginError::NetworkError(
@@ -253,27 +245,20 @@ async fn fetch_output_keys(
     let mut real_outputs: Vec<[EdwardsPoint; 2]> = Vec::with_capacity(outs.len());
 
     for out in outs {
-        let key_hex = out
-            .get("key")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                PluginError::NetworkError(
-                    "missing 'key' in get_outs output entry".into(),
-                )
-            })?;
-
-        let key_bytes = hex::decode(key_hex).map_err(|e| {
-            PluginError::NetworkError(format!("invalid hex key in get_outs: {e}"))
+        let key_hex = out.get("key").and_then(|v| v.as_str()).ok_or_else(|| {
+            PluginError::NetworkError("missing 'key' in get_outs output entry".into())
         })?;
+
+        let key_bytes = hex::decode(key_hex)
+            .map_err(|e| PluginError::NetworkError(format!("invalid hex key in get_outs: {e}")))?;
 
         let key_point = bytes_to_edwards(&key_bytes)?;
 
         // Decode the commitment from the output if present, otherwise
         // derive a commitment to zero (backward compat with older daemons)
         let commitment_point = if let Some(mask) = out.get("mask").and_then(|v| v.as_str()) {
-            let mask_bytes = hex::decode(mask).map_err(|e| {
-                PluginError::NetworkError(format!("invalid hex mask: {e}"))
-            })?;
+            let mask_bytes = hex::decode(mask)
+                .map_err(|e| PluginError::NetworkError(format!("invalid hex mask: {e}")))?;
             bytes_to_edwards(&mask_bytes)?
         } else {
             // Fallback: commitment = key * 8 (zero amount)
@@ -293,9 +278,7 @@ fn bytes_to_edwards(bytes: &[u8]) -> Result<EdwardsPoint, PluginError> {
             let mut arr = [0u8; 32];
             arr.copy_from_slice(bytes);
             CompressedEdwardsY(arr).decompress().ok_or_else(|| {
-                PluginError::NetworkError(
-                    "failed to decode compressed EdwardsPoint".into(),
-                )
+                PluginError::NetworkError("failed to decode compressed EdwardsPoint".into())
             })
         }
         64 => {
@@ -305,9 +288,7 @@ fn bytes_to_edwards(bytes: &[u8]) -> Result<EdwardsPoint, PluginError> {
             compressed.copy_from_slice(&bytes[..32]);
             compressed[31] |= bytes[63] & 0x80; // flip sign bit from X
             CompressedEdwardsY(compressed).decompress().ok_or_else(|| {
-                PluginError::NetworkError(
-                    "failed to decode uncompressed EdwardsPoint".into(),
-                )
+                PluginError::NetworkError("failed to decode uncompressed EdwardsPoint".into())
             })
         }
         _ => Err(PluginError::NetworkError(format!(

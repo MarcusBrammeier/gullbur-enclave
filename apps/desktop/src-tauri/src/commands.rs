@@ -287,16 +287,16 @@ pub async fn sign_transaction(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let tx_bytes = hex::decode(&tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
-        let seed_guard = vault.seed.read().await;
-        let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
-        drop(seed_guard);
-        let idx = account_index.unwrap_or(0);
-        let host = vault.plugin_host.read().await;
-        let signed = host
-            .sign_transaction(&tx_bytes, &seed_bytes, idx, &network)
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(hex::encode(signed))
+    let seed_guard = vault.seed.read().await;
+    let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
+    drop(seed_guard);
+    let idx = account_index.unwrap_or(0);
+    let host = vault.plugin_host.read().await;
+    let signed = host
+        .sign_transaction(&tx_bytes, &seed_bytes, idx, &network)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(hex::encode(signed))
 }
 
 #[tauri::command]

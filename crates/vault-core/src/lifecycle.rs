@@ -120,9 +120,7 @@ impl LifecycleManager {
                 }
                 Ok(Err(e)) => {
                     tracing::error!("IPC server failed to bind: {e}");
-                    return Err(VaultError::Internal(format!(
-                        "IPC server bind failed: {e}"
-                    )));
+                    return Err(VaultError::Internal(format!("IPC server bind failed: {e}")));
                 }
                 Err(_) => {
                     tracing::error!("IPC server readiness channel closed without signal");
