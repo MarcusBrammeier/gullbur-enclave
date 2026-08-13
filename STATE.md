@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
 > **Version:** 0.1.0-beta.1 (public staging)
-> **Last updated:** 2026-08-10
-> **HEAD:** `c6bd497` (2026-08-10)
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (307 passed, 1 ignored) | `cargo test -p cli-integration` ✅ | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **frontend Svelte component tests ✅ (192)** | `cargo clippy -D warnings` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 10-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
+> **Last updated:** 2026-08-13
+> **HEAD:** `d59de16` (2026-08-13)
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (314 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **WASM crypto round-trip (7) ✅** | **frontend Svelte component tests ✅ (248)** | `cargo fmt --check` ✅ | `cargo clippy -D clippy::unwrap_used` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 13-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
 
 ### Security hardening (2026-08-08)
 
@@ -124,10 +124,20 @@
 - **GUI workflow tests** — `QrScanner.test.ts` (camera error/stream wiring) +
   expanded `addressBook.test.ts` (round-trip, corrupt-data recovery, malformed
   entry filtering).
-- **Full 10-layer sweep green** — Layers 8-10 (full functional sweep, 20-account
+- **Full 13-layer sweep green** — Layers 8-10 (full functional sweep, 20-account
   E2E stress, daemon crash→restart→reconnect recovery) fixed: headless CLI
   build (un-gated `with_no_encrypt`), numeric JSON-RPC IDs, inode-based PID
-  resolution, correct crash-recovery contract. **ALL TESTS PASSED.**
+  resolution, correct crash-recovery contract. Layers 11-13 added 2026-08-13:
+  **WASM crypto round-trip** (real shipped blob), **frontend vitest suite**
+  (248 tests), and **static gates** (fmt + clippy + deny + audit) mirroring CI
+  so local green == CI green. **ALL 13 LAYERS PASSED.**
+- **Standard release gate** — `scripts/full-test-sweep.sh` is now the canonical
+  13-layer gate (run before every `build-all.sh` + push): compile → unit →
+  integration → persistence → IPC e2e/security → fuzz build → branding audit →
+  desktop binary → full functional → E2E stress → disconnect recovery → WASM
+  crypto round-trip → frontend vitest → static gates. All Layers gate on **tool
+  exit codes** (not `grep -q` on output) to avoid the pipefail/SIGPIPE pitfall,
+  so a green run is authoritative.
 
 ## Project Overview
 
@@ -222,10 +232,11 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo fmt --check` | ✅ |
 | `cargo check --workspace` | ✅ |
 | `cargo clippy --workspace -- -D warnings` | ✅ (zero warnings) |
-| `cargo test --workspace --lib` | ✅ (304 passed, 1 ignored) |
+| `cargo test --workspace --lib` | ✅ (314 passed, 1 ignored) |
 | `cargo test -p cli-integration` | ✅ (6 passed, 41 total) |
 | `cargo test -p vault-core --test e2e_websocket` | ✅ (13 methods) |
 | `cargo test -p vault-core --test account_persistence` | ✅ (3 passed) |
+| **WASM crypto round-trip** (`crypto_wasm.test.ts`) | ✅ (7 tests, real shipped blob) |
 | **IPC e2e handshake: e2e_ipc_flow / e2e_disconnect_reconnect / e2e_full_lifecycle** | ✅ (3 tests) |
 | `cargo deny check` | ✅ |
 | `bash scripts/audit.sh` | ✅ (advisories suppressed for 17 known Tauri transitive) |
@@ -236,7 +247,7 @@ c36a865 chore: pre-shrink sweep fixes
 | `scripts/android-sweep.sh` | ✅ (added **on-device adb-forward WS handshake**) |
 | **scripts/full-functional-sweep.py** | ✅ **33/33 checks** |
 | **— Stage 1: Testing Upgrades (2026-08-08) —** | |
-| **Svelte component tests** | ✅ **118 tests** (97 original + 8 fuzz + 21 theme engine) |
+| **Svelte component tests** | ✅ **248 tests** (per Layer 12 vitest sweep, 2026-08-13) |
 | **scripts/e2e-full-stack-sweep.py** | ✅ **20-account concurrent balance + tx-history stress** |
 | **scripts/disconnect-recovery-test.py** | ✅ **Daemon crash → restart → reconnect lifecycle** |
 | **Edge-case input fuzzing** | ✅ **8 fuzz tests** (zero-width chars, homoglyphs, XSS, path traversal, amount fuzzing) |
@@ -289,7 +300,7 @@ The STATE.md mentioned a "KeyHandle trait overhaul" but BTC/LTC PSBT already par
 - **APK** (12M universal side-load): `apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`
 - **AAB** (7.1M — Play/distribution, target hit): `apps/desktop/src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`
 - **5 fuzz targets**: aes_gcm, bip39, json_rpc, psbt, validate_address
-- **304+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **2 staged-mnemonic e2e** + **89 frontend Svelte component tests** — all passing
+- **314+ unit tests** + **6 CLI integration** + **13 IPC e2e/security** + **2 staged-mnemonic e2e** + **248 frontend tests** (incl. 7 WASM crypto round-trip) — all passing
 - **Address book store** (`apps/desktop/src/lib/addressBook.ts`) — persistent per-network recipients + 6 tests
 - **QR receive-scan** (`QrScanner.svelte`) — getUserMedia + jsQR recipient scanning
 - **Accent-theme system** — 5 presets (emerald/violet/amber/cyan/rose) + motion tokens
