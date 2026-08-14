@@ -68,8 +68,8 @@ static BTC_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| {
 fn esplora_base(network: &str) -> &str {
     match network {
         "bitcoin" => "https://blockstream.info/api",
-        "bitcoin-testnet" => "https://blockstream.info/testnet/api",
-        "bitcoin-signet" => "https://blockstream.info/signet/api",
+        "bitcoin-testnet" => "https://mempool.space/testnet4/api",
+        "bitcoin-signet" => "https://mempool.space/testnet/api",
         _ => "https://blockstream.info/api",
     }
 }
@@ -118,7 +118,7 @@ impl WalletPlugin for BtcPlugin {
     ) -> Result<Account, PluginError> {
         let btc_network = match network {
             "bitcoin" => bitcoin::Network::Bitcoin,
-            "bitcoin-testnet" => bitcoin::Network::Testnet,
+            "bitcoin-testnet" => bitcoin::Network::Testnet4,
             "bitcoin-signet" => bitcoin::Network::Signet,
             _ => return Err(PluginError::UnsupportedNetwork(network.into())),
         };
@@ -178,7 +178,7 @@ impl WalletPlugin for BtcPlugin {
         // Determine BIP-84 network
         let btc_network = match network {
             "bitcoin" => bitcoin::Network::Bitcoin,
-            "bitcoin-testnet" => bitcoin::Network::Testnet,
+            "bitcoin-testnet" => bitcoin::Network::Testnet4,
             "bitcoin-signet" => bitcoin::Network::Signet,
             _ => return Err(PluginError::UnsupportedNetwork(network.into())),
         };
@@ -422,7 +422,7 @@ impl WalletPlugin for BtcPlugin {
         if let Ok(unchecked) = addr.parse::<bitcoin::Address<NetworkUnchecked>>() {
             let expected = match network {
                 "bitcoin" => bitcoin::Network::Bitcoin,
-                "bitcoin-testnet" => bitcoin::Network::Testnet,
+                "bitcoin-testnet" => bitcoin::Network::Testnet4,
                 "bitcoin-signet" => bitcoin::Network::Signet,
                 _ => return Ok(false),
             };

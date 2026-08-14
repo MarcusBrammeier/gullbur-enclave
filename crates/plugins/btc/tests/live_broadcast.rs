@@ -8,7 +8,7 @@
 use plugin_btc::BtcPlugin;
 use wallet_plugin::{KeyHandle, KeyType, WalletPlugin};
 
-const RPC: &str = "https://blockstream.info/testnet/api";
+const RPC: &str = "https://mempool.space/testnet4/api";
 
 fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
@@ -152,7 +152,11 @@ async fn live_broadcast_testnet() {
     };
 
     let signed_psbt_bytes = plugin
-        .sign_transaction(&psbt_bytes, seed_hex.as_bytes(), 0, "bitcoin-testnet")
+        // Pass the DECODED seed bytes so the plugin derives the same key used
+        // by create_account. Passing seed_hex.as_bytes() (the ASCII hex string)
+        // yields a different BIP-32 master -> wrong pubkey -> the node rejects
+        // the spend (OP_EQUALVERIFY / script-verify-fail).
+        .sign_transaction(&psbt_bytes, &seed, 0, "bitcoin-testnet")
         .await
         .expect("sign_transaction should succeed");
     let signed_psbt =
