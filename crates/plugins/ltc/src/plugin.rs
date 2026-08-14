@@ -258,13 +258,32 @@ impl WalletPlugin for LtcPlugin {
                 PluginError::Internal(format!("PSBT input {i} missing witness UTXO"))
             })?;
 
-            // Compute BIP-143 sighash for this input at its proper index
-            let sighash = sighasher
-                .p2wpkh_signature_hash(i, &utxo.script_pubkey, utxo.value, sighash_type)
-                .map_err(|e| PluginError::Internal(format!("sighash: {e}")))?;
+            // Compute the correct signature hash for the UTXO's script type.
+            //
+            // create_account emits *legacy P2PKH* addresses (m/n...) for testnet,
+            // so a funded UTXO's script_pubkey is P2PKH and must be signed with the
+            // legacy signature hash (script code = the P2PKH script itself). Segwit
+            // UTXOs (ltc1/tltc1) use the BIP-143 P2WPKH hash. Signing with the wrong
+            // algorithm for the script type yields a signature the node rejects.
+            let digest: [u8; 32] = if utxo.script_pubkey.is_p2wpkh() {
+                let h = sighasher
+                    .p2wpkh_signature_hash(i, &utxo.script_pubkey, utxo.value, sighash_type)
+                    .map_err(|e| PluginError::Internal(format!("p2wpkh sighash: {e}")))?;
+                *h.as_ref()
+            } else if utxo.script_pubkey.is_p2pkh() {
+                let h = sighasher
+                    .legacy_signature_hash(i, &utxo.script_pubkey, sighash_type.to_u32())
+                    .map_err(|e| PluginError::Internal(format!("p2pkh sighash: {e}")))?;
+                *h.as_ref()
+            } else {
+                return Err(PluginError::Internal(format!(
+                    "unsupported UTXO script type for input {i}: {}",
+                    utxo.script_pubkey
+                )));
+            };
 
             // Sign with bitcoin's secp256k1 (handles low-S normalization)
-            let msg = bitcoin::secp256k1::Message::from_digest(*sighash.as_ref());
+            let msg = bitcoin::secp256k1::Message::from_digest(digest);
             let secp_sig = secp_signer.sign_ecdsa(&msg, &secret_key);
             let mut sig_bytes = secp_sig.serialize_der().to_vec();
             sig_bytes.push(sighash_type.to_u32() as u8);
@@ -814,5 +833,89 @@ mod tests {
             .sign_transaction(b"not a valid PSBT", &seed_bytes, 0, "litecoin")
             .await;
         assert!(result.is_err(), "passing garbage bytes should return Err");
+    }
+
+    #[tokio::test]
+    async fn test_sign_transaction_p2pkh_legacy_input() {
+        // Regression test for the P2PKH (legacy, m/n...) signing path.
+        // create_account emits *legacy P2PKH* addresses for testnet, but sign_transaction
+        // previously only handled P2WPKH (BIP-143). That mismatch made the plugin sign a
+        // P2PKH UTXO with the wrong sighash algorithm, so any broadcast of a funded
+        // legacy testnet address was rejected by the node. This test proves a P2PKH
+        // witness_utxo now signs via the legacy (pre-segwit) signature hash.
+        use bitcoin::absolute::LockTime;
+        use bitcoin::hashes::Hash;
+        use bitcoin::psbt::Psbt;
+        use bitcoin::transaction::Version;
+        use bitcoin::{Amount, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Witness};
+
+        let plugin = LtcPlugin::new();
+
+        let seed_hex = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        let seed_bytes = hex::decode(seed_hex).expect("test invariant");
+
+        let unsigned_tx = bitcoin::Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint::new(bitcoin::Txid::from_byte_array([1u8; 32]), 0),
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::new(),
+            }],
+            output: vec![TxOut {
+                value: Amount::from_sat(90000),
+                script_pubkey: ScriptBuf::from_bytes(vec![0u8; 25]),
+            }],
+        };
+
+        // Legacy P2PKH script: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+        // = 0x76 0xa9 0x14 <hash160> 0x88 0xac
+        let mut p2pkh_bytes = vec![0x76u8, 0xa9, 0x14];
+        p2pkh_bytes.extend_from_slice(&[0u8; 20]);
+        p2pkh_bytes.push(0x88);
+        p2pkh_bytes.push(0xac);
+        let p2pkh_script = ScriptBuf::from_bytes(p2pkh_bytes);
+        assert!(p2pkh_script.is_p2pkh(), "test invariant: script must be P2PKH");
+
+        let psbt = Psbt {
+            unsigned_tx,
+            version: 0,
+            xpub: Default::default(),
+            proprietary: Default::default(),
+            unknown: Default::default(),
+            inputs: vec![bitcoin::psbt::Input {
+                witness_utxo: Some(TxOut {
+                    value: Amount::from_sat(50000),
+                    script_pubkey: p2pkh_script,
+                }),
+                ..Default::default()
+            }],
+            outputs: vec![Default::default()],
+        };
+
+        let psbt_bytes = psbt.serialize();
+        let signed = plugin
+            .sign_transaction(&psbt_bytes, &seed_bytes, 0, "litecoin-testnet")
+            .await
+            .expect("sign_transaction should succeed on a P2PKH legacy input");
+
+        let signed_psbt = Psbt::deserialize(&signed).expect("signed PSBT should deserialize");
+        assert!(
+            !signed_psbt.inputs[0].partial_sigs.is_empty(),
+            "P2PKH input must carry a partial sig"
+        );
+
+        // Confirm the UTXO script we signed stayed P2PKH (not rewritten to a witness
+        // program), proving the legacy sighash path was used for THIS script.
+        assert!(
+            signed_psbt.inputs[0]
+                .witness_utxo
+                .as_ref()
+                .expect("witness_utxo preserved")
+                .script_pubkey
+                .is_p2pkh(),
+            "signed input's UTXO script must remain P2PKH"
+        );
     }
 }
