@@ -42,7 +42,7 @@ static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| {
 fn esplora_base(network: &str) -> &str {
     match network {
         "litecoin" => "https://litecoin.mempool.space/api",
-        "litecoin-testnet" => "https://litecoin.mempool.space/testnet/api",
+        "litecoin-testnet" => "https://litecoin.mempool.space/testnet4/api",
         _ => "https://litecoin.mempool.space/api",
     }
 }
@@ -125,7 +125,7 @@ fn ltc_p2pkh_address(
 fn btc_network(network: &str) -> Result<bitcoin::Network, PluginError> {
     match network {
         "litecoin" => Ok(bitcoin::Network::Bitcoin),
-        "litecoin-testnet" => Ok(bitcoin::Network::Testnet),
+        "litecoin-testnet" => Ok(bitcoin::Network::Testnet4),
         _ => Err(PluginError::UnsupportedNetwork(network.into())),
     }
 }
@@ -512,7 +512,7 @@ mod tests {
     fn test_btc_network_testnet() {
         assert_eq!(
             btc_network("litecoin-testnet").expect("test invariant"),
-            bitcoin::Network::Testnet
+            bitcoin::Network::Testnet4
         );
     }
 
@@ -533,7 +533,7 @@ mod tests {
     fn test_esplora_base_testnet() {
         assert_eq!(
             esplora_base("litecoin-testnet"),
-            "https://litecoin.mempool.space/testnet/api"
+            "https://litecoin.mempool.space/testnet4/api"
         );
     }
 
@@ -549,7 +549,7 @@ mod tests {
     fn test_balance_base_testnet() {
         assert_eq!(
             esplora_base("litecoin-testnet"),
-            "https://litecoin.mempool.space/testnet/api"
+            "https://litecoin.mempool.space/testnet4/api"
         );
     }
 
