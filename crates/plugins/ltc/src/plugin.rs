@@ -131,10 +131,12 @@ fn btc_network(network: &str) -> Result<bitcoin::Network, PluginError> {
 }
 
 fn coin_type(network: &str) -> u32 {
+    // BIP-44 / SLIP-44: Litecoin is registered coin type 2, used for both
+    // mainnet and testnet. (Coin type 1 is Bitcoin testnet only.)
     match network {
         "litecoin" => 2,
-        "litecoin-testnet" => 1,
-        _ => 1,
+        "litecoin-testnet" => 2,
+        _ => 2,
     }
 }
 
@@ -492,12 +494,12 @@ mod tests {
 
     #[test]
     fn test_coin_type_testnet() {
-        assert_eq!(coin_type("litecoin-testnet"), 1);
+        assert_eq!(coin_type("litecoin-testnet"), 2);
     }
 
     #[test]
     fn test_coin_type_unknown() {
-        assert_eq!(coin_type("unknown"), 1);
+        assert_eq!(coin_type("unknown"), 2);
     }
 
     #[test]
