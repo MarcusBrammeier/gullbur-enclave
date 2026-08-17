@@ -1211,7 +1211,7 @@ pub async fn report_bug(
 
     // Build the GitHub issue URL
     // Build the GitHub issue URL
-    let repo = "MarcusBrammeier/gullbur-enclave"; // REPLACE_ME: actual GitHub org/repo
+    let repo = "MarcusBrammeier/gullbur-enclave";
     let base_url = format!("https://github.com/{repo}/issues/new");
 
     // Build final URL with URL-encoded body
@@ -1412,7 +1412,7 @@ pub async fn check_for_updates() -> UpdateCheckResult {
     match update_checker::check_for_updates("MarcusBrammeier/gullbur-enclave", token.as_deref())
         .await
     {
-        // REPLACE_ME
+        // query the confirmed repo for the latest published release
         Ok(Some(info)) => UpdateCheckResult {
             local_version: info.local_version,
             latest_version: info.release.tag_name.clone(),

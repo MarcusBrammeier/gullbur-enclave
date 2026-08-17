@@ -111,6 +111,8 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 > testnet3/4, XMR stagenet) is still being validated.** See
 > [TESTING.md](TESTING.md) for details and how to send us testnet coins.
 
+See the [CHANGELOG](CHANGELOG.md) for the full release history.
+
 ## License
 
 **Business Source License 1.1 (BSL-1.1)** — source-available during beta/testing.
