@@ -30,7 +30,8 @@ const DEFAULT_XMR_RPC_PORT: u16 = 18082;
 pub struct MoneroWalletRpcProcess {
     /// Path to the monero-wallet-rpc binary.
     binary_path: String,
-    /// Remote daemon to connect to (e.g. "stagenet.xmr-node.cakewallet.com:38081").
+    /// Remote daemon to connect to (e.g. "xmr-node.cakewallet.com:18081").
+    /// This is the monero P2P daemon (host:port), NOT the JSON-RPC URL.
     daemon_address: String,
     /// Directory for wallet files (ephemeral).
     wallet_dir: String,
@@ -44,8 +45,13 @@ impl MoneroWalletRpcProcess {
     /// Create a new wallet-rpc process config. Does **not** start it.
     ///
     /// `network` is a Monero network string ("monero", "monero-stagenet", "monero-testnet").
-    /// The daemon address is auto-selected from public nodes.
-    /// Call `.start().await` to actually launch.
+    /// The daemon address is auto-selected from known public nodes, and can be
+    /// overridden per-instance via [`Self::with_daemon`] (e.g. to point at a local node).
+    ///
+    /// Note: wallet-rpc needs a **P2P** daemon (`host:port`), not a JSON-RPC URL.
+    /// As of 2026-08 only the mainnet default is verified reachable; stagenet/testnet
+    /// public P2P nodes are not reliably available, so point those at your own
+    /// `monerod --stagenet`/`--testnet` node (P2P enabled) or leave balance/history off.
     pub fn new(
         binary_path: impl Into<String>,
         network: &str,
