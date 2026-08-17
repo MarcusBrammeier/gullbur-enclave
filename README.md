@@ -106,6 +106,11 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 
 **Beta.** Core crypto works across all 4 chains. All 18 beta gates pass. The Android APK is testable — sideload the `.apk` from the releases page. Testnet-only mode is on by default; mainnet access requires an explicit opt-in warning.
 
+> **Testnet validation status:** signing/broadcast are verified on a local regtest
+> node and the daemon JSON-RPC path is verified live; **public testnet relay (LTC
+> testnet3/4, XMR stagenet) is still being validated.** See
+> [TESTING.md](TESTING.md) for details and how to send us testnet coins.
+
 ## License
 
 **Business Source License 1.1 (BSL-1.1)** — source-available during beta/testing.

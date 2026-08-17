@@ -314,6 +314,8 @@ c36a865 chore: pre-shrink sweep fixes
 | `cargo deny` suppresses 17 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |
 | GitHub URLs are `MarcusBrammeier` placeholders | User must set actual org/repo before publishing | Placeholder (set via grep) |
 | **XMR wallet-rpc balance/history needs a P2P daemon** | The plugin's JSON-RPC path is fixed (broadcast/fee/decoys via configurable daemon). But `monero-wallet-rpc` (balance/history) needs a **P2P** daemon; Cake stagenet/testnet P2P subdomains are dead and no reliable public stagenet/testnet P2P node exists (2026-08). Mainnet P2P (`xmr-node.cakewallet.com:18081`) verified live. Override via `MoneroWalletRpcProcess::with_daemon` or a local `monerod --stagenet`. | Documented; user-supplied node needed for fully live stagenet balance/broadcast |
+| **LTC public testnet relay NOT yet proven** | Sign+broadcast verified **on local regtest** (txid `56992f8c…`, 1 confirm on our node). Public testnet3/testnet4 relay not yet demonstrated — no testnet LTC has landed on the public chain. | Pending; see `TESTING.md` for the public funding address. Published for community testnet sends. |
+| **CypherFaucet tLTC does not propagate to public testnet** | Claiming tLTC from `cypherfaucet.com` returns a txid, but the tx is **not visible** on `mempool.space` testnet3/testnet4 (404) and `litecoinspace.org` is down. Its LTC explorer is a `.onion`; appears to be an isolated/relay-gapped chain. Do not spend more time on this faucet for public testing. | Investigated 2026-08; documented so it isn't re-attempted. |
 
 ---
 
