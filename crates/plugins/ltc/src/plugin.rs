@@ -501,7 +501,11 @@ mod tests {
     #[test]
     fn test_supported_networks() {
         let plugin = LtcPlugin::new();
-        let ids: Vec<&str> = plugin.supported_networks().iter().map(|s| s.id.as_str()).collect();
+        let ids: Vec<&str> = plugin
+            .supported_networks()
+            .iter()
+            .map(|s| s.id.as_str())
+            .collect();
         assert_eq!(ids.len(), 4);
         assert!(ids.contains(&"litecoin"));
         assert!(ids.contains(&"litecoin-testnet3"));
@@ -932,7 +936,10 @@ mod tests {
         p2pkh_bytes.push(0x88);
         p2pkh_bytes.push(0xac);
         let p2pkh_script = ScriptBuf::from_bytes(p2pkh_bytes);
-        assert!(p2pkh_script.is_p2pkh(), "test invariant: script must be P2PKH");
+        assert!(
+            p2pkh_script.is_p2pkh(),
+            "test invariant: script must be P2PKH"
+        );
 
         let psbt = Psbt {
             unsigned_tx,

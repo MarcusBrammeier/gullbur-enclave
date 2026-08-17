@@ -1,9 +1,9 @@
 # Gullbúr Enclave — Project State
 
 > **Version:** 0.1.0-beta.1 (public staging)
-> **Last updated:** 2026-08-13
-> **HEAD:** `d59de16` (2026-08-13)
-> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (314 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **WASM crypto round-trip (7) ✅** | **frontend Svelte component tests ✅ (248)** | `cargo fmt --check` ✅ | `cargo clippy -D clippy::unwrap_used` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 13-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
+> **Last updated:** 2026-08-17
+> **HEAD:** `4b5ea60` (2026-08-17)
+> **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (322 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **WASM crypto round-trip (7) ✅** | **frontend Svelte component tests ✅ (248)** | `cargo fmt --check` ✅ | `cargo clippy -D clippy::unwrap_used` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 13-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
 
 ### Security hardening (2026-08-08)
 
@@ -138,6 +138,33 @@
   crypto round-trip → frontend vitest → static gates. All Layers gate on **tool
   exit codes** (not `grep -q` on output) to avoid the pipefail/SIGPIPE pitfall,
   so a green run is authoritative.
+
+### Session 2026-08-17 — LTC testnet split + XMR daemon resilience + E2E proof
+
+- **LTC testnet3/testnet4 split** (`26559e6`): `litecoin-testnet` split into
+  explicit `litecoin-testnet3` (→ `/testnet/api`, `Network::Testnet`) and
+  `litecoin-testnet4` (→ `/testnet4/api`, `Network::Testnet4`), with
+  `litecoin-testnet` kept as a backward-compat alias to testnet3. Both derive
+  the identical legacy P2PKH `m/n` address (`m/84'/2'/0'/0/i`), so derivation,
+  signing and address-validation are shared; only the Esplora base and
+  `bitcoin::Network` differ.
+- **LTC P2PKH address-helper fix** (`1dde27b`): the address helpers initially
+  rejected the new split ids — caught by a focused split-verification test
+  before it shipped.
+- **LTC regtest E2E test** (`46bfd10`): funds our derived P2PKH address on a
+  LOCAL `litecoind` regtest node, signs a spend through `LtcPlugin` legacy
+  P2PKH path, broadcasts + confirms on-chain (txid `56992f8c…`, 1 confirm).
+  Proves sign→broadcast E2E deterministically, independent of flaky public
+  faucets.
+- **XMR configurable daemon endpoints + failover** (`ede9d6c`): replaced the
+  single hardcoded daemon URL with an ordered per-network fallback list
+  (default `node.monerodevs.org`, verified live on mainnet 18089 / stagenet
+  38089 / testnet 28089). New `XmrPlugin::with_daemon_urls` builder; `daemon_rpc_with`
+  fails over to the next endpoint on failure. `broadcast_transaction` and
+  `estimate_fee` route through it; decoys stay best-effort. Live
+  `estimate_fee` returns real fees (20000 piconero) on all three networks.
+- **LTC live testnet3 broadcast test** (`4b5ea60`): ignored-by-default test
+  spending our derived P2PKH UTXO on the public testnet3 chain.
 
 ## Project Overview
 

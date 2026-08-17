@@ -63,7 +63,10 @@ async fn regtest_sign_e2e() {
         .expect("create_account must succeed");
     let addr = acct.address.clone();
     eprintln!("Derived address: {addr}");
-    assert!(addr.starts_with('m') || addr.starts_with('n'), "expected P2PKH, got {addr}");
+    assert!(
+        addr.starts_with('m') || addr.starts_with('n'),
+        "expected P2PKH, got {addr}"
+    );
 
     let script_pubkey = p2pkh_script_from_address(&addr).expect("recompute P2PKH script");
     assert!(script_pubkey.is_p2pkh(), "expected P2PKH script");

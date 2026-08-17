@@ -120,8 +120,7 @@ impl XmrPlugin {
         network: impl Into<String>,
         urls: impl IntoIterator<Item = String>,
     ) -> Self {
-        Arc::make_mut(&mut self.daemon_urls)
-            .insert(network.into(), urls.into_iter().collect());
+        Arc::make_mut(&mut self.daemon_urls).insert(network.into(), urls.into_iter().collect());
         self
     }
 
@@ -487,9 +486,10 @@ async fn daemon_rpc_with(
         last_err = Some(format!("{url}: response missing 'result'"));
     }
 
-    Err(PluginError::NetworkError(
-        format!("all daemon endpoints failed: {}", last_err.unwrap_or_else(|| "no endpoints".into())),
-    ))
+    Err(PluginError::NetworkError(format!(
+        "all daemon endpoints failed: {}",
+        last_err.unwrap_or_else(|| "no endpoints".into())
+    )))
 }
 
 /// Convenience: call the default single endpoint for a network (tests / fallback).
@@ -614,9 +614,9 @@ impl WalletPlugin for XmrPlugin {
         let client = self
             .build_client()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
-        let urls = self.daemon_urls_for(network).ok_or_else(|| {
-            PluginError::UnsupportedNetwork(network.into())
-        })?;
+        let urls = self
+            .daemon_urls_for(network)
+            .ok_or_else(|| PluginError::UnsupportedNetwork(network.into()))?;
         let tx_hex = hex::encode(tx);
         let params = serde_json::json!({ "tx_as_hex": tx_hex });
         let result = daemon_rpc_with(&client, &urls, "send_raw_transaction", params).await?;
@@ -712,9 +712,9 @@ impl WalletPlugin for XmrPlugin {
         let client = self
             .build_client()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
-        let urls = self.daemon_urls_for(network).ok_or_else(|| {
-            PluginError::UnsupportedNetwork(network.into())
-        })?;
+        let urls = self
+            .daemon_urls_for(network)
+            .ok_or_else(|| PluginError::UnsupportedNetwork(network.into()))?;
         let params = serde_json::json!({});
         let result = daemon_rpc_with(&client, &urls, "get_fee_estimate", params).await?;
 
@@ -1171,7 +1171,9 @@ mod tests {
     fn default_daemon_urls_cover_all_networks() {
         let plugin = XmrPlugin::new();
         for net in ["monero", "monero-stagenet", "monero-testnet"] {
-            let urls = plugin.daemon_urls_for(net).expect("network should have a default");
+            let urls = plugin
+                .daemon_urls_for(net)
+                .expect("network should have a default");
             assert!(!urls.is_empty(), "{net} should have >= 1 endpoint");
             assert!(
                 urls[0].contains("node.monerodevs.org"),

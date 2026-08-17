@@ -37,10 +37,7 @@ async fn broadcast_tx(hex: &str, base: &str) -> Result<String, String> {
         .await
         .map_err(|e| format!("broadcast HTTP: {e}"))?;
     let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("read resp: {e}"))?;
+    let body = resp.text().await.map_err(|e| format!("read resp: {e}"))?;
     let txid = body.trim().to_string();
     if !status.is_success() || txid.len() != 64 || txid.chars().any(|c| !c.is_ascii_hexdigit()) {
         return Err(format!("broadcast rejected ({status}): {txid}"));
@@ -52,7 +49,11 @@ async fn broadcast_tx(hex: &str, base: &str) -> Result<String, String> {
 fn p2pkh_script_from_address(addr: &str) -> Result<ScriptBuf, String> {
     let decoded = base58ck::decode_check(addr).map_err(|e| format!("base58 decode: {e}"))?;
     if decoded.len() != 21 || decoded[0] != 0x6f {
-        return Err(format!("not a valid testnet P2PKH address (len {} ver {}): {addr}", decoded.len(), decoded.get(0).map(|b| *b).unwrap_or(0)));
+        return Err(format!(
+            "not a valid testnet P2PKH address (len {} ver {}): {addr}",
+            decoded.len(),
+            decoded.get(0).map(|b| *b).unwrap_or(0)
+        ));
     }
     let mut script = vec![0x76, 0xa9, 0x14]; // OP_DUP OP_HASH160 PUSH20
     script.extend_from_slice(&decoded[1..21]);
@@ -104,9 +105,7 @@ async fn live_broadcast_testnet3() {
     let prev_txid = prev_txid_hex
         .parse::<bitcoin::Txid>()
         .expect("prev txid must be 64-hex");
-    eprintln!(
-        "Spending prev {prev_txid}:{prev_vout} = {prev_value} sats (testnet3 P2PKH)"
-    );
+    eprintln!("Spending prev {prev_txid}:{prev_vout} = {prev_value} sats (testnet3 P2PKH)");
 
     // Build a PSBT spending the P2PKH UTXO
     let fee = 1000u64;
@@ -124,7 +123,8 @@ async fn live_broadcast_testnet3() {
             value: Amount::from_sat(send_amount),
             // burn to a zero P2PKH (testnet)
             script_pubkey: ScriptBuf::from_bytes(vec![
-                0x76, 0xa9, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0xac,
+                0x76, 0xa9, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x88,
+                0xac,
             ]),
         }],
     };
