@@ -82,7 +82,7 @@ fn ltc_p2wpkh_address(
 ) -> Result<String, PluginError> {
     let hrp_str = match network {
         "litecoin" => "ltc",
-        "litecoin-testnet" => "tltc",
+        "litecoin-testnet3" | "litecoin-testnet4" | "litecoin-testnet" => "tltc",
         _ => return Err(PluginError::UnsupportedNetwork(network.into())),
     };
     let hrp = bech32::Hrp::parse_unchecked(hrp_str);
@@ -117,7 +117,7 @@ fn ltc_p2pkh_address(
         "litecoin" => (0x30u8, "L"),
         // Litecoin testnet P2PKH: 0x6f ('m'/'n')
         // Litecoin testnet P2SH:  0xc4 ('2')
-        "litecoin-testnet" => (0x6fu8, "m"),
+        "litecoin-testnet3" | "litecoin-testnet4" | "litecoin-testnet" => (0x6fu8, "m"),
         _ => return Err(PluginError::UnsupportedNetwork(network.into())),
     };
 
