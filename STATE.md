@@ -313,6 +313,7 @@ c36a865 chore: pre-shrink sweep fixes
 | EVM BIP-44 derivation was ignored | Was signing all accounts with same key | ✅ Fixed this session |
 | `cargo deny` suppresses 17 Tauri transitive `unmaintained` advisories | Low risk (transitive, non-core deps) | Accepted |
 | GitHub URLs are `MarcusBrammeier` placeholders | User must set actual org/repo before publishing | Placeholder (set via grep) |
+| **XMR wallet-rpc balance/history needs a P2P daemon** | The plugin's JSON-RPC path is fixed (broadcast/fee/decoys via configurable daemon). But `monero-wallet-rpc` (balance/history) needs a **P2P** daemon; Cake stagenet/testnet P2P subdomains are dead and no reliable public stagenet/testnet P2P node exists (2026-08). Mainnet P2P (`xmr-node.cakewallet.com:18081`) verified live. Override via `MoneroWalletRpcProcess::with_daemon` or a local `monerod --stagenet`. | Documented; user-supplied node needed for fully live stagenet balance/broadcast |
 
 ---
 
