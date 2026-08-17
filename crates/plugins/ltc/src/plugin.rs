@@ -20,7 +20,7 @@ impl Default for LtcPlugin {
     }
 }
 
-static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| {
+static LTC_NETWORKS: LazyLock<[NetworkSpec; 4]> = LazyLock::new(|| {
     [
         NetworkSpec {
             id: "litecoin".into(),
@@ -30,8 +30,23 @@ static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| {
             is_testnet: false,
         },
         NetworkSpec {
+            id: "litecoin-testnet3".into(),
+            name: "Litecoin Testnet3".into(),
+            symbol: "tLTC".into(),
+            decimals: 8,
+            is_testnet: true,
+        },
+        NetworkSpec {
+            id: "litecoin-testnet4".into(),
+            name: "Litecoin Testnet4".into(),
+            symbol: "tLTC".into(),
+            decimals: 8,
+            is_testnet: true,
+        },
+        // Backward-compat alias: "litecoin-testnet" resolves to testnet3.
+        NetworkSpec {
             id: "litecoin-testnet".into(),
-            name: "Litecoin Testnet".into(),
+            name: "Litecoin Testnet (alias → testnet3)".into(),
             symbol: "tLTC".into(),
             decimals: 8,
             is_testnet: true,
@@ -42,7 +57,9 @@ static LTC_NETWORKS: LazyLock<[NetworkSpec; 2]> = LazyLock::new(|| {
 fn esplora_base(network: &str) -> &str {
     match network {
         "litecoin" => "https://litecoin.mempool.space/api",
-        "litecoin-testnet" => "https://litecoin.mempool.space/testnet4/api",
+        // testnet3 JSON-RPC (the network the key-index 0 testnet address lives on).
+        "litecoin-testnet3" | "litecoin-testnet" => "https://litecoin.mempool.space/testnet/api",
+        "litecoin-testnet4" => "https://litecoin.mempool.space/testnet4/api",
         _ => "https://litecoin.mempool.space/api",
     }
 }
@@ -125,7 +142,9 @@ fn ltc_p2pkh_address(
 fn btc_network(network: &str) -> Result<bitcoin::Network, PluginError> {
     match network {
         "litecoin" => Ok(bitcoin::Network::Bitcoin),
-        "litecoin-testnet" => Ok(bitcoin::Network::Testnet4),
+        // testnet3 (the network the key-index 0 testnet address lives on).
+        "litecoin-testnet3" | "litecoin-testnet" => Ok(bitcoin::Network::Testnet),
+        "litecoin-testnet4" => Ok(bitcoin::Network::Testnet4),
         _ => Err(PluginError::UnsupportedNetwork(network.into())),
     }
 }
@@ -135,7 +154,7 @@ fn coin_type(network: &str) -> u32 {
     // mainnet and testnet. (Coin type 1 is Bitcoin testnet only.)
     match network {
         "litecoin" => 2,
-        "litecoin-testnet" => 2,
+        "litecoin-testnet3" | "litecoin-testnet4" | "litecoin-testnet" => 2,
         _ => 2,
     }
 }
@@ -198,8 +217,11 @@ impl WalletPlugin for LtcPlugin {
         );
         // Use legacy P2PKH address for testnet (most faucets only accept m/n prefix)
         // and Bech32 segwit for mainnet (modern wallets prefer ltc1).
+        // Both testnet3 and testnet4 use the same legacy m/n P2PKH prefix (0x6f).
         let address_str = match network {
-            "litecoin-testnet" => ltc_p2pkh_address(&compressed, network)?,
+            "litecoin-testnet3" | "litecoin-testnet4" | "litecoin-testnet" => {
+                ltc_p2pkh_address(&compressed, network)?
+            }
             _ => ltc_p2wpkh_address(&compressed, network)?,
         };
         Ok(Account {
@@ -443,7 +465,7 @@ impl WalletPlugin for LtcPlugin {
                 }
                 Ok(false)
             }
-            "litecoin-testnet" => {
+            "litecoin-testnet3" | "litecoin-testnet4" | "litecoin-testnet" => {
                 // Bech32 segwit (tltc1...): decode validates the checksum.
                 if let Ok((hrp, _, _)) = bech32::segwit::decode(addr) {
                     if hrp.as_str() == "tltc" {
@@ -478,7 +500,13 @@ mod tests {
 
     #[test]
     fn test_supported_networks() {
-        assert_eq!(LtcPlugin::new().supported_networks().len(), 2);
+        let plugin = LtcPlugin::new();
+        let ids: Vec<&str> = plugin.supported_networks().iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids.len(), 4);
+        assert!(ids.contains(&"litecoin"));
+        assert!(ids.contains(&"litecoin-testnet3"));
+        assert!(ids.contains(&"litecoin-testnet4"));
+        assert!(ids.contains(&"litecoin-testnet"), "backward-compat alias");
     }
 
     #[test]
@@ -530,9 +558,25 @@ mod tests {
     }
 
     #[test]
-    fn test_btc_network_testnet() {
+    fn test_btc_network_testnet3() {
+        assert_eq!(
+            btc_network("litecoin-testnet3").expect("test invariant"),
+            bitcoin::Network::Testnet
+        );
+    }
+
+    #[test]
+    fn test_btc_network_testnet_alias() {
         assert_eq!(
             btc_network("litecoin-testnet").expect("test invariant"),
+            bitcoin::Network::Testnet
+        );
+    }
+
+    #[test]
+    fn test_btc_network_testnet4() {
+        assert_eq!(
+            btc_network("litecoin-testnet4").expect("test invariant"),
             bitcoin::Network::Testnet4
         );
     }
@@ -551,9 +595,21 @@ mod tests {
     }
 
     #[test]
-    fn test_esplora_base_testnet() {
+    fn test_esplora_base_testnet3() {
+        assert_eq!(
+            esplora_base("litecoin-testnet3"),
+            "https://litecoin.mempool.space/testnet/api"
+        );
         assert_eq!(
             esplora_base("litecoin-testnet"),
+            "https://litecoin.mempool.space/testnet/api"
+        );
+    }
+
+    #[test]
+    fn test_esplora_base_testnet4() {
+        assert_eq!(
+            esplora_base("litecoin-testnet4"),
             "https://litecoin.mempool.space/testnet4/api"
         );
     }
@@ -567,9 +623,9 @@ mod tests {
     }
 
     #[test]
-    fn test_balance_base_testnet() {
+    fn test_balance_base_testnet4() {
         assert_eq!(
-            esplora_base("litecoin-testnet"),
+            esplora_base("litecoin-testnet4"),
             "https://litecoin.mempool.space/testnet4/api"
         );
     }
