@@ -25,6 +25,9 @@ mod decoy_selector;
 pub struct XmrPlugin {
     socks5_proxy: Option<String>,
     wallet_rpc_url: Option<String>,
+    /// Ordered fallback daemon JSON-RPC endpoints per network.
+    /// Each network maps to a list; on a failed call we try the next entry.
+    daemon_urls: Arc<std::collections::HashMap<String, Vec<String>>>,
     /// Cache of derived key entropy by account ID — needed for wallet-rpc restore.
     key_cache: Arc<Mutex<std::collections::HashMap<String, Vec<u8>>>>,
 }
@@ -55,11 +58,30 @@ static XMR_NETWORKS: LazyLock<[NetworkSpec; 3]> = LazyLock::new(|| {
     ]
 });
 
+/// Default daemon JSON-RPC endpoints per network (verified live 2026-08).
+fn default_daemon_urls() -> std::collections::HashMap<String, Vec<String>> {
+    let mut m = std::collections::HashMap::new();
+    m.insert(
+        "monero".into(),
+        vec!["http://node.monerodevs.org:18089/json_rpc".into()],
+    );
+    m.insert(
+        "monero-stagenet".into(),
+        vec!["http://node.monerodevs.org:38089/json_rpc".into()],
+    );
+    m.insert(
+        "monero-testnet".into(),
+        vec!["http://node.monerodevs.org:28089/json_rpc".into()],
+    );
+    m
+}
+
 impl XmrPlugin {
     pub fn new() -> Self {
         Self {
             socks5_proxy: None,
             wallet_rpc_url: None,
+            daemon_urls: Arc::new(default_daemon_urls()),
             key_cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -68,6 +90,7 @@ impl XmrPlugin {
         Self {
             socks5_proxy,
             wallet_rpc_url: None,
+            daemon_urls: Arc::new(default_daemon_urls()),
             key_cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -76,6 +99,7 @@ impl XmrPlugin {
         Self {
             socks5_proxy: Some(format!("socks5://127.0.0.1:{socks_port}")),
             wallet_rpc_url: None,
+            daemon_urls: Arc::new(default_daemon_urls()),
             key_cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -87,6 +111,23 @@ impl XmrPlugin {
             wallet_rpc_url: Some(url.into()),
             ..self
         }
+    }
+
+    /// Override the daemon JSON-RPC endpoints for a network with an ordered fallback list.
+    /// On a failed call the plugin tries the next URL in the list.
+    pub fn with_daemon_urls(
+        mut self,
+        network: impl Into<String>,
+        urls: impl IntoIterator<Item = String>,
+    ) -> Self {
+        Arc::make_mut(&mut self.daemon_urls)
+            .insert(network.into(), urls.into_iter().collect());
+        self
+    }
+
+    /// The candidate daemon endpoints for a network (for RPC + failover).
+    fn daemon_urls_for(&self, network: &str) -> Option<Vec<String>> {
+        self.daemon_urls.get(network).cloned()
     }
 
     fn build_client(&self) -> Result<reqwest::Client, reqwest::Error> {
@@ -375,25 +416,40 @@ async fn sign_monero_tx(
         .map_err(|e| PluginError::Internal(format!("failed to serialize signed tx: {e}")))
 }
 
-/// Map a Monero network name to its public daemon JSON-RPC URL.
-fn daemon_rpc_url(network: &str) -> Result<&'static str, PluginError> {
+/// Map a Monero network name to its default public daemon JSON-RPC URL.
+///
+/// The previous Cake Wallet endpoints (xmr-node.cakewallet.com and its
+/// stagenet/testnet subdomains) are dead — stagenet/testnet no longer resolve
+/// and mainnet times out. Replaced with node.monerodevs.org, a verified public
+/// node serving mainnet (18089) / stagenet (38089) / testnet (28089), all
+/// confirmed live via get_info (2026-08).
+///
+/// This is the built-in default; callers can override via `XmrPlugin::with_daemon_urls`.
+fn default_daemon_url(network: &str) -> Result<&'static str, PluginError> {
     match network {
-        "monero" => Ok("https://xmr-node.cakewallet.com/json_rpc"),
-        "monero-stagenet" => Ok("https://stagenet.xmr-node.cakewallet.com/json_rpc"),
-        "monero-testnet" => Ok("https://testnet.xmr-node.cakewallet.com/json_rpc"),
+        "monero" => Ok("http://node.monerodevs.org:18089/json_rpc"),
+        "monero-stagenet" => Ok("http://node.monerodevs.org:38089/json_rpc"),
+        "monero-testnet" => Ok("http://node.monerodevs.org:28089/json_rpc"),
         _ => Err(PluginError::UnsupportedNetwork(network.into())),
     }
 }
 
-/// Perform a raw JSON-RPC call to the Monero daemon and return the result object.
-async fn daemon_rpc(
+/// Perform a JSON-RPC call to a Monero daemon, trying each candidate URL in order.
+///
+/// `urls` is the ordered fallback list (from `XmrPlugin`) for the network. If a
+/// URL fails to connect or is unreachable, we try the next one, so a single dead
+/// node can't break balance/fee/broadcast/decoys.
+async fn daemon_rpc_with(
     client: &reqwest::Client,
-    network: &str,
+    urls: &[String],
     method: &str,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, PluginError> {
-    let url = daemon_rpc_url(network)?;
-
+    if urls.is_empty() {
+        return Err(PluginError::NetworkError(
+            "no daemon endpoints configured for this network".into(),
+        ));
+    }
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": "0",
@@ -401,29 +457,50 @@ async fn daemon_rpc(
         "params": params,
     });
 
-    let resp = client
-        .post(url)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| PluginError::NetworkError(e.to_string()))?;
-
-    let json: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| PluginError::NetworkError(format!("invalid JSON-RPC response: {e}")))?;
-
-    if let Some(err) = json.get("error") {
-        let msg = err
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown RPC error");
-        return Err(PluginError::NetworkError(msg.to_string()));
+    let mut last_err: Option<String> = None;
+    for url in urls {
+        let send = client.post(url).json(&body).send().await;
+        let resp = match send {
+            Ok(r) => r,
+            Err(e) => {
+                last_err = Some(format!("{url}: {e}"));
+                continue; // try next endpoint
+            }
+        };
+        let json = match resp.json::<serde_json::Value>().await {
+            Ok(j) => j,
+            Err(e) => {
+                last_err = Some(format!("{url}: bad JSON: {e}"));
+                continue;
+            }
+        };
+        if let Some(err) = json.get("error") {
+            let msg = err
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown RPC error");
+            return Err(PluginError::NetworkError(msg.to_string()));
+        }
+        if let Some(result) = json.get("result").cloned() {
+            return Ok(result);
+        }
+        last_err = Some(format!("{url}: response missing 'result'"));
     }
 
-    json.get("result")
-        .cloned()
-        .ok_or_else(|| PluginError::NetworkError("missing 'result' in RPC response".into()))
+    Err(PluginError::NetworkError(
+        format!("all daemon endpoints failed: {}", last_err.unwrap_or_else(|| "no endpoints".into())),
+    ))
+}
+
+/// Convenience: call the default single endpoint for a network (tests / fallback).
+async fn daemon_rpc(
+    client: &reqwest::Client,
+    network: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, PluginError> {
+    let url = default_daemon_url(network)?;
+    daemon_rpc_with(client, &[url.to_string()], method, params).await
 }
 
 // ── WalletPlugin implementation ─────────────────────────────────────────────
@@ -537,9 +614,12 @@ impl WalletPlugin for XmrPlugin {
         let client = self
             .build_client()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
+        let urls = self.daemon_urls_for(network).ok_or_else(|| {
+            PluginError::UnsupportedNetwork(network.into())
+        })?;
         let tx_hex = hex::encode(tx);
         let params = serde_json::json!({ "tx_as_hex": tx_hex });
-        let result = daemon_rpc(&client, network, "send_raw_transaction", params).await?;
+        let result = daemon_rpc_with(&client, &urls, "send_raw_transaction", params).await?;
 
         let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -632,8 +712,11 @@ impl WalletPlugin for XmrPlugin {
         let client = self
             .build_client()
             .map_err(|e| PluginError::Internal(e.to_string()))?;
+        let urls = self.daemon_urls_for(network).ok_or_else(|| {
+            PluginError::UnsupportedNetwork(network.into())
+        })?;
         let params = serde_json::json!({});
-        let result = daemon_rpc(&client, network, "get_fee_estimate", params).await?;
+        let result = daemon_rpc_with(&client, &urls, "get_fee_estimate", params).await?;
 
         let fee_atomic = result
             .get("fee")
@@ -1082,6 +1165,67 @@ mod tests {
     #[test]
     fn supported_networks_count() {
         assert_eq!(XmrPlugin::new().supported_networks().len(), 3);
+    }
+
+    #[test]
+    fn default_daemon_urls_cover_all_networks() {
+        let plugin = XmrPlugin::new();
+        for net in ["monero", "monero-stagenet", "monero-testnet"] {
+            let urls = plugin.daemon_urls_for(net).expect("network should have a default");
+            assert!(!urls.is_empty(), "{net} should have >= 1 endpoint");
+            assert!(
+                urls[0].contains("node.monerodevs.org"),
+                "{net} default should use node.monerodevs.org, got {}",
+                urls[0]
+            );
+        }
+    }
+
+    #[test]
+    fn daemon_urls_override_via_builder() {
+        let plugin = XmrPlugin::new()
+            .with_daemon_urls("monero", ["http://127.0.0.1:18089/json_rpc".to_string()])
+            .with_daemon_urls(
+                "monero-stagenet",
+                [
+                    "http://a.example/json_rpc".to_string(),
+                    "http://b.example/json_rpc".to_string(),
+                ],
+            );
+
+        let mainnet = plugin.daemon_urls_for("monero").unwrap();
+        assert_eq!(mainnet, vec!["http://127.0.0.1:18089/json_rpc".to_string()]);
+
+        // Ordered fallback list preserved
+        let stagenet = plugin.daemon_urls_for("monero-stagenet").unwrap();
+        assert_eq!(stagenet.len(), 2);
+        assert_eq!(stagenet[0], "http://a.example/json_rpc");
+        assert_eq!(stagenet[1], "http://b.example/json_rpc");
+
+        // Un-overridden network keeps its default
+        let testnet = plugin.daemon_urls_for("monero-testnet").unwrap();
+        assert_eq!(testnet[0], "http://node.monerodevs.org:28089/json_rpc");
+    }
+
+    #[test]
+    fn daemon_urls_for_unknown_network_is_none() {
+        let plugin = XmrPlugin::new();
+        assert!(plugin.daemon_urls_for("dogecoin").is_none());
+    }
+
+    #[test]
+    fn daemon_rpc_with_empty_list_errors() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = reqwest::Client::new();
+        let err = rt.block_on(async {
+            daemon_rpc_with(&client, &[], "get_info", serde_json::json!({})).await
+        });
+        assert!(err.is_err(), "empty endpoint list must error");
+        if let Err(PluginError::NetworkError(msg)) = err {
+            assert!(msg.contains("no daemon endpoints"), "msg: {msg}");
+        } else {
+            panic!("expected NetworkError");
+        }
     }
 
     #[test]
