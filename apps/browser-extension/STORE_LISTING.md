@@ -68,10 +68,10 @@ Same as Chrome listing above.
 cryptocurrency, wallet, bitcoin, ethereum, monero, bip39, bip44, security, privacy, tor, self-custody
 
 ### Homepage URL
-https://github.com/gullbur/gullbur
+https://github.com/MarcusBrammeier/gullbur-enclave
 
 ### Support URL
-https://github.com/gullbur/gullbur/issues
+https://github.com/MarcusBrammeier/gullbur-enclave/issues
 
 ### Extension ID (configured in manifest.json)
 wallet@gullbur.io
