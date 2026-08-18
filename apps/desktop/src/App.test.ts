@@ -92,7 +92,7 @@ describe('App.svelte', () => {
 
   it('renders the sidebar with logo', () => {
     render(App);
-    expect(screen.getByText('Gullbúr Enclave')).toBeTruthy();
+    expect(screen.getAllByText('Gullbúr Enclave').length).toBeGreaterThan(0);
   });
 
   it('shows connection status text', () => {

@@ -19,6 +19,8 @@
   let showSettings = $state(false);
   let errorMessage = $state<string | null>(null);
   let connecting = $state(false);
+  // Mobile drawer state — sidebar collapses to an off-canvas drawer < md.
+  let sidebarOpen = $state(false);
 
   // Console / Debug report state (for compact sidebar status bar)
   let showConsole = $state(false);
@@ -144,8 +146,24 @@
 
 <!-- Flex row: Sidebar + Main content -->
 <div class="flex min-h-screen">
+  <!-- Mobile top bar (visible < md) -->
+  <div class="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 py-3 bg-canvas border-b border-default">
+    <div class="flex items-center gap-2.5">
+      {@html iconHtml('wallet')}
+      <h1 class="text-sm font-bold tracking-tight truncate">Gullbúr Enclave</h1>
+    </div>
+    <button class="btn-secondary p-2" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Toggle menu" aria-expanded={sidebarOpen}>
+      {@html iconHtml('menu', 'w-5 h-5')}
+    </button>
+  </div>
+
   <!-- ─── Sidebar ───────────────────────────────────────────────────── -->
-  <aside class="fixed left-0 top-0 w-64 h-screen flex flex-col bg-canvas border-r border-default z-30">
+  <aside
+    class="fixed left-0 top-0 w-64 h-screen flex flex-col bg-canvas border-r border-default z-30
+      transition-transform duration-200
+      md:translate-x-0
+      {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
+  >
     
     <!-- Logo + App name -->
     <div class="flex items-center gap-2.5 px-4 py-4 border-b border-default shrink-0">
@@ -254,8 +272,13 @@
     </div>
   </aside>
 
+  <!-- Mobile drawer backdrop (close on tap, < md) -->
+  {#if sidebarOpen}
+    <div class="md:hidden fixed inset-0 z-20 bg-black/40" onclick={() => sidebarOpen = false} aria-hidden="true"></div>
+  {/if}
+
   <!-- ─── Main content area ──────────────────────────────────────────── -->
-  <main class="ml-64 flex-1 flex flex-col min-h-screen">
+  <main class="ml-0 md:ml-64 flex-1 flex flex-col min-h-screen pt-14 md:pt-0">
     <section class="flex-1 max-w-6xl mx-auto w-full px-4 py-5 sm:p-6 overflow-y-auto">
       {#if !vault.initialized}
         <VaultInit />
