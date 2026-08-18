@@ -63,6 +63,7 @@ impl BiometricEngine for TauriBiometryEngine {
                 },
                 None => Err(AuthError::NotSupported),
             },
+            AuthStatus::PasswordUnlocked => Ok(()), // already verified via password
             AuthStatus::HardwareRequired => Err(AuthError::NotSupported),
             AuthStatus::Unauthenticated => Err(AuthError::NotSupported),
         }

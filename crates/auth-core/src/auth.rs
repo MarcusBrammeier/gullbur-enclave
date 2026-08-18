@@ -15,6 +15,7 @@ use std::time::SystemTime;
 const UNAUTHENTICATED: u8 = 0;
 const BIOMETRIC_UNLOCKED: u8 = 1;
 const HARDWARE_REQUIRED: u8 = 2;
+const PASSWORD_UNLOCKED: u8 = 3;
 
 /// Current authentication status of the vault.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,10 @@ pub enum AuthStatus {
     /// A FIDO2 hardware touch is required for this specific high-value
     /// operation (e.g., `vault_executeBatch`, `vault_requestSessionKey`).
     HardwareRequired,
+
+    /// Password authentication passed (the vault's BIP-39 passphrase was
+    /// verified). Session key is loaded and standard operations are permitted.
+    PasswordUnlocked,
 }
 
 impl AuthStatus {
@@ -38,6 +43,7 @@ impl AuthStatus {
             AuthStatus::Unauthenticated => UNAUTHENTICATED,
             AuthStatus::BiometricUnlocked => BIOMETRIC_UNLOCKED,
             AuthStatus::HardwareRequired => HARDWARE_REQUIRED,
+            AuthStatus::PasswordUnlocked => PASSWORD_UNLOCKED,
         }
     }
 
@@ -45,13 +51,17 @@ impl AuthStatus {
         match v {
             BIOMETRIC_UNLOCKED => AuthStatus::BiometricUnlocked,
             HARDWARE_REQUIRED => AuthStatus::HardwareRequired,
+            PASSWORD_UNLOCKED => AuthStatus::PasswordUnlocked,
             _ => AuthStatus::Unauthenticated,
         }
     }
 
     /// Returns `true` if the vault is in a state where signing is permitted.
     pub fn can_sign(self) -> bool {
-        matches!(self, AuthStatus::BiometricUnlocked)
+        matches!(
+            self,
+            AuthStatus::BiometricUnlocked | AuthStatus::PasswordUnlocked
+        )
     }
 
     /// Returns `true` if this status represents a locked state.
@@ -65,6 +75,7 @@ impl AuthStatus {
             AuthStatus::Unauthenticated => "unauthenticated",
             AuthStatus::BiometricUnlocked => "biometric_unlocked",
             AuthStatus::HardwareRequired => "hardware_required",
+            AuthStatus::PasswordUnlocked => "password_unlocked",
         }
     }
 }
@@ -107,6 +118,25 @@ impl AuthManager {
             .compare_exchange(
                 UNAUTHENTICATED,
                 BIOMETRIC_UNLOCKED,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            )
+            .map_err(|_| {
+                AuthError::Internal("Already authenticated or hardware required".into())
+            })?;
+        Ok(())
+    }
+
+    /// Transition to `PasswordUnlocked`.
+    ///
+    /// Called when the vault passphrase has been verified. The caller is
+    /// responsible for loading the session key into secure memory. Can only
+    /// transition from `Unauthenticated`.
+    pub fn try_password(&self) -> Result<(), AuthError> {
+        self.status
+            .compare_exchange(
+                UNAUTHENTICATED,
+                PASSWORD_UNLOCKED,
                 Ordering::AcqRel,
                 Ordering::Relaxed,
             )
@@ -272,6 +302,36 @@ mod tests {
         mgr.try_biometric().expect("test invariant");
         // Second unlock from BiometricUnlocked should fail
         assert!(mgr.try_biometric().is_err());
+    }
+
+    #[test]
+    fn test_password_unlock_succeeds() {
+        let mgr = AuthManager::new();
+        assert!(mgr.try_password().is_ok());
+        assert_eq!(mgr.status(), AuthStatus::PasswordUnlocked);
+        assert!(mgr.status().can_sign());
+    }
+
+    #[test]
+    fn test_password_from_locked_fails() {
+        let mgr = AuthManager::new();
+        mgr.try_password().expect("test invariant");
+        // Second unlock from PasswordUnlocked should fail
+        assert!(mgr.try_password().is_err());
+    }
+
+    #[test]
+    fn test_can_sign_password() {
+        assert!(AuthStatus::PasswordUnlocked.can_sign());
+        assert!(!AuthStatus::PasswordUnlocked.is_locked());
+    }
+
+    #[test]
+    fn test_lock() {
+        let mgr = AuthManager::new();
+        mgr.try_password().expect("test invariant");
+        mgr.lock();
+        assert_eq!(mgr.status(), AuthStatus::Unauthenticated);
     }
 
     #[test]

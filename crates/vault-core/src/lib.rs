@@ -340,6 +340,72 @@ impl Vault {
         self.mnemonic.read().await.clone()
     }
 
+    /// Unlock the vault with the BIP-39 passphrase.
+    ///
+    /// Verifies the typed passphrase by re-deriving the seed from the stored
+    /// mnemonic and comparing to the stored seed. The passphrase is **never
+    /// stored** — only a correct one reproduces the seed. On success, the
+    /// auth manager transitions to `PasswordUnlocked` (perms = signable).
+    /// On a wrong passphrase the vault stays locked.
+    pub async fn unlock_with_password(&self, passphrase: &str) -> Result<(), VaultError> {
+        // Must be initialized (mnemonic + seed present) and currently locked.
+        if !self.initialized.load(Ordering::SeqCst) {
+            return Err(VaultError::NotInitialized);
+        }
+        if self.auth_manager.status().can_sign() {
+            return Err(VaultError::Internal("Already unlocked".into()));
+        }
+
+        let phrase = self
+            .mnemonic
+            .read()
+            .await
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| VaultError::Internal("No mnemonic stored".into()))?;
+        let stored_seed = self
+            .seed
+            .read()
+            .await
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| VaultError::Internal("No seed stored".into()))?;
+
+        // Re-derive the seed from the mnemonic + typed passphrase.
+        let words = crypto_core::keys::mnemonic_from_string(&phrase)
+            .map_err(|e| VaultError::CryptoError(e.to_string()))?;
+        let derived = crypto_core::keys::mnemonic_to_seed(words.as_words(), passphrase)
+            .map_err(|e| VaultError::CryptoError(e.to_string()))?;
+
+        // Constant-time-ish compare of the 64-byte seed.
+        let matches = stored_seed.len() == derived.len()
+            && stored_seed.iter().zip(derived.iter()).all(|(a, b)| a == b);
+        if !matches {
+            tracing::warn!("password unlock: passphrase did not reproduce the seed");
+            return Err(VaultError::Internal("Incorrect passphrase".into()));
+        }
+
+        self.auth_manager
+            .try_password()
+            .map_err(|e| VaultError::Internal(e.to_string()))?;
+        self.auth_manager.touch();
+        tracing::info!("vault unlocked via password");
+        Ok(())
+    }
+
+    /// Unlock the vault via biometric. Ensures a fresh biometric prompt.
+    pub async fn unlock_biometric(&self) -> Result<(), VaultError> {
+        if !self.initialized.load(Ordering::SeqCst) {
+            return Err(VaultError::NotInitialized);
+        }
+        self.auth_manager
+            .try_biometric()
+            .map_err(|e| VaultError::Internal(e.to_string()))?;
+        self.auth_manager.touch();
+        tracing::info!("vault unlocked via biometric");
+        Ok(())
+    }
+
     /// Enable or disable Tor SOCKS5 proxy for plugin RPCs.
     pub async fn set_tor_enabled(&self, enabled: bool) -> Result<(), VaultError> {
         self.tor_enabled.store(enabled, Ordering::SeqCst);

@@ -139,6 +139,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_vault_status,
             commands::initialize_vault,
+            commands::biometric_unlock_vault,
+            commands::password_unlock_vault,
             commands::create_account,
             commands::get_balance,
             commands::sign_transaction,

@@ -194,6 +194,56 @@ pub async fn biometric_unlock_vault(
 }
 
 #[tauri::command]
+pub async fn password_unlock_vault(
+    passphrase: String,
+    vault_state: State<'_, Arc<RwLock<VaultState>>>,
+) -> Result<VaultStatus, String> {
+    let vs = vault_state.read().await;
+    let mut vault_guard = vs.vault.write().await;
+
+    if vault_guard
+        .as_ref()
+        .map(|v| v.initialized.load(std::sync::atomic::Ordering::SeqCst))
+        .unwrap_or(false)
+    {
+        // Vault already loaded — verify the passphrase and unlock.
+        let vault = vault_guard.as_ref().expect("checked");
+        vault
+            .unlock_with_password(&passphrase)
+            .await
+            .map_err(|e| format!("Password unlock failed: {e}"))?;
+        return Ok(VaultStatus {
+            initialized: true,
+            connected: vs.ipc_handle.read().await.is_some(),
+            tor_enabled: false,
+            active_plugins: vec!["btc".into(), "evm".into(), "xmr".into()],
+        });
+    }
+
+    // No vault loaded — restore from persisted keystore first, then verify passphrase.
+    let mut vault = vault_core::Vault::new();
+    vault
+        .try_restore()
+        .await
+        .map_err(|e| format!("Failed to restore vault: {e}"))?;
+    if vault.initialized.load(std::sync::atomic::Ordering::SeqCst) {
+        vault
+            .unlock_with_password(&passphrase)
+            .await
+            .map_err(|e| format!("Password unlock failed: {e}"))?;
+        *vault_guard = Some(vault);
+        Ok(VaultStatus {
+            initialized: true,
+            connected: vs.ipc_handle.read().await.is_some(),
+            tor_enabled: false,
+            active_plugins: vec!["btc".into(), "evm".into(), "xmr".into()],
+        })
+    } else {
+        Err("No persisted vault found — please create or restore a wallet".into())
+    }
+}
+
+#[tauri::command]
 pub async fn initialize_vault(
     seed: Option<String>,
     passphrase: Option<String>,

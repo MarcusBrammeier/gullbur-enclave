@@ -71,8 +71,8 @@ impl AuthProvider for SoftwareAuth {
                 // Can't approve at this level — re-auth needed
                 Ok(AuthResult::Denied)
             }
-            AuthStatus::BiometricUnlocked => {
-                // Software mode approves biometric-level requests automatically
+            AuthStatus::BiometricUnlocked | AuthStatus::PasswordUnlocked => {
+                // Software mode approves biometric/password-level requests automatically
                 Ok(AuthResult::Approved)
             }
             AuthStatus::HardwareRequired => {

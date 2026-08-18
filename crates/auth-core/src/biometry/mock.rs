@@ -14,7 +14,7 @@ impl BiometricEngine for MockEngine {
 
     fn verify(&self, status: AuthStatus) -> Result<(), AuthError> {
         match status {
-            AuthStatus::BiometricUnlocked => Ok(()),
+            AuthStatus::BiometricUnlocked | AuthStatus::PasswordUnlocked => Ok(()),
             AuthStatus::HardwareRequired => Err(AuthError::NotSupported),
             AuthStatus::Unauthenticated => Err(AuthError::NotSupported),
         }
