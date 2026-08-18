@@ -16,10 +16,10 @@ testnet coins to finish the job.
 
 | Chain | What's verified | What's pending |
 |-------|-----------------|----------------|
-| **Litecoin (LTC)** | BIP-84 derivation, legacy P2PKH signing, and broadcast all verified **end-to-end on a local `litecoind` regtest node** (tx confirmed on-chain). | **Public testnet3/testnet4 relay is NOT yet proven.** We have not yet received testnet LTC that lands on the public chain. |
+| **Litecoin (LTC)** | BIP-84 derivation, legacy P2PKH signing, and broadcast all verified **end-to-end on a local `litecoind` regtest node** (tx confirmed on-chain). | **Public testnet3/testnet4 relay is NOT yet proven.** We have not yet received testnet LTC that lands on the public chain (t3 address `mkenEChN…` shows 0 tx). |
 | **Monero (XMR)** | CLSAG signing (unit-tested), and daemon JSON-RPC (fee estimate, broadcast, decoy fetch) verified **live** against a public node on mainnet/stagenet/testnet. | **Balance/history via `monero-wallet-rpc`** needs a public P2P stagenet daemon, which is not reliably available as of 2026-08. So a full funded-sign-broadcast on stagenet is pending. |
-| **Bitcoin (BTC)** | SegWit derivation + PSBT signing. | See LTC — same public-testnet-relay caveat applies to testnet4 funding. |
-| **Ethereum / EVM** | Signing + broadcast verified on **Sepolia** (live transaction accepted). | EVM testnet funding is proven. Only LTC/XMR testnets remain. |
+| **Bitcoin (BTC)** | SegWit derivation + PSBT signing. **Live testnet4 broadcast CONFIRMED** — derived address `tb1qxfw0jn…` shows 3 confirmed txs, incl. a 1000-sat-fee spend confirmed in block 148333 (txid `e64e895c…`). | Minor — testnet4 relay is proven; no remaining gap. |
+| **Ethereum / EVM** | Signing + broadcast verified on **Sepolia** (live transaction accepted, creds `0x6b9b…` VERIFIED). | EVM testnet funding is proven. Only LTC/XMR testnets remain. |
 
 ---
 
