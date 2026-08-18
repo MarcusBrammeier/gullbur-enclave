@@ -1,9 +1,12 @@
 //! Live `monero-wallet-rpc` integration test (Phase 2.2).
 //!
 //! Verifies the REAL `monero-wallet-rpc` binary (v0.18.5.1) boots under
-//! `MoneroWalletRpcProcess`, connects to a public stagenet daemon, and answers
+//! `MoneroWalletRpcProcess`, connects to a stagenet daemon, and answers
 //! actual wallet RPC calls — proving the XMR wallet-rpc integration works
 //! end-to-end at the binary level (no funded coins required).
+//!
+//! Default daemon is the local synced stagenet node (127.0.0.1:38081). Override
+//! via XMR_WALLET_RPC_DAEMON if a different stagenet node is preferred.
 //!
 //! Run (binary auto-downloaded to target/xmr-test-bin):
 //!   cargo test -p vault-core --test xmr_wallet_rpc_live -- --ignored --nocapture
@@ -53,9 +56,11 @@ async fn live_wallet_rpc_boots_and_answers() {
     let wallet_dir = format!("/tmp/xmr-wallet-live-{}", std::process::id());
     let port = 18100u16;
 
+    let daemon =
+        std::env::var("XMR_WALLET_RPC_DAEMON").unwrap_or_else(|_| "127.0.0.1:38081".into());
     let mut proc = MoneroWalletRpcProcess::new(&bin, "monero-stagenet", &wallet_dir)
         .with_port(port)
-        .with_daemon("stagenet.xmr-node.cakewallet.com:38081");
+        .with_daemon(&daemon);
 
     // 1. Boot the binary — proves spawn + health-check readiness.
     proc.start().await.expect("wallet-rpc should start");
