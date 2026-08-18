@@ -2171,6 +2171,7 @@ dependencies = [
  "tauri-mcp",
  "tauri-plugin-biometric",
  "tauri-plugin-dialog",
+ "tauri-plugin-fs",
  "tauri-plugin-shell",
  "tokio",
  "tracing",

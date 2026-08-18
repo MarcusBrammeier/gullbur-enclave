@@ -73,7 +73,8 @@ pub fn run() {
     install_crash_reporter();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init());
 
     let builder = if cfg!(debug_assertions) {
         builder.plugin(tauri_mcp::init())
@@ -174,6 +175,7 @@ pub fn run() {
             // Console bridge (WebView -> Rust logs)
             commands::webview_log,
             commands::export_current_keystore,
+            commands::get_keystore_bytes,
             // Biometric unlock
             commands::biometric_unlock_vault,
             // Bug Reporter

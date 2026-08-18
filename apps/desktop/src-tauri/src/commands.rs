@@ -1437,6 +1437,17 @@ pub async fn open_vault_from_bytes(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn get_keystore_bytes(
+    vault_state: State<'_, Arc<RwLock<VaultState>>>,
+) -> Result<Vec<u8>, String> {
+    let vs = vault_state.read().await;
+    let vault_guard = vs.vault.read().await;
+    let _vault = vault_guard.as_ref().ok_or("Vault not available")?;
+    vault_core::Vault::load_persisted_seed()
+        .ok_or_else(|| "No persisted keystore found — vault may not be initialized".to_string())
+}
+
 /// Export the current vault's encrypted keystore to a custom file path.
 /// Returns the number of bytes written on success.
 #[tauri::command]

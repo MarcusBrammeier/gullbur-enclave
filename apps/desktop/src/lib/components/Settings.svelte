@@ -63,7 +63,7 @@
     vault.testnetOnly = next;
     testnetOnly = next;
     // Persist the flag to the engine so mainnet ops are actually blocked.
-    invoke('set_testnet_only', { enabled: next }).catch(() => {
+    Promise.resolve(invoke('set_testnet_only', { enabled: next })).catch(() => {
       pushError('Failed to update testnet-only mode in the vault engine');
       // revert optimistic update
       vault.testnetOnly = !next;
@@ -270,14 +270,17 @@
             try {
               const { save } = await import('@tauri-apps/plugin-dialog');
               const dest = await save({
-                title: 'Export Keystore',
-                defaultPath: 'gullbur-keystore.bin',
-                filters: [{ name: 'Keystore', extensions: ['bin'] }],
+                title: 'Save Wallet File',
+                defaultPath: 'gullbur-wallet.gwl',
+                filters: [{ name: 'Gullbur Wallet', extensions: ['gwl', 'bin'] }],
               });
               if (!dest) return;
               const { invoke } = await import('@tauri-apps/api/core');
-              const bytes = await invoke('export_current_keystore', { destination: dest });
-              alert(`✓ Keystore exported (${bytes} bytes) to:\n${dest}`);
+              const bytes: number[] = await invoke('get_keystore_bytes');
+              // Write via plugin-fs — works on desktop (path) and Android (content URI / SAF).
+              const { writeFile } = await import('@tauri-apps/plugin-fs');
+              await writeFile(dest, new Uint8Array(bytes));
+              alert(`✓ Wallet file saved (${bytes.length} bytes) to:\n${dest}`);
             } catch (e) {
               alert('✗ Export failed: ' + (e instanceof Error ? e.message : String(e)));
             }
