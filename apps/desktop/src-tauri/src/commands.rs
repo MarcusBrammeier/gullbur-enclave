@@ -907,6 +907,24 @@ pub async fn toggle_tor(
     }
 }
 
+/// Set testnet-only enforcement in the engine. While true, mainnet
+/// create-account / sign / broadcast are rejected.
+#[tauri::command]
+pub async fn set_testnet_only(
+    vault_state: State<'_, Arc<RwLock<VaultState>>>,
+    enabled: bool,
+) -> Result<bool, String> {
+    let vs = vault_state.read().await;
+    let vault_guard = vs.vault.read().await;
+    let vault = vault_guard.as_ref().ok_or("Vault not available")?;
+    vault
+        .set_testnet_only(enabled)
+        .await
+        .map_err(|e| e.to_string())?;
+    tracing::info!("[testnet-only] enforcement set to {enabled}");
+    Ok(enabled)
+}
+
 // ── Auth Commands ──────────────────────────────────────────────────────────
 
 /// Lock the vault — resets auth status to Unauthenticated.

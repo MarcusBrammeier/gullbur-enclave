@@ -278,7 +278,26 @@ pub fn register_vault_handlers(
                     "plugin_ids": plugin_ids,
                     "networks": networks,
                     "accounts": accounts,
+                    "testnet_only": host.testnet_only_enabled(),
                 }))
+            }
+        });
+    }
+
+    // ── vault.set_testnet_only ─────────────────────────────────────────
+    {
+        let ph = Arc::clone(&plugin_host);
+        handler.register("vault.set_testnet_only", move |params: Value| {
+            let ph = Arc::clone(&ph);
+            async move {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(RpcError::invalid_params)?;
+                let host = ph.read().await;
+                host.set_testnet_only(enabled);
+                tracing::info!("testnet-only enforcement -> {enabled} via IPC");
+                Ok(serde_json::json!({ "testnet_only": enabled }))
             }
         });
     }

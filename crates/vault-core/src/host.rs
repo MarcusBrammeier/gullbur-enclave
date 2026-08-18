@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use keystore_core::DeviceKeyProvider;
 use keystore_core::vault;
@@ -102,6 +103,9 @@ pub struct PluginHost {
     accounts: Mutex<Vec<Account>>,
     /// Optional monero-wallet-rpc URL for real balance queries
     xmr_wallet_rpc_url: Option<String>,
+    /// Testnet-only enforcement: while true, create/sign/broadcast refuse
+    /// mainnet networks. Defaults to true.
+    testnet_only: AtomicBool,
 }
 
 impl PluginHost {
@@ -113,6 +117,7 @@ impl PluginHost {
             network_routing: HashMap::new(),
             accounts: Mutex::new(accounts),
             xmr_wallet_rpc_url: None,
+            testnet_only: AtomicBool::new(true),
         }
     }
 
@@ -250,6 +255,7 @@ impl PluginHost {
         index: u32,
         network: &str,
     ) -> Result<Account, PluginError> {
+        self.ensure_testnet_ok(network)?;
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
@@ -273,6 +279,38 @@ impl PluginHost {
             .clone()
     }
 
+    /// Set testnet-only enforcement. While true, create/sign/broadcast refuse
+    /// mainnet networks.
+    pub fn set_testnet_only(&self, enabled: bool) {
+        self.testnet_only
+            .store(enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Current testnet-only enforcement flag.
+    pub fn testnet_only_enabled(&self) -> bool {
+        self.testnet_only.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Refuse mainnet operations while testnet-only is set.
+    fn ensure_testnet_ok(&self, network: &str) -> Result<(), PluginError> {
+        if !self.testnet_only_enabled() {
+            return Ok(());
+        }
+        if let Some(plugin) = self.resolve(network) {
+            for spec in plugin.supported_networks() {
+                if spec.id == network {
+                    if spec.is_testnet {
+                        return Ok(());
+                    }
+                    return Err(PluginError::UnsupportedNetwork(format!(
+                        "network '{network}' is mainnet; disable testnet-only mode to use it"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub async fn sign_transaction(
         &self,
         tx: &[u8],
@@ -280,6 +318,7 @@ impl PluginHost {
         account_index: u32,
         network: &str,
     ) -> Result<Vec<u8>, PluginError> {
+        self.ensure_testnet_ok(network)?;
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
@@ -293,6 +332,7 @@ impl PluginHost {
         signed_tx: &[u8],
         network: &str,
     ) -> Result<String, PluginError> {
+        self.ensure_testnet_ok(network)?;
         let plugin = self
             .resolve(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
@@ -781,6 +821,58 @@ mod tests {
         let ids = host.plugin_ids();
         // Structural: verify the method returns Vec<String> and doesn't panic
         assert!(ids.is_empty() || ids.len() >= 3);
+    }
+
+    #[test]
+    fn test_testnet_only_defaults_to_true() {
+        let host = PluginHost::new();
+        assert!(host.testnet_only_enabled(), "testnet-only must default on");
+    }
+
+    #[test]
+    fn test_testnet_only_setter_and_getter() {
+        let host = PluginHost::new();
+        host.set_testnet_only(false);
+        assert!(!host.testnet_only_enabled());
+        host.set_testnet_only(true);
+        assert!(host.testnet_only_enabled());
+    }
+
+    #[tokio::test]
+    async fn test_create_account_mainnet_rejected_while_testnet_only() {
+        let mut host = PluginHost::new();
+        host.initialize_default_plugins();
+        let seed = [7u8; 64];
+        let res = host.create_account(&seed, 0, "ethereum").await;
+        assert!(
+            res.is_err(),
+            "mainnet create_account must be rejected while testnet-only on: {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_account_testnet_allowed_while_testnet_only() {
+        let mut host = PluginHost::new();
+        host.initialize_default_plugins();
+        let seed = [7u8; 64];
+        let res = host.create_account(&seed, 0, "sepolia").await;
+        assert!(
+            res.is_ok(),
+            "testnet create_account should succeed while testnet-only on: {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_account_mainnet_allowed_after_disabling_testnet_only() {
+        let mut host = PluginHost::new();
+        host.initialize_default_plugins();
+        host.set_testnet_only(false);
+        let seed = [7u8; 64];
+        let res = host.create_account(&seed, 0, "ethereum").await;
+        assert!(
+            res.is_ok(),
+            "mainnet create_account should succeed after disabling testnet-only: {res:?}"
+        );
     }
 
     #[test]

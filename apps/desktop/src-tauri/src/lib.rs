@@ -160,6 +160,8 @@ pub fn run() {
             commands::get_security_stats,
             // Tor
             commands::toggle_tor,
+            // Testnet-only enforcement
+            commands::set_testnet_only,
             // Account management
             commands::rename_account,
             // Seed re-export

@@ -150,6 +150,10 @@ async fn e2e_all_10_methods_via_websocket() {
         .await;
     WsClient::assert_ok(&r, "vault.initialize");
 
+    // 5b. Disable testnet-only — this E2E creates a mainnet bitcoin account.
+    let r = client.call("vault.set_testnet_only", json!({"enabled": false})).await;
+    WsClient::assert_ok(&r, "vault.set_testnet_only");
+
     // 6. vault.status — now initialized
     let r = client.call("vault.status", json!({})).await;
     let s = WsClient::assert_ok(&r, "vault.status (post-init)");

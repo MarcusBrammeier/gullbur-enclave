@@ -87,7 +87,15 @@ async fn e2e_full_vault_lifecycle() {
             .is_empty()
     );
     assert!(!s["networks"].as_array().expect("test invariant").is_empty());
+    assert!(
+        s["testnet_only"].as_bool().expect("test invariant"),
+        "testnet-only should default on"
+    );
     println!("[e2e] 3. Status OK ✓");
+
+    // ── 5b. Disable testnet-only (this E2E exercises real mainnet ETH) ──
+    let _ = rpc!("vault.set_testnet_only", {"enabled": false});
+    println!("[e2e] 3b. Testnet-only disabled for mainnet lifecycle ✓");
 
     // ── 6. Create ETH account ────────────────────────────────────────────
     let r = rpc!("vault.create_account", {"network":"ethereum","index":0});

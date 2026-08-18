@@ -7,6 +7,15 @@ exclude-dev = true
 feature-depth = 1
 
 [advisories]
+# All ignores below are `informational = "unmaintained"` only — NO security
+# vulnerabilities (no CVEs / CVSS). Reviewed 2026-08-17:
+#   - RUSTSEC-2024-0370..0420: gtk-rs GTK3 bindings (gtk/gdk/atk + -sys,
+#     gtk3-macros, proc-macro-error) — transitive build-time UI deps of the
+#     Tauri desktop shell. GTK3 line is archived upstream; bindings don't handle
+#     untrusted data. Low risk.
+#   - RUSTSEC-2025-0075..0100: `unic-*` Unicode utility crates, unmaintained.
+#     Functionality now covered by Rust stdlib. Purely additive, no risk.
+# Revisit if a real CVE appears in any of these.
 ignore = [
     "RUSTSEC-2024-0370",
     "RUSTSEC-2024-0411",

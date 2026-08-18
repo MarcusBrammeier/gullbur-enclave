@@ -351,6 +351,20 @@ impl Vault {
         Ok(())
     }
 
+    /// Enable/disable testnet-only enforcement. While enabled, the engine
+    /// refuses create-account / sign / broadcast on mainnet networks.
+    pub async fn set_testnet_only(&self, enabled: bool) -> Result<(), VaultError> {
+        let host = self.plugin_host.read().await;
+        host.set_testnet_only(enabled);
+        tracing::info!("testnet-only enforcement -> {enabled}");
+        Ok(())
+    }
+
+    /// Current testnet-only enforcement flag.
+    pub async fn testnet_only_enabled(&self) -> bool {
+        self.plugin_host.read().await.testnet_only_enabled()
+    }
+
     /// Configure a monero-wallet-rpc URL for real XMR balance queries.
     /// Set before `initialize()` for it to take effect.
     pub fn with_xmr_wallet_rpc(mut self, url: impl Into<String>) -> Self {

@@ -125,6 +125,19 @@ async fn e2e_signing_flow() {
         "Expected at least 1 registered plugin, got {plugin_ids}"
     );
 
+    // This E2E signs on mainnet (ethereum) — disable testnet-only first.
+    let result = handler
+        .dispatch(JsonRpcRequest::new(
+            "vault.set_testnet_only",
+            Some(serde_json::json!({ "enabled": false })),
+            4,
+        ))
+        .await;
+    assert!(
+        matches!(result, DispatchResult::Success(_)),
+        "vault.set_testnet_only(false) should succeed"
+    );
+
     // ── Step 3: vault.create_account ───────────────────────────────────────
     let result = handler
         .dispatch(JsonRpcRequest::new(

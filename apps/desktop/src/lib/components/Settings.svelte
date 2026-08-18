@@ -5,6 +5,7 @@
   import DebugReport from './DebugReport.svelte';
   import ConsoleLog from './ConsoleLog.svelte';
   import { iconHtml } from '../icons';
+  import { pushError } from '../toasts.svelte.ts';
   interface Props {
     onclose: () => void;
   }
@@ -58,8 +59,16 @@
   }
 
   function handleTestnetToggle() {
-    vault.testnetOnly = !testnetOnly;
-    testnetOnly = vault.testnetOnly;
+    const next = !testnetOnly;
+    vault.testnetOnly = next;
+    testnetOnly = next;
+    // Persist the flag to the engine so mainnet ops are actually blocked.
+    invoke('set_testnet_only', { enabled: next }).catch(() => {
+      pushError('Failed to update testnet-only mode in the vault engine');
+      // revert optimistic update
+      vault.testnetOnly = !next;
+      testnetOnly = !next;
+    });
   }
 
   function handleBackdropClick(e: MouseEvent) {
