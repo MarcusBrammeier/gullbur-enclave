@@ -1,9 +1,0 @@
-{
-  "name": "com.gullbur.wallet.relay",
-  "description": "Gullbúr Enclave — Native Messaging Relay (Firefox)",
-  "path": "<BINARY_PATH>",
-  "type": "stdio",
-  "allowed_extensions": [
-    "wallet@gullbur.io"
-  ]
-}

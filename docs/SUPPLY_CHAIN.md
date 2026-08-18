@@ -67,4 +67,3 @@ None are in the key-handling or networking hot path. **Accepted**, revisit befor
 4. Do NOT `cargo update` blindly — pin sha2 0.10 / hkdf coupling is intentional.
 5. Add a nightly **600s** fuzz schedule for deeper coverage (audit prep).
 
-*Internal doc — scrub before public repo release (FOSS_BOUNDARY.md).*

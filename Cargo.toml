@@ -15,7 +15,6 @@ members = [
     "crates/plugins/xmr",
     "crates/extension-relay",
     "apps/desktop/src-tauri",
-    "apps/cli",
     "crates/plugins/ltc",
     "crates/update-checker",
     "fuzz",
@@ -24,7 +23,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.2"
+version = "0.1.0-beta"
 edition = "2024"
 # SOURCE-AVAILABLE during beta/testing (BSL-1.1); converts to Apache-2.0 at
 # v1.0. Do NOT relicense to a permissive license before the Change Date.

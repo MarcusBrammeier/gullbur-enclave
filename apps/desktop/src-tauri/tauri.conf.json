@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicholasio/vsce-format/main/schemas/tauri-v2.json",
   "productName": "Gullbúr Enclave",
-  "version": "0.0.2",
+  "version": "0.1.0-beta",
   "identifier": "com.gullbur.enclave",
   "build": {
     "beforeDevCommand": "npm run dev",
