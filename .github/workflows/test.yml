@@ -63,10 +63,10 @@ jobs:
           npm run build
 
       - name: cargo check
-        run: cargo check --workspace
+        run: cargo check --workspace --locked
 
       - name: cargo test (lib)
-        run: cargo test --workspace --lib
+        run: cargo test --workspace --lib --locked
 
       - name: cargo fmt
         run: cargo fmt --check
@@ -80,4 +80,4 @@ jobs:
           cargo deny check
 
       - name: cargo test (cli-integration)
-        run: cargo test -p cli-integration -- --test-threads=1
+        run: cargo test -p cli-integration -- --test-threads=1 --locked

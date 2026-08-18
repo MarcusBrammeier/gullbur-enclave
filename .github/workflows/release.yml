@@ -45,9 +45,9 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --workspace -- -D warnings -D clippy::unwrap_used
       - name: cargo test
-        run: cargo test --workspace --lib
+        run: cargo test --workspace --lib --locked
       - name: cargo test (cli-integration)
-        run: cargo test -p cli-integration -- --test-threads=1
+        run: cargo test -p cli-integration -- --test-threads=1 --locked
 
   build:
     needs: check
@@ -146,7 +146,8 @@ jobs:
           body: |
             ## Gullbúr Enclave — ${{ github.ref_name }}
 
-            Clean public FOSS staging release. See `STATE.md` / `docs/FOSS_BOUNDARY.md`
-            in the private dev repo for the internal state and boundary.
+            Self-custody multi-chain wallet (BTC / ETH / XMR / LTC). **Testnet-only during beta** — no mainnet funds at risk.
+
+            See the [README](https://github.com/MarcusBrammeier/gullbur-enclave#readme) and [TESTING.md](https://github.com/MarcusBrammeier/gullbur-enclave/blob/main/TESTING.md) for network-validation status and known issues.
           draft: true
           files: artifacts/**

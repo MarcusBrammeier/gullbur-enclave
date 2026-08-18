@@ -55,7 +55,7 @@ jobs:
 
       - name: Build dependency (Rust)
         if: matrix.language == 'rust'
-        run: cargo check --workspace
+        run: cargo check --workspace --locked
 
       - name: Setup Node (for JS/TS analysis)
         if: matrix.language == 'javascript-typescript'
