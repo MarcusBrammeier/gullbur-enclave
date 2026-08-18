@@ -4,10 +4,12 @@ This page explains how **Gullbúr Enclave**'s testnet support is validated, what
 is proven, what is still pending, and — if you want to help — how to send us
 testnet coins to finish the job.
 
-> **Short version:** Signing and broadcast are verified on a **local regtest
-> node** and the daemon JSON-RPC path is verified **live**. What is **not yet
-> proven** is public **testnet relay** — we have not yet received a payout that
-> propagates to the public testnet chain. That is the gap we'd like your help
+> **Short version:** Signing, broadcast, and **public-chain relay are proven on
+> BTC testnet4 and EVM Sepolia** (confirmed on-chain), and `monero-wallet-rpc`
+> balance/history now works against a local synced stagenet node. The remaining
+> gap is **LTC public testnet relay** (testnet3/4), which simply awaits any
+> testnet LTC landing at our address — we have not yet received a payout that
+> propagates to the public LTC testnet chain. That is the gap we'd like your
 > closing.
 
 ---
@@ -16,7 +18,7 @@ testnet coins to finish the job.
 
 | Chain | What's verified | What's pending |
 |-------|-----------------|----------------|
-| **Litecoin (LTC)** | BIP-84 derivation, legacy P2PKH signing, and broadcast all verified **end-to-end on a local `litecoind` regtest node** (tx confirmed on-chain). | **Public testnet3/testnet4 relay is NOT yet proven.** We have not yet received testnet LTC that lands on the public chain (t3 address `mkenEChN…` shows 0 tx). |
+| **Litecoin (LTC)** | BIP-84 derivation, legacy P2PKH signing, and broadcast all verified **end-to-end on a local `litecoind` regtest node** (tx confirmed on-chain). Relay path shares the Esplora broadcast BTC testnet4 proved public. | **Public relay awaits testnet LTC funding** — our t3 address `mkenEChN…` shows 0 tx; no working faucet (cypherfaucet relay-gapped, bitaps CF-gated) and no local node ready. Once any testnet3/4 LTC lands + confirms, we broadcast → relay + confirm on the public chain. |
 | **Monero (XMR)** | CLSAG signing (unit-tested), and daemon JSON-RPC (fee estimate, broadcast, decoy fetch) verified **live** against a public node on mainnet/stagenet/testnet. **`monero-wallet-rpc` (balance/history) now proven** against a local synced stagenet P2P node. | Full **funded sign→broadcast** on stagenet still needs a handful of stagenet coins landed at our address — same funding gap as LTC. |
 | **Bitcoin (BTC)** | SegWit derivation + PSBT signing. **Live testnet4 broadcast CONFIRMED** — derived address `tb1qxfw0jn…` shows 3 confirmed txs, incl. a 1000-sat-fee spend confirmed in block 148333 (txid `e64e895c…`). | Minor — testnet4 relay is proven; no remaining gap. |
 | **Ethereum / EVM** | Signing + broadcast verified on **Sepolia** (live transaction accepted, creds `0x6b9b…` VERIFIED). | EVM testnet funding is proven. Only LTC/XMR testnets remain. |
