@@ -36,7 +36,7 @@ export const vault = $state({
   error: null as string | null,
   torEnabled: false,
   testnetOnly: true,
-  authStatus: 'unauthenticated' as 'unauthenticated' | 'biometric_unlocked' | 'hardware_required',
+  authStatus: 'unauthenticated' as 'unauthenticated' | 'biometric_unlocked' | 'password_unlocked' | 'hardware_required',
   authTimeout: 30,
   authStartedAt: 0,
   theme: 'dark' as 'light' | 'dark' | 'system',

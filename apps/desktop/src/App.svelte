@@ -7,6 +7,7 @@
   import type { AccentTheme } from './lib/vault.svelte.ts';
   import VaultInit from './lib/components/VaultInit.svelte';
   import Dashboard from './lib/components/Dashboard.svelte';
+  import LockScreen from './lib/components/LockScreen.svelte';
   import StatusBar from './lib/components/StatusBar.svelte';
   import AuthPrompt from './lib/components/AuthPrompt.svelte';
   import Settings from './lib/components/Settings.svelte';
@@ -281,6 +282,8 @@
     <section class="flex-1 max-w-6xl mx-auto w-full px-4 py-5 sm:p-6 overflow-y-auto">
       {#if !vault.initialized}
         <VaultInit />
+      {:else if vault.authStatus === 'unauthenticated'}
+        <LockScreen />
       {:else}
         <Dashboard />
       {/if}
