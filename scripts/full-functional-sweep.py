@@ -132,10 +132,13 @@ check("list_networks: Ethereum (eth)", has_eth, f"ids: {net_ids}")
 check("list_networks: Monero (xmr)", has_xmr, f"ids: {net_ids}")
 check("list_networks: Litecoin (ltc)", has_ltc, f"ids: {net_ids}")
 
-# ── PHASE 5: vault.create_account (4 chains) ──────────────────────────────
-print("\n▸ [5] vault.create_account (4 chains)")
+# ── PHASE 5: vault.create_account (4 chains, testnet-only enforced) ──────
+# The engine enforces testnet-only by default (host.testnet_only = true), so
+# account creation must use testnet network ids or it is correctly refused.
+print("\n▸ [5] vault.create_account (4 chains, testnet-only)")
 accounts = {}
-for net, label in [("bitcoin", "BTC"), ("ethereum", "ETH"), ("monero", "XMR"), ("litecoin", "LTC")]:
+for net, label in [("bitcoin-testnet", "BTC(t4)"), ("sepolia", "ETH(sepolia)"),
+                   ("monero-stagenet", "XMR(stagenet)"), ("litecoin-testnet", "LTC(t3)")]:
     acct = ws_call("vault.create_account", {"network": net, "index": 0})
     if "address" in acct:
         accounts[net] = acct["address"]
@@ -145,9 +148,9 @@ for net, label in [("bitcoin", "BTC"), ("ethereum", "ETH"), ("monero", "XMR"), (
 
 # ── PHASE 6: vault.validate_address ────────────────────────────────────────
 print("\n▸ [6] vault.validate_address")
-va = ws_call("vault.validate_address", {"network": "bitcoin", "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"})
-check("validate_address: valid BTC address accepted", va.get("valid") is True, str(va))
-vb = ws_call("vault.validate_address", {"network": "bitcoin", "address": "not-an-address"})
+va = ws_call("vault.validate_address", {"network": "bitcoin-testnet", "address": "tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk"})
+check("validate_address: valid BTC testnet address accepted", va.get("valid") is True, str(va))
+vb = ws_call("vault.validate_address", {"network": "bitcoin-testnet", "address": "zzz-invalid-zzz"})
 check("validate_address: invalid BTC address rejected", vb.get("valid") is False, str(vb))
 
 # ── PHASE 7: vault.list_accounts (no params) ─────────────────────────────
@@ -158,36 +161,38 @@ check(f"list_accounts >= 4", len(acct_list) >= 4, f"got {len(acct_list)}: {[a.ge
 
 # ── PHASE 8: vault.get_balance (routing check) ─────────────────────────────
 print("\n▸ [8] vault.get_balance (routing)")
-if "bitcoin" in accounts:
-    bal = ws_call("vault.get_balance", {"network": "bitcoin", "address": accounts["bitcoin"]})
+btc_net = "bitcoin-testnet"
+eth_net = "sepolia"
+if btc_net in accounts:
+    bal = ws_call("vault.get_balance", {"network": btc_net, "address": accounts[btc_net]})
     # Valid: either a balance result OR a routed error (but NOT -32601 method_not_found)
     is_not_method_not_found = True
     if "error" in bal and bal.get("error", {}).get("code") == -32601:
         is_not_method_not_found = False
     check("get_balance: routes to BTC plugin", is_not_method_not_found, str(bal)[:80])
 
-if "ethereum" in accounts:
-    bal_e = ws_call("vault.get_balance", {"network": "ethereum", "address": accounts["ethereum"]})
+if eth_net in accounts:
+    bal_e = ws_call("vault.get_balance", {"network": eth_net, "address": accounts[eth_net]})
     is_not_mnf = not ("error" in bal_e and bal_e.get("error", {}).get("code") == -32601)
     check("get_balance: routes to EVM plugin", is_not_mnf, str(bal_e)[:80])
 
 # ── PHASE 9: vault.estimate_fee (routing check) ───────────────────────────
 print("\n▸ [9] vault.estimate_fee (routing)")
-fee = ws_call("vault.estimate_fee", {"network": "bitcoin"})
+fee = ws_call("vault.estimate_fee", {"network": btc_net})
 is_not_mnf = not ("error" in fee and fee.get("error", {}).get("code") == -32601)
 check("estimate_fee: routes to BTC plugin", is_not_mnf, str(fee)[:80])
 
 # ── PHASE 10: vault.get_transaction_history (routing check) ──────────────
 print("\n▸ [10] vault.get_transaction_history (routing)")
-if "bitcoin" in accounts:
-    hist = ws_call("vault.get_transaction_history", {"network": "bitcoin", "address": accounts["bitcoin"], "limit": 3})
+if btc_net in accounts:
+    hist = ws_call("vault.get_transaction_history", {"network": btc_net, "address": accounts[btc_net], "limit": 3})
     is_not_mnf = not ("error" in hist and hist.get("error", {}).get("code") == -32601)
     check("get_transaction_history: routes to BTC plugin", is_not_mnf, str(hist)[:80])
 
 # ── PHASE 11: vault.sign_transaction (bad PSBT → error, proves routing) ──
 print("\n▸ [11] vault.sign_transaction (error path — validates routing)")
 sign = ws_call("vault.sign_transaction", {
-    "network": "bitcoin",
+    "network": btc_net,
     "tx_hex": "00",  # not a valid PSBT
     "key_id": "deadbeef" + "0" * 56,
     "key_type": "Secp256k1",
@@ -206,7 +211,7 @@ import hashlib
 # the CLI sign command at least routes. The deep multi-input test is in
 # the Rust unit test (test_sign_transaction_multi_input_all_inputs_signed).
 sign2 = ws_call("vault.sign_transaction", {
-    "network": "bitcoin",
+    "network": btc_net,
     "tx_hex": "70736274ff01007e0200000002010101010101010101010101010101010101010101010101010101010101010100000000000000000002020202020202020202020202020202020202020202020202020202020202020201000000000000000000018096980000000000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000002200",
     "key_id": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef@0",
     "key_type": "Secp256k1",
@@ -220,7 +225,7 @@ else:
 
 # ── PHASE 12: vault.broadcast_transaction (error path — bad tx) ──────────
 print("\n▸ [12] vault.broadcast_transaction (error path)")
-bt = ws_call("vault.broadcast_transaction", {"network": "bitcoin", "signed_tx_hex": "00"})
+bt = ws_call("vault.broadcast_transaction", {"network": btc_net, "signed_tx_hex": "00"})
 # Should get a broadcast failure, not method_not_found
 is_not_mnf = not ("error" in bt and bt.get("error", {}).get("code") == -32601)
 check("broadcast_transaction: routes to BTC plugin", is_not_mnf, str(bt)[:80])
@@ -232,7 +237,7 @@ check("lock: locked=true", lk.get("locked") is True, str(lk))
 
 # ── PHASE 14: Operations blocked after lock ────────────────────────────────
 print("\n▸ [14] Operations blocked after lock")
-blk = ws_call("vault.create_account", {"network": "bitcoin", "index": 1})
+blk = ws_call("vault.create_account", {"network": btc_net, "index": 1})
 # After lock, create_account should fail with auth_required (code -32002)
 code = blk.get("error", {}).get("code", 0) if "error" in blk else 0
 is_auth_rejected = code == -32002

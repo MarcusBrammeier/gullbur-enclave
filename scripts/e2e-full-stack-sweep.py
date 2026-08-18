@@ -92,8 +92,10 @@ ws.close()
 
 # ── PHASE 3: Create 20 accounts (5 per chain × 4 chains) ──────────────────
 print("\n▸ [3] vault.create_account (20 accounts: 5 × BTC, ETH, XMR, LTC)")
-chains = ["bitcoin", "ethereum", "monero", "litecoin"]
-chain_labels = {"bitcoin": "BTC", "ethereum": "ETH", "monero": "XMR", "litecoin": "LTC"}
+# Engine enforces testnet-only (host.testnet_only=true), so account creation
+# must use testnet network ids or it is correctly refused.
+chains = ["bitcoin-testnet", "sepolia", "monero-stagenet", "litecoin-testnet"]
+chain_labels = {"bitcoin-testnet": "BTC(t4)", "sepolia": "ETH(sep)", "monero-stagenet": "XMR(stagenet)", "litecoin-testnet": "LTC(t3)"}
 created_accounts = {}
 total_created = 0
 
@@ -240,18 +242,18 @@ ws.close()
 print("\n▸ [7] Multi-chain validate_address")
 ws = ws_connect()
 # BTC valid address
-va = ws_call(ws, "vault.validate_address", {"network": "bitcoin", "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"})
-check("validate_address: valid BTC address accepted", va.get("valid") is True, str(va))
+va = ws_call(ws, "vault.validate_address", {"network": "bitcoin-testnet", "address": "tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk"})
+check("validate_address: valid BTC testnet address accepted", va.get("valid") is True, str(va))
 # BTC invalid
-vb = ws_call(ws, "vault.validate_address", {"network": "bitcoin", "address": "not-an-address"})
+vb = ws_call(ws, "vault.validate_address", {"network": "bitcoin-testnet", "address": "zzz-invalid-zzz"})
 check("validate_address: invalid BTC address rejected", vb.get("valid") is False, str(vb))
 # ETH valid
-ve = ws_call(ws, "vault.validate_address", {"network": "ethereum", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"})
+ve = ws_call(ws, "vault.validate_address", {"network": "sepolia", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"})
 check("validate_address: valid ETH address accepted", ve.get("valid") is True, str(ve))
 # XMR valid — use a real generated monero account address (created above)
-xmr_acct = (created_accounts.get("monero") or [{}])[0]
+xmr_acct = (created_accounts.get("monero-stagenet") or [{}])[0]
 xmr_addr = xmr_acct.get("address", "")
-vx = ws_call(ws, "vault.validate_address", {"network": "monero", "address": xmr_addr}) if xmr_addr else {"valid": False}
+vx = ws_call(ws, "vault.validate_address", {"network": "monero-stagenet", "address": xmr_addr}) if xmr_addr else {"valid": False}
 check("validate_address: valid XMR address accepted", vx.get("valid") is True, str(vx))
 ws.close()
 
@@ -261,7 +263,7 @@ ws = ws_connect()
 lk = ws_call(ws, "vault.lock", {})
 check("lock: locked=true", lk.get("locked") is True, str(lk))
 # Try create_account after lock → should fail with -32002
-blk = ws_call(ws, "vault.create_account", {"network": "bitcoin", "index": 99})
+blk = ws_call(ws, "vault.create_account", {"network": "bitcoin-testnet", "index": 99})
 code = blk.get("error", {}).get("code", 0) if "error" in blk else 0
 check("create_account blocked after lock (auth_required)", code == -32002, str(blk)[:80])
 # Status should still work
@@ -272,18 +274,18 @@ ws.close()
 # ── PHASE 9: Estimate fee + sign + broadcast routing ──────────────────────
 print("\n▸ [9] Fee estimation + signing routing")
 ws = ws_connect()
-fee = ws_call(ws, "vault.estimate_fee", {"network": "bitcoin", "recipient": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "amount": "0.001"})
+fee = ws_call(ws, "vault.estimate_fee", {"network": "bitcoin-testnet", "recipient": "tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk", "amount": "0.001"})
 check("estimate_fee: routes to BTC plugin", "error" not in fee or fee.get("error", {}).get("code") != -32601, str(fee)[:80])
 
 sign = ws_call(ws, "vault.sign_transaction", {
-    "network": "bitcoin",
+    "network": "bitcoin-testnet",
     "tx_hex": "00",
     "key_id": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef@0",
     "key_type": "Secp256k1",
 })
 check("sign_transaction: routes to BTC plugin", "error" not in sign or sign.get("error", {}).get("code") != -32601, str(sign)[:100])
 
-bt = ws_call(ws, "vault.broadcast_transaction", {"network": "bitcoin", "signed_tx_hex": "00"})
+bt = ws_call(ws, "vault.broadcast_transaction", {"network": "bitcoin-testnet", "signed_tx_hex": "00"})
 check("broadcast_transaction: routes to BTC plugin", "error" not in bt or bt.get("error", {}).get("code") != -32601, str(bt)[:80])
 
 ws.close()

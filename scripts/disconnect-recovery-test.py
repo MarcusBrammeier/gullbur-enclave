@@ -113,7 +113,7 @@ check("generate_mnemonic works (24 words)", len(words) == 24, "got %d" % len(wor
 init = ws_call("vault.initialize", {"seed_phrase": mn.get("mnemonic", ""), "passphrase": ""})
 check("vault.initialize succeeds", init.get("success") is True, str(init))
 
-acct = ws_call("vault.create_account", {"network": "bitcoin", "index": 0})
+acct = ws_call("vault.create_account", {"network": "bitcoin-testnet", "index": 0})
 check("create_account works", "address" in acct, str(acct)[:60])
 
 # Phase 2: Force-kill the daemon
@@ -188,7 +188,7 @@ if new_pid is not None:
         mn3 = ws_call("vault.generate_mnemonic", {})
         chk = ws_call("vault.initialize", {"seed_phrase": mn3.get("mnemonic", ""), "passphrase": ""})
         check("reconnect: vault re-initializable after crash", chk.get("success") is True, str(chk)[:80])
-        acct2 = ws_call("vault.create_account", {"network": "ethereum", "index": 0})
+        acct2 = ws_call("vault.create_account", {"network": "sepolia", "index": 0})
         check("reconnect: create_account after restart", "address" in acct2, str(acct2)[:60])
     except Exception as e:
         check("reconnect + functional verification", False, str(e))

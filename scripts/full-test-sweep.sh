@@ -15,6 +15,19 @@ NC='\033[0m'
 pass()  { echo -e "  ${GREEN}✓${NC} $1"; }
 fail()  { echo -e "  ${RED}✗${NC} $1"; FAIL=1; }
 
+# Layers 8/9/10 launch the headless CLI against the shared ~/.gullbur state
+# dir, and each assumes a FRESH, uninitialized vault (they each call
+# vault.initialize). Without a reset between layers, Layer 8's persisted
+# vault makes 9/10 fail with "already initialized" or wrong account counts.
+# Back up (don't delete) the user's real vault, then start clean.
+reset_state() {
+  local vdir="${HOME}/.gullbur"
+  if [ -d "$vdir" ]; then
+    local bak="/tmp/gullbur-sweep-bak-$(date +%s)"
+    mv "$vdir" "$bak" && echo "(test state backed up to $bak)"
+  fi
+}
+
 cd "$ROOT"
 
 echo ""
@@ -25,7 +38,9 @@ echo ""
 
 # ── Layer 1: Compile ─────────────────────────────────────────────
 echo "▸ Layer 1: Compile"
-cargo check --workspace 2>&1 | tail -1 | head -1 && pass "cargo check --workspace" || fail "cargo check"
+# --locked so cargo never re-resolves the lock (preserves the dual-sha2
+# crypto resolution — plain `cargo check` collapses it and breaks keystore hkdf)
+cargo check --workspace --locked 2>&1 | tail -1 | head -1 && pass "cargo check --workspace --locked" || fail "cargo check --locked"
 
 # ── Layer 2: Library tests ───────────────────────────────────────
 echo "▸ Layer 2: Library unit tests"
@@ -111,6 +126,7 @@ CLI="$ROOT/target/release/gullbur-cli"
 SWEEP="$ROOT/scripts/full-functional-sweep.py"
 if [ -f "$CLI" ] && [ -f "$SWEEP" ]; then
   TMPDIR=$(mktemp -d /tmp/full-sweep-layer8-XXXX)
+  reset_state
   "$CLI" --port 19891 launch >/dev/null 2>&1 &
   SRV=$!
   sleep 2
@@ -130,6 +146,7 @@ echo "▸ Layer 9: E2E full-stack sweep (20 accounts, concurrent stress)"
 SWEEP_E2E="$ROOT/scripts/e2e-full-stack-sweep.py"
 if [ -f "$CLI" ] && [ -f "$SWEEP_E2E" ]; then
   TMPDIR=$(mktemp -d /tmp/full-sweep-layer9-XXXX)
+  reset_state
   "$CLI" --port 19892 launch >/dev/null 2>&1 &
   SRV=$!
   sleep 2
@@ -149,6 +166,7 @@ echo "▸ Layer 10: Disconnect recovery (daemon crash + restart)"
 RECOVERY="$ROOT/scripts/disconnect-recovery-test.py"
 if [ -f "$CLI" ] && [ -f "$RECOVERY" ]; then
   TMPDIR=$(mktemp -d /tmp/full-sweep-layer10-XXXX)
+  reset_state
   "$CLI" --port 19893 launch >/dev/null 2>&1 &
   SRV=$!
   sleep 2
