@@ -210,7 +210,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "auth-core"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "crypto-core",
@@ -772,7 +772,7 @@ dependencies = [
  "rand 0.9.5",
  "serde_json",
  "tokio",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "vault-core",
  "wallet-plugin",
  "zeroize",
@@ -961,7 +961,7 @@ dependencies = [
 
 [[package]]
 name = "crypto-core"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "aes-gcm",
  "bip32",
@@ -1543,7 +1543,7 @@ dependencies = [
 
 [[package]]
 name = "extension-relay"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "auth-core",
  "clap",
@@ -1553,7 +1553,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
  "vault-core",
@@ -2124,32 +2124,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "gullbur-cli"
-version = "0.0.7"
-dependencies = [
- "auth-core",
- "clap",
- "futures-util",
- "hex",
- "ipc-core",
- "plugin-btc",
- "plugin-evm",
- "plugin-ltc",
- "plugin-xmr",
- "rand 0.8.7",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.21.0",
- "tracing",
- "tracing-subscriber",
- "vault-core",
- "zeroize",
-]
-
-[[package]]
 name = "gullbur-desktop"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "aes-gcm",
  "auth-core",
@@ -2589,7 +2565,7 @@ dependencies = [
 
 [[package]]
 name = "ipc-core"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "axum",
@@ -2602,13 +2578,13 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "tracing",
 ]
 
 [[package]]
 name = "ipc-protocol"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "proptest",
  "rand 0.9.5",
@@ -2832,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "keystore-core"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -3672,7 +3648,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-btc"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -3690,7 +3666,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-evm"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "crypto-core",
@@ -3709,7 +3685,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-ltc"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "base58ck",
@@ -3727,7 +3703,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-manifest"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "serde",
  "serde_json",
@@ -3738,7 +3714,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-xmr"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "crypto-core",
@@ -4041,8 +4017,6 @@ version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a"
 dependencies = [
- "libc",
- "rand_chacha 0.3.1",
  "rand_core 0.6.4",
 ]
 
@@ -5758,18 +5732,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83b561d025642014097b66e6c1bb422783339e0909e4429cde4749d1990bc38"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite 0.21.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "489a59b6730eda1b0171fcfda8b121f4bee2b35cba8645ca35c5f7ba3eb736c1"
@@ -5777,7 +5739,7 @@ dependencies = [
  "futures-util",
  "log",
  "tokio",
- "tungstenite 0.27.0",
+ "tungstenite",
 ]
 
 [[package]]
@@ -5915,7 +5877,7 @@ checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "tor-daemon"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -6062,25 +6024,6 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tungstenite"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ef1a641ea34f399a848dea702823bbecfb4c486f911735368f1f137cb8257e1"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http",
- "httparse",
- "log",
- "rand 0.8.7",
- "sha1",
- "thiserror 1.0.69",
- "url",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eadc29d668c91fcc564941132e17b28a7ceb2f3ebf0b9dae3e03fd7a6748eb0d"
@@ -6200,7 +6143,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "update-checker"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -6273,7 +6216,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vault-core"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "auth-core",
@@ -6298,7 +6241,7 @@ dependencies = [
  "tar",
  "thiserror 2.0.18",
  "tokio",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "tor-daemon",
  "tracing",
  "wallet-plugin",
@@ -6358,7 +6301,7 @@ dependencies = [
 
 [[package]]
 name = "wallet-plugin"
-version = "0.0.2"
+version = "0.1.0-beta"
 dependencies = [
  "async-trait",
  "crypto-core",
