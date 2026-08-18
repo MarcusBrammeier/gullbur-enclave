@@ -1,16 +1,18 @@
 # Changelog
 
-All notable changes to **Gullbúr Enclave** (desktop app version `0.1.0`).
+All notable changes to **Gullbúr Enclave** (desktop app version `0.0.2` internal).
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
-Versioning follows the app's public release cadence (beta → 1.0).
+Versioning: **0.0.xxx** = internal pre-beta snapshots (all prior 0.1.x releases are
+reclassified internal). The public release, once network paths are proven, will be
+**0.1.0-beta** → 1.0.
 
 ---
 
-## [0.1.0-beta.2] — 2026-08-17 (internal, upcoming)
+## [0.0.2] — 2026-08-17 (internal)
 
-> Internal beta held until all network paths are verified. This changelog entry
-> documents the current dev state; it is **not** yet published.
+> Internal pre-beta snapshot. Not published. Reclassifies all earlier dev
+> releases as internal; public cadence reserved for 0.1.0-beta onward.
 
 ### Added
 - **Litecoin testnet3/testnet4 split** — `litecoin-testnet` now exposes explicit

@@ -3,7 +3,7 @@ name = "gullbur-desktop"
 version.workspace = true
 edition = "2024"
 license.workspace = true
-description = "Gullbúr Enclave — Pre-Beta v0.0.8 (internal)"
+description = "Gullbúr Enclave — Pre-Beta v0.0.2 (internal)"
 
 [lib]
 name = "gullbur_desktop_lib"

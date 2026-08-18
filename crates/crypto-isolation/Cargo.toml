@@ -1,6 +1,6 @@
 [package]
 name = "crypto-isolation"
-version = "0.1.0"
+version = "0.0.2"
 edition = "2024"
 license.workspace = true
 description = "Minimal AES-256-GCM isolation crypto — no native deps, compiles to WASM"

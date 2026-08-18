@@ -1,8 +1,11 @@
 # Gullbúr Enclave — Project State
 
-> **Version:** 0.1.0-beta.1 (public staging)
-> **Last updated:** 2026-08-17
-> **HEAD:** `4b5ea60` (2026-08-17)
+> **Version:** 0.0.2 (internal pre-beta)
+> **Last updated:** 2026-08-18
+> **HEAD:** `5709418` (2026-08-17)
+> **Release cadence:** all prior 0.1.x releases are reclassified as internal
+> **0.0.xxx** snapshots. The public release, once all network paths are proven,
+> will be **0.1.0-beta**.
 > **CI:** `cargo check --workspace` ✅ | `cargo test --workspace --lib` ✅ (322 passed, 1 ignored) | `cargo test -p cli-integration` ✅ (6 passed) | account persistence (3) ✅ | **IPC e2e + engine_security (13) + staged-mnemonic e2e (2) ✅** | **WASM crypto round-trip (7) ✅** | **frontend Svelte component tests ✅ (248)** | `cargo fmt --check` ✅ | `cargo clippy -D clippy::unwrap_used` ✅ | `cargo deny check` ✅ | `cargo audit` ✅ | `cargo +nightly fuzz build` ✅ | **full 13-layer sweep ✅** | Linux AppImage/.deb + Android APK/AAB ✅
 
 ### Security hardening (2026-08-08)
