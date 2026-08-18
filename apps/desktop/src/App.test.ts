@@ -138,12 +138,6 @@ describe('App.svelte', () => {
     expect(screen.getByTitle('Warm Light Studio')).toBeTruthy();
   });
 
-  it('renders accent color dot buttons (5 presets)', () => {
-    render(App);
-    const accentBtns = screen.getAllByTitle(/Accent:/i);
-    expect(accentBtns.length).toBe(5);
-  });
-
   it('renders settings button in sidebar', () => {
     render(App);
     expect(screen.getByText('Settings')).toBeTruthy();
@@ -192,13 +186,6 @@ describe('App.svelte', () => {
     await flushSync();
     fireEvent.click(screen.getByTitle('OLED Tactical Dark'));
     expect(applyThemeMock).toHaveBeenCalledWith('obsidian');
-  });
-
-  it('calls themeEngine.setAccent on accent click', () => {
-    render(App);
-    fireEvent.click(screen.getByTitle('Accent: violet'));
-    expect(setAccentMock).toHaveBeenCalledWith('violet');
-    expect(mockVault.accent).toBe('violet');
   });
 
   it('calls themeEngine.setMotionSpeed on motion button click', async () => {

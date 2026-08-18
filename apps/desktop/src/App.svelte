@@ -4,7 +4,6 @@
   import { pushError } from './lib/toasts.svelte.ts';
   import { invoke } from '@tauri-apps/api/core';
   import { themeEngine } from './lib/themeEngine.svelte.ts';
-  import type { AccentTheme } from './lib/vault.svelte.ts';
   import VaultInit from './lib/components/VaultInit.svelte';
   import Dashboard from './lib/components/Dashboard.svelte';
   import LockScreen from './lib/components/LockScreen.svelte';
@@ -123,11 +122,6 @@
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('gullbur_theme', id);
   }
-
-  function handleAccentChange(accent: AccentTheme) {
-    vault.accent = accent;
-    themeEngine.setAccent(accent);
-  }
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
@@ -219,23 +213,6 @@
           >
             {@html getThemeIcon(id)}
           </button>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Accent selector -->
-    <div class="px-4 py-2 space-y-2 border-b border-default">
-      <span class="text-[10px] uppercase tracking-wider text-muted">Accent</span>
-      <div class="flex items-center gap-1.5">
-        {#each (['emerald', 'violet', 'amber', 'cyan', 'rose'] as const) as accent}
-          <button
-            class="w-5 h-5 rounded-full border border-border-strong transition-all hover:scale-110
-              {vault.accent === accent ? 'ring-2 ring-accent' : ''}"
-            style="background: {accent === 'emerald' ? '#10b981' : accent === 'violet' ? '#8b5cf6' : accent === 'amber' ? '#f59e0b' : accent === 'cyan' ? '#06b6d4' : '#f43f5e'}"
-            title={`Accent: ${accent}`}
-            aria-label={`Accent ${accent}`}
-            onclick={() => handleAccentChange(accent)}
-          ></button>
         {/each}
       </div>
     </div>
