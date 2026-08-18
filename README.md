@@ -104,12 +104,15 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 
 ## Status
 
-**Beta.** Core crypto works across all 4 chains. All 18 beta gates pass. The Android APK is testable — sideload the `.apk` from the releases page. Testnet-only mode is on by default; mainnet access requires an explicit opt-in warning.
+**Beta.** Core crypto works across all 4 chains. **Testnet-only mode is on by default** — mainnet access requires an explicit opt-in warning, so no real funds are at risk during beta. This is a deliberate early release for community development: the codebase is published before every testnet proof and the audit are complete, and known gaps are tracked openly on the [issues page](https://github.com/MarcusBrammeier/gullbur-enclave/issues).
 
-> **Testnet validation status:** signing/broadcast are verified on a local regtest
-> node and the daemon JSON-RPC path is verified live; **public testnet relay (LTC
-> testnet3/4, XMR stagenet) is still being validated.** See
-> [TESTING.md](TESTING.md) for details and how to send us testnet coins.
+> **Testnet validation status (see [TESTING.md](TESTING.md)):**
+> - ✅ **Broadcast + public-chain relay proven:** Bitcoin testnet4 and EVM Sepolia (confirmed on-chain).
+> - ✅ **Monero wallet-rpc (balance/history)** works against a local synced stagenet node.
+> - 🟡 **LTC public testnet relay** awaits any testnet LTC at our address (all public faucets currently dead). Signing/broadcast logic is proven on a local regtest node.
+> - 🟡 **A third-party security audit** has not yet been performed; see [SECURITY.md](SECURITY.md).
+
+Please report bugs, review the crypto/security code, and send us valueless testnet coins to help finish the remaining paths.
 
 See the [CHANGELOG](CHANGELOG.md) for the full release history.
 

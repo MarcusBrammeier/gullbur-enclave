@@ -26,7 +26,9 @@ set -euo pipefail
 DEV_REPO="/root/fosscryptocore-new"
 STAGE_DIR="${STAGE_DIR:-/root/gullbur-foss-staging}"
 STAGE_REPO="$STAGE_DIR/gullbur-enclave"
-TAG="${TAG:-v0.1.0-beta.1}"
+# Public stable snapshot tag + bundled version (internal develops 0.1.x freely).
+TAG="${TAG:-v0.1.0-beta}"
+BUNDLED_VER="${BUNDLED_VER:-0.1.0-beta}"
 
 cd "$DEV_REPO"
 HEAD=$(git rev-parse --short HEAD)
@@ -71,6 +73,28 @@ if [ -n "$STALE" ]; then
   echo "  ✗ Stale internal files still tracked:"; echo "$STALE"
   exit 1
 fi
+
+echo "┌─ Prune workspace members the public tree cannot build (apps/cli) ─"
+# apps/cli (Pro/Enterprise headless CLI) is stripped from the public tree, so it
+# must also be dropped from [workspace] members or `cargo build --workspace`
+# fails on a public clone. cli-integration + fuzz only depend on the shipped
+# crates, so they stay.
+if [ -f Cargo.toml ]; then
+  sed -i '/^[[:space:]]*"apps\/cli",[[:space:]]*$/d' Cargo.toml
+  echo "  ✂ removed \"apps/cli\" from workspace members"
+fi
+
+echo "┌─ Align bundled version to the public snapshot ($BUNDLED_VER) ─"
+# Set Cargo package version, package.json, and tauri.conf to the public snapshot
+# so the shipped artifact and tag are self-consistent (internal stays on 0.x).
+sed -i "s/^version = \"[^\"]*\"/version = \"$BUNDLED_VER\"/" Cargo.toml 2>/dev/null || true
+if [ -f apps/desktop/package.json ]; then
+  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$BUNDLED_VER\"/" apps/desktop/package.json
+fi
+if [ -f apps/desktop/src-tauri/tauri.conf.json ]; then
+  sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$BUNDLED_VER\"/" apps/desktop/src-tauri/tauri.conf.json
+fi
+echo "  (Cargo.toml + package.json + tauri.conf  → $BUNDLED_VER)"
 
 echo "┌─ Strip internal-only sections from public docs ─"
 # Remove any trailing "internal doc" lines from CODE_SWEEP-style content, if present.
