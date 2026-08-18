@@ -55,10 +55,15 @@ echo "▸ [4/5] Full test sweep (10 layers)"
 bash scripts/full-test-sweep.sh && ok "full test sweep" || bad "full test sweep"
 
 echo "▸ [5/5] Stage .deb + AppImage to $OUT_DIR"
-DEB="$(find target/release/bundle/deb -name '*.deb' 2>/dev/null | head -1)"
-APPIMAGE="$(find target/release/bundle/appimage -name '*.AppImage' 2>/dev/null | head -1)"
-if [ -n "$DEB" ]; then cp -f "$DEB" "$OUT_DIR/"; ok "staged .deb: $(basename "$DEB")"; else bad "no .deb found"; fi
-if [ -n "$APPIMAGE" ]; then cp -f "$APPIMAGE" "$OUT_DIR/"; ok "staged AppImage: $(basename "$APPIMAGE")"; else bad "no AppImage found"; fi
+# Pick the bundle matching the CURRENT workspace version (0.0.2), newest-first,
+# so a stale 0.1.0/0.0.8 bundle left in target/ can't be mis-staged.
+VER="$(grep -m1 '^version' Cargo.toml | sed 's/.*= *"//;s/"//')"
+DEB="$(find target/release/bundle/deb -name "*.deb" -newermt '-2 days' 2>/dev/null | grep -F "$VER" | head -1)"
+APPIMAGE="$(find target/release/bundle/appimage -name '*.AppImage' -newermt '-2 days' 2>/dev/null | grep -F "$VER" | head -1)"
+if [ -z "$DEB" ]; then DEB="$(find target/release/bundle/deb -name "*$VER*.deb" 2>/dev/null | head -1)"; fi
+if [ -z "$APPIMAGE" ]; then APPIMAGE="$(find target/release/bundle/appimage -name "*$VER*.AppImage" 2>/dev/null | head -1)"; fi
+if [ -n "$DEB" ]; then cp -f "$DEB" "$OUT_DIR/"; ok "staged .deb: $(basename "$DEB")"; else bad "no .deb found (run: npx tauri build)"; fi
+if [ -n "$APPIMAGE" ]; then cp -f "$APPIMAGE" "$OUT_DIR/"; ok "staged AppImage: $(basename "$APPIMAGE")"; else bad "no AppImage found (run: npx tauri build)"; fi
 
 echo ""
 echo "  Result: $PASS/$((PASS+FAIL)) steps OK  →  artifacts in $OUT_DIR"
