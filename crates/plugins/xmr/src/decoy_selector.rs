@@ -156,6 +156,7 @@ async fn fetch_output_distribution(
 /// The selection uses a modified version of Monero's decoy selection algorithm:
 /// - 50% probability to pick from the last ~N blocks (recent)
 /// - 50% probability to pick uniformly across the full chain
+///
 /// This ensures a reasonable distribution that won't trivially stand out
 /// on chain analysis.
 fn select_decoy_indices(distribution: &[u64], count: usize, total_outputs: u64) -> Vec<u64> {
