@@ -43,7 +43,7 @@ jobs:
       - name: cargo deny check
         run: cargo deny check
       - name: cargo clippy
-        run: cargo clippy --workspace -- -D warnings -D clippy::unwrap_used
+        run: cargo clippy --workspace --locked -- -D warnings -D clippy::unwrap_used
       - name: cargo test
         run: cargo test --workspace --lib --locked
       - name: cargo test (cli-integration)
