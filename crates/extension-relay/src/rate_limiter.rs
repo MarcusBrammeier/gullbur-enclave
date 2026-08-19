@@ -49,3 +49,9 @@ impl RateLimiter {
         }
     }
 }
+
+impl Default for RateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}

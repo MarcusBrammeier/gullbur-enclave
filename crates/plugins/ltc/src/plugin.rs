@@ -253,7 +253,7 @@ impl WalletPlugin for LtcPlugin {
         let ct = coin_type(network);
         let path = format!("m/84'/{ct}'/0'/0/{acct_index}");
         let secp = bitcoin::secp256k1::Secp256k1::new();
-        let master = bitcoin::bip32::Xpriv::new_master(btc_net, &seed)
+        let master = bitcoin::bip32::Xpriv::new_master(btc_net, seed)
             .map_err(|e| PluginError::Internal(format!("master key: {e}")))?;
         let derivation_path: bitcoin::bip32::DerivationPath = path
             .parse()

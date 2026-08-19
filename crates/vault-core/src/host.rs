@@ -510,10 +510,14 @@ impl PluginHost {
             .and_then(|v| v.as_u64())
             .unwrap_or(3600);
 
-        // Generate a fresh k256 keypair for this session
+        // Generate a fresh k256 keypair for this session.
+        // derives a generic secp256k1 session key from the 32-byte seed (NOT a
+        // BIP-44 eth key, which would change the session-key material) — so the
+        // deprecated helper is deliberately retained here. See deprecation note.
         let seed = crypto_core::keys::generate_seed();
         let mut seed_bytes = [0u8; 32];
         seed_bytes.copy_from_slice(seed.as_slice());
+        #[allow(deprecated)]
         let secret = crypto_core::keys::derive_k256_key(&seed_bytes, 0)
             .map_err(|e| PluginError::Internal(format!("Session key generation failed: {e}")))?;
         let public_key = secret.public_key().to_sec1_bytes().to_vec();

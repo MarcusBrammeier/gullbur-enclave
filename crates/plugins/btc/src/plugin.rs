@@ -188,7 +188,7 @@ impl WalletPlugin for BtcPlugin {
         };
         let path = format!("m/84'/{coin_type}'/0'/0/{acct_index}");
         let secp = bitcoin::secp256k1::Secp256k1::new();
-        let master = bitcoin::bip32::Xpriv::new_master(btc_network, &seed)
+        let master = bitcoin::bip32::Xpriv::new_master(btc_network, seed)
             .map_err(|e| PluginError::Internal(format!("BIP-32 master key error: {e}")))?;
         let derivation_path: bitcoin::bip32::DerivationPath =
             path.parse().map_err(|e: bitcoin::bip32::Error| {

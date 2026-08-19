@@ -325,6 +325,7 @@ pub async fn get_balance(
 }
 
 #[tauri::command]
+#[allow(unused_variables)] // key_id is part of the Tauri command arg contract (matched by name from JS)
 pub async fn sign_transaction(
     network: String,
     tx_hex: String,
@@ -753,7 +754,7 @@ async fn dispatch_method(
                 .get("tx_hex")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing tx_hex")?;
-            let key_id = args
+            let _key_id = args
                 .get("key_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");

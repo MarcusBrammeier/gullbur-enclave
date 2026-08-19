@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
-use wallet_plugin::{Account, KeyType};
+use wallet_plugin::Account;
 
 use crate::approval::ApprovalQueue;
 use crate::host::PluginHost;
@@ -443,7 +443,7 @@ pub fn register_vault_handlers(
                     .get("tx_hex")
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?;
-                let key_id = params
+                let _key_id = params
                     .get("key_id")
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?
@@ -936,7 +936,7 @@ pub fn register_vault_handlers(
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?
                     .to_string();
-                let key_type_str = params
+                let _key_type_str = params
                     .get("key_type")
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?;
