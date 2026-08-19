@@ -845,7 +845,7 @@ mod tests {
         let psbt_bytes = psbt.serialize();
 
         // LTC's sign_transaction parses key_id as "hexseed@index".
-        let key = wallet_plugin::KeyHandle {
+        let _key = wallet_plugin::KeyHandle {
             key_id: format!("{seed_hex}@0"),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],

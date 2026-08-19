@@ -682,7 +682,7 @@ mod tests {
 
         let psbt_bytes = psbt.serialize();
         let seed_bytes = hex::decode(seed_hex).expect("test invariant");
-        let key = wallet_plugin::KeyHandle {
+        let _key = wallet_plugin::KeyHandle {
             key_id: seed_hex.into(),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],

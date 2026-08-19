@@ -165,6 +165,9 @@ pub fn derive_bip44_xmr_entropy(seed_512: &[u8; 64], index: u32) -> Result<[u8; 
 
 #[cfg(test)]
 mod tests {
+    // These tests intentionally exercise deprecated derivation helpers to verify
+    // they still work; keep them active until the helpers are removed.
+    #![allow(deprecated)]
     use super::*;
 
     #[test]

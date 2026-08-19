@@ -25,7 +25,7 @@ fn p2pkh_script_from_address(addr: &str) -> Result<ScriptBuf, String> {
         return Err(format!(
             "not a valid P2PKH address (len {} ver {}): {addr}",
             decoded.len(),
-            decoded.get(0).map(|b| *b).unwrap_or(0)
+            decoded.first().copied().unwrap_or(0)
         ));
     }
     let mut script = vec![0x76, 0xa9, 0x14]; // OP_DUP OP_HASH160 PUSH20

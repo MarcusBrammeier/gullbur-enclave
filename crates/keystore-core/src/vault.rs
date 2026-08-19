@@ -596,9 +596,7 @@ mod tests {
 
     #[test]
     fn test_argon2_mem_safety() {
-        assert!(
-            ARGON2_M_COST >= 16 * 1024,
-            "m_cost should be at least 16 MiB"
-        );
+        // Compile-time guarantee that the memory cost stays above the safety floor.
+        const _: () = assert!(ARGON2_M_COST >= 16 * 1024);
     }
 }

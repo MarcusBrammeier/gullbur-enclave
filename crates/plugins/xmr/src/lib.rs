@@ -1548,7 +1548,7 @@ mod tests {
 
     #[test]
     fn test_validate_address_77_byte_len_accepted_for_both_networks_checked() {
-        let plugin = XmrPlugin::new();
+        let _plugin = XmrPlugin::new();
         // A 77-byte integrated/sub-address decodes cleanly (encode path); the
         // network-byte gate above governs acceptance. Assert the encode yields a
         // base58-decodable 77-byte payload (so the 69-vs-77 length gate is the
