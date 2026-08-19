@@ -51,13 +51,13 @@ Gullbúr Enclave is a multi-chain cryptocurrency wallet that runs multiple block
 - **Biometric unlock** — TouchID / Windows Hello / Android fingerprint
 - **FIDO2 YubiKey** — optional hardware gating for high-value operations
 - **Tor support** — optional SOCKS5 routing for all RPC traffic
-- **CLI + desktop + mobile** — headless binary for automation, Tauri desktop shell, Android APK
+- **Desktop + mobile** — Tauri desktop shell, Android APK
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────┐
-│              Desktop / CLI / Mobile           │
+│              Desktop / Mobile                │
 ├──────────────────────────────────────────────┤
 │             IPC WebSocket Layer               │
 ├──────────┬──────────┬───────────────────────┤
