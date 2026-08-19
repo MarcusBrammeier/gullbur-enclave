@@ -148,9 +148,14 @@ async fn list_accounts_after_creation() {
     let (token, _handle) = setup_server(PORT + 5).await;
 
     // Create accounts across distinct testnet networks
-    for (i, net) in ["bitcoin-testnet", "sepolia", "monero-stagenet", "litecoin-testnet"]
-        .iter()
-        .enumerate()
+    for (i, net) in [
+        "bitcoin-testnet",
+        "sepolia",
+        "monero-stagenet",
+        "litecoin-testnet",
+    ]
+    .iter()
+    .enumerate()
     {
         let r = call(
             PORT + 5,

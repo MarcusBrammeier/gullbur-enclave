@@ -242,7 +242,11 @@ async fn lock_unlock_accounts_preserved() {
 
     // Create one account per network
     let mut pre_addrs: HashSet<(String, String)> = HashSet::new();
-    for (net, idx) in &[("bitcoin-testnet", 0u64), ("sepolia", 0u64), ("litecoin-testnet", 0u64)] {
+    for (net, idx) in &[
+        ("bitcoin-testnet", 0u64),
+        ("sepolia", 0u64),
+        ("litecoin-testnet", 0u64),
+    ] {
         let r = call(
             LOCK_UNLOCK_PORT,
             &token,
