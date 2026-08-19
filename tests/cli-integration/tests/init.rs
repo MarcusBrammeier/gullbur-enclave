@@ -197,7 +197,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"bitcoin","index":0}),
+                serde_json::json!({"network":"bitcoin-testnet","index":0}),
             )
             .await,
             "btc A",
@@ -208,7 +208,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"ethereum","index":0}),
+                serde_json::json!({"network":"sepolia","index":0}),
             )
             .await,
             "eth A",
@@ -219,7 +219,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"litecoin","index":0}),
+                serde_json::json!({"network":"litecoin-testnet","index":0}),
             )
             .await,
             "ltc A",
@@ -230,7 +230,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"monero","index":0}),
+                serde_json::json!({"network":"monero-stagenet","index":0}),
             )
             .await,
             "xmr A",
@@ -256,7 +256,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT + 1,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"bitcoin","index":0}),
+                serde_json::json!({"network":"bitcoin-testnet","index":0}),
             )
             .await,
             "btc B",
@@ -267,7 +267,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT + 1,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"ethereum","index":0}),
+                serde_json::json!({"network":"sepolia","index":0}),
             )
             .await,
             "eth B",
@@ -278,7 +278,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT + 1,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"litecoin","index":0}),
+                serde_json::json!({"network":"litecoin-testnet","index":0}),
             )
             .await,
             "ltc B",
@@ -289,7 +289,7 @@ async fn deterministic_seed_restoration() {
                 DET_PORT + 1,
                 &token,
                 "vault.create_account",
-                serde_json::json!({"network":"monero","index":0}),
+                serde_json::json!({"network":"monero-stagenet","index":0}),
             )
             .await,
             "xmr B",

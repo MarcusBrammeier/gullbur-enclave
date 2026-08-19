@@ -48,7 +48,7 @@ async fn get_balance_routes() {
         &token,
         "vault.get_balance",
         serde_json::json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "address": "0x1234567890123456789012345678901234567890"
         }),
     )
@@ -77,7 +77,7 @@ async fn estimate_fee_routes() {
         &token,
         "vault.estimate_fee",
         serde_json::json!({
-            "network": "bitcoin"
+            "network": "bitcoin-testnet"
         }),
     )
     .await;
@@ -98,7 +98,7 @@ async fn transaction_history_routes() {
         &token,
         "vault.get_transaction_history",
         serde_json::json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "address": "0x1234567890123456789012345678901234567890",
             "limit": 5
         }),
@@ -188,7 +188,7 @@ async fn get_balance_btc() {
         OP_PORT,
         &token,
         "vault.create_account",
-        serde_json::json!({"network": "bitcoin", "index": 0}),
+        serde_json::json!({"network": "bitcoin-testnet", "index": 0}),
     )
     .await;
     let addr = assert_ok(&r, "create btc")["address"]
@@ -199,7 +199,7 @@ async fn get_balance_btc() {
         OP_PORT,
         &token,
         "vault.get_balance",
-        serde_json::json!({"network": "bitcoin", "address": &addr}),
+        serde_json::json!({"network": "bitcoin-testnet", "address": &addr}),
     )
     .await;
     if let Some(err) = r.get("error") {
@@ -215,7 +215,7 @@ async fn get_balance_xmr() {
         OP_PORT + 1,
         &token,
         "vault.create_account",
-        serde_json::json!({"network": "monero", "index": 0}),
+        serde_json::json!({"network": "monero-stagenet", "index": 0}),
     )
     .await;
     let addr = assert_ok(&r, "create xmr")["address"]
@@ -226,7 +226,7 @@ async fn get_balance_xmr() {
         OP_PORT + 1,
         &token,
         "vault.get_balance",
-        serde_json::json!({"network": "monero", "address": &addr}),
+        serde_json::json!({"network": "monero-stagenet", "address": &addr}),
     )
     .await;
     if let Some(err) = r.get("error") {
@@ -242,7 +242,7 @@ async fn get_balance_ltc() {
         OP_PORT + 2,
         &token,
         "vault.create_account",
-        serde_json::json!({"network": "litecoin", "index": 0}),
+        serde_json::json!({"network": "litecoin-testnet", "index": 0}),
     )
     .await;
     let addr = assert_ok(&r, "create ltc")["address"]
@@ -253,7 +253,7 @@ async fn get_balance_ltc() {
         OP_PORT + 2,
         &token,
         "vault.get_balance",
-        serde_json::json!({"network": "litecoin", "address": &addr}),
+        serde_json::json!({"network": "litecoin-testnet", "address": &addr}),
     )
     .await;
     if let Some(err) = r.get("error") {
@@ -266,7 +266,7 @@ async fn get_balance_ltc() {
 async fn estimate_fee_eth() {
     let (token, _handle) = setup_op_server(OP_PORT + 3).await;
     let r = call(OP_PORT + 3, &token, "vault.estimate_fee",
-        serde_json::json!({"network": "ethereum", "recipient": "0x1234567890123456789012345678901234567890", "amount": "0.001"})).await;
+        serde_json::json!({"network": "sepolia", "recipient": "0x1234567890123456789012345678901234567890", "amount": "0.001"})).await;
     if let Some(err) = r.get("error") {
         let code = err["code"].as_i64().unwrap_or(0);
         assert_ne!(code, -32601, "estimate_fee ETH must route");
@@ -280,7 +280,7 @@ async fn estimate_fee_ltc() {
         OP_PORT + 4,
         &token,
         "vault.estimate_fee",
-        serde_json::json!({"network": "litecoin", "recipient": "ltc1qtest", "amount": "0.001"}),
+        serde_json::json!({"network": "litecoin-testnet", "recipient": "ltc1qtest", "amount": "0.001"}),
     )
     .await;
     if let Some(err) = r.get("error") {
@@ -293,7 +293,7 @@ async fn estimate_fee_ltc() {
 async fn tx_history_btc() {
     let (token, _handle) = setup_op_server(OP_PORT + 5).await;
     let r = call(OP_PORT + 5, &token, "vault.get_transaction_history",
-        serde_json::json!({"network": "bitcoin", "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "limit": 5})).await;
+        serde_json::json!({"network": "bitcoin-testnet", "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "limit": 5})).await;
     if let Some(err) = r.get("error") {
         let code = err["code"].as_i64().unwrap_or(0);
         assert_ne!(code, -32601, "tx_history BTC must route");
@@ -307,7 +307,7 @@ async fn tx_history_ltc() {
         OP_PORT + 6,
         &token,
         "vault.get_transaction_history",
-        serde_json::json!({"network": "litecoin", "address": "ltc1qtest", "limit": 5}),
+        serde_json::json!({"network": "litecoin-testnet", "address": "ltc1qtest", "limit": 5}),
     )
     .await;
     if let Some(err) = r.get("error") {

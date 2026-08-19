@@ -75,7 +75,7 @@ async fn setup_signing_server(
         &token,
         "vault.create_account",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "index": 0
         }),
     )
@@ -125,7 +125,7 @@ async fn sign_eth_transaction() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "tx_hex": tx_hex,
             "key_id": &account_id,
             "key_type": "Secp256k1"
@@ -150,7 +150,7 @@ async fn sign_with_bad_key_id() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "tx_hex": "02f8",
             "key_id": "nonexistent-key",
             "key_type": "Secp256k1"
@@ -175,7 +175,7 @@ async fn broadcast_invalid_tx() {
         &token,
         "vault.broadcast_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "signed_tx_hex": "00"
         }),
     )
@@ -201,7 +201,7 @@ async fn broadcast_error_routes() {
         &token,
         "vault.broadcast_transaction",
         json!({
-            "network": "bitcoin",
+            "network": "bitcoin-testnet",
             "signed_tx_hex": "001122"
         }),
     )
@@ -231,7 +231,7 @@ async fn btc_sign_error_handling() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "bitcoin",
+            "network": "bitcoin-testnet",
             "tx_hex": "00",
             "key_id": "bip44-btc-0",
             "key_type": "Secp256k1"
@@ -264,7 +264,7 @@ async fn sign_blocked_before_init() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "tx_hex": "02f8",
             "key_id": "ethereum-0",
             "key_type": "Secp256k1"

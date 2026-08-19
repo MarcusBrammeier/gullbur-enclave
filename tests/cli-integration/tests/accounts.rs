@@ -45,12 +45,12 @@ async fn create_btc_account() {
         &token,
         "vault.create_account",
         serde_json::json!({
-            "network": "bitcoin",
+            "network": "bitcoin-testnet",
             "index": 0
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (bitcoin)");
+    let result = assert_ok(&r, "vault.create_account (bitcoin-testnet)");
     let address = result["address"].as_str().expect("test invariant");
     // BTC addresses start with bc1 (bech32) or tb1 (testnet)
     assert!(
@@ -68,12 +68,12 @@ async fn create_eth_account() {
         &token,
         "vault.create_account",
         serde_json::json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "index": 0
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (ethereum)");
+    let result = assert_ok(&r, "vault.create_account (sepolia)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(
         address.starts_with("0x"),
@@ -91,12 +91,12 @@ async fn create_xmr_account() {
         &token,
         "vault.create_account",
         serde_json::json!({
-            "network": "monero",
+            "network": "monero-stagenet",
             "index": 0
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (monero)");
+    let result = assert_ok(&r, "vault.create_account (monero-stagenet)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(!address.is_empty(), "XMR address should be non-empty");
 }
@@ -110,12 +110,12 @@ async fn create_ltc_account() {
         &token,
         "vault.create_account",
         serde_json::json!({
-            "network": "litecoin",
+            "network": "litecoin-testnet",
             "index": 0
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (litecoin)");
+    let result = assert_ok(&r, "vault.create_account (litecoin-testnet)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(!address.is_empty(), "LTC address should be non-empty");
 }
@@ -147,8 +147,8 @@ async fn create_sepolia_account() {
 async fn list_accounts_after_creation() {
     let (token, _handle) = setup_server(PORT + 5).await;
 
-    // Create 5 accounts across different networks
-    for (i, net) in ["bitcoin", "ethereum", "monero", "litecoin", "sepolia"]
+    // Create accounts across distinct testnet networks
+    for (i, net) in ["bitcoin-testnet", "sepolia", "monero-stagenet", "litecoin-testnet"]
         .iter()
         .enumerate()
     {
@@ -176,8 +176,8 @@ async fn list_accounts_after_creation() {
     let accounts = result.as_array().expect("test invariant");
     assert_eq!(
         accounts.len(),
-        5,
-        "expected 5 accounts, got {}",
+        4,
+        "expected 4 accounts, got {}",
         accounts.len()
     );
     for acct in accounts {
@@ -197,8 +197,8 @@ async fn validate_valid_address() {
         &token,
         "vault.validate_address",
         serde_json::json!({
-            "network": "bitcoin",
-            "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+            "network": "bitcoin-testnet",
+            "address": "tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk"
         }),
     )
     .await;
@@ -216,8 +216,8 @@ async fn validate_invalid_address() {
         &token,
         "vault.validate_address",
         serde_json::json!({
-            "network": "bitcoin",
-            "address": "not-a-valid-address-xyz"
+            "network": "bitcoin-testnet",
+            "address": "zzz-invalid-zzz"
         }),
     )
     .await;
@@ -249,7 +249,7 @@ async fn multi_index_derivation() {
             &token,
             "vault.create_account",
             serde_json::json!({
-                "network": "bitcoin",
+                "network": "bitcoin-testnet",
                 "index": i
             }),
         )
@@ -283,7 +283,7 @@ async fn multi_accounts_per_network() {
             &token,
             "vault.create_account",
             serde_json::json!({
-                "network": "bitcoin",
+                "network": "bitcoin-testnet",
                 "index": i
             }),
         )
@@ -295,7 +295,7 @@ async fn multi_accounts_per_network() {
             &token,
             "vault.create_account",
             serde_json::json!({
-                "network": "ethereum",
+                "network": "sepolia",
                 "index": i
             }),
         )
@@ -318,7 +318,7 @@ async fn multi_accounts_per_network() {
         let net = acct["network"].as_str().expect("test invariant");
         let addr = acct["address"].as_str().expect("test invariant");
         assert!(
-            net == "bitcoin" || net == "ethereum",
+            net == "bitcoin-testnet" || net == "sepolia",
             "unexpected network: {net}"
         );
         assert!(!addr.is_empty(), "address should not be empty");
@@ -336,18 +336,15 @@ async fn ltc_address_format() {
         &token,
         "vault.create_account",
         serde_json::json!({
-            "network": "litecoin",
+            "network": "litecoin-testnet",
             "index": 0
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (litecoin)");
+    let result = assert_ok(&r, "vault.create_account (litecoin-testnet)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(
-        address.starts_with("ltc1")
-            || address.starts_with("L")
-            || address.starts_with("M")
-            || address.starts_with("tb1"),
-        "LTC address should start with ltc1/L/M/tb1, got: {address}"
+        address.starts_with('m') || address.starts_with('n'),
+        "LTC testnet address should be legacy P2PKH (m/n), got: {address}"
     );
 }

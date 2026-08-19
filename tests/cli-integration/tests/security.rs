@@ -67,7 +67,7 @@ async fn operations_blocked_after_lock() {
         &token,
         "vault.create_account",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "index": 0
         }),
     )
@@ -87,7 +87,7 @@ async fn operations_blocked_after_lock() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "tx_hex": "02f8",
             "key_id": account_id,
             "key_type": "Secp256k1"
@@ -169,7 +169,7 @@ async fn unlock_flow() {
         &token,
         "vault.create_account",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "index": 0
         }),
     )
@@ -183,7 +183,7 @@ async fn unlock_flow() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "ethereum",
+            "network": "sepolia",
             "tx_hex": "02f8",
             "key_id": &account_id,
             "key_type": "Secp256k1"
@@ -242,7 +242,7 @@ async fn lock_unlock_accounts_preserved() {
 
     // Create one account per network
     let mut pre_addrs: HashSet<(String, String)> = HashSet::new();
-    for (net, idx) in &[("bitcoin", 0u64), ("ethereum", 0u64), ("litecoin", 0u64)] {
+    for (net, idx) in &[("bitcoin-testnet", 0u64), ("sepolia", 0u64), ("litecoin-testnet", 0u64)] {
         let r = call(
             LOCK_UNLOCK_PORT,
             &token,
