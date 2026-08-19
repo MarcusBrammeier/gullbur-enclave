@@ -106,6 +106,8 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 
 **Beta.** Core crypto works across all 4 chains. **Testnet-only mode is on by default** — mainnet access requires an explicit opt-in warning, so no real funds are at risk during beta. This is a deliberate early release for community development: the codebase is published before every testnet proof and the audit are complete, and known gaps are tracked openly on the [issues page](https://github.com/MarcusBrammeier/gullbur-enclave/issues).
 
+> **⚠️ GUI overhaul planned before 1.0.** The current desktop/mobile interface is a functional work-in-progress. A **full GUI overhaul** is planned for a later beta before the 1.0 release. Community UX feedback during beta directly informs it.
+
 > **Testnet validation status (see [TESTING.md](TESTING.md)):**
 > - ✅ **Broadcast + public-chain relay proven:** Bitcoin testnet4 and EVM Sepolia (confirmed on-chain).
 > - ✅ **Monero wallet-rpc (balance/history)** works against a local synced stagenet node.

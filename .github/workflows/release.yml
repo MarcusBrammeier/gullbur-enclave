@@ -148,6 +148,8 @@ jobs:
 
             Self-custody multi-chain wallet (BTC / ETH / XMR / LTC). **Testnet-only during beta** — no mainnet funds at risk.
 
+            > ⚠️ **GUI overhaul planned before 1.0.** This beta is a functional work-in-progress; a full desktop/mobile GUI overhaul is planned before the 1.0 release. Community UX feedback during beta directly informs it.
+
             See the [README](https://github.com/MarcusBrammeier/gullbur-enclave#readme) and [TESTING.md](https://github.com/MarcusBrammeier/gullbur-enclave/blob/main/TESTING.md) for network-validation status and known issues.
           draft: true
           files: artifacts/**
