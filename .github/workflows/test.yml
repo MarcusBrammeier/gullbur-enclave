@@ -80,4 +80,4 @@ jobs:
           cargo deny check
 
       - name: cargo test (cli-integration)
-        run: cargo test -p cli-integration -- --test-threads=1 --locked
+        run: cargo test -p cli-integration --locked -- --test-threads=1
