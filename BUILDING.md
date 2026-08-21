@@ -73,7 +73,7 @@ ANDROID_HOME=/path/to/android-sdk ANDROID_NDK_HOME=/path/to/ndk \
 
 ### What's included / excluded
 
-This **public** repository ships the core engine, the desktop GUI, the browser
-extension, and the integration/fuzz tests. It deliberately **excludes** the
-`gullbur-cli` headless tool, the internal test sweeps, and internal planning
-docs — those live in the private development repo.
+This repository ships the core engine, the desktop GUI, the browser
+extension, and the integration/fuzz tests. Build tooling and internal
+test scaffolding used during development are not part of the shipped
+source tree.

@@ -82,9 +82,9 @@ Gullbúr Enclave is a multi-chain cryptocurrency wallet that runs multiple block
 
 ## Quick Start
 
-> The headless CLI (`gullbur-cli`) is a **Pro/Enterprise** power-user feature and
-> is intentionally **not** part of the public FOSS build. Public users use the
-> desktop GUI (Linux / macOS) or the Android app.
+> This repository ships the open-source desktop GUI (Linux / macOS) and the
+> Android app. It does not include internal or non-FOSS build tooling; follow
+> the build instructions below to compile the desktop app.
 
 ```bash
 # Build + run the app

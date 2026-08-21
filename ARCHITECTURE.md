@@ -26,10 +26,8 @@ gullbur/
 │       └── ltc/             ← Litecoin: FPI reference implementation (Scrypt-based, BIP-84 pattern)
 ├── apps/
 │   ├── desktop/             ← Tauri v2 + Svelte 5 + Tailwind CSS (Linux/macOS/Windows)
-│   ├── cli/                 ← Internal testing CLI (13 subcommands, WebSocket IPC)
 │   └── browser-extension/   ← Chrome/Firefox MV3 EIP-6963 relay extension
 ├── fuzz/                    ← cargo-fuzz targets (nightly only)
-└── scripts/                 ← test-*.sh, CI helpers
 ```
 
 ## Security Boundaries
