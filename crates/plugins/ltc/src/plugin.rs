@@ -173,12 +173,20 @@ impl WalletPlugin for LtcPlugin {
 
     fn plugin_metadata(&self) -> PluginMetadata {
         PluginMetadata {
-            description: "Litecoin — Scrypt-based cryptocurrency, FPI reference implementation. BIP-84 key derivation, PSBT signing, Esplora-backed queries.",
+            description: "Litecoin — Scrypt-based cryptocurrency, FPI reference implementation. BIP-84 key derivation, PSBT signing, Esplora-backed queries. NOTE: mainnet outputs P2WPKH (ltc1...), testnet3/testnet4 force legacy P2PKH (m/n...) for faucet compatibility — both share the same BIP-84 m/84'/2' path.",
             author: "Gullbúr Enclave",
             homepage: "https://github.com/MarcusBrammeier/gullbur-enclave",
             repository: "https://github.com/MarcusBrammeier/gullbur-enclave",
             min_wallet_version: "0.1.0",
-            tags: &["litecoin", "ltc", "reference", "scrypt", "bip84"],
+            tags: &[
+                "litecoin",
+                "ltc",
+                "reference",
+                "scrypt",
+                "bip84",
+                "p2wpkh",
+                "p2pkh",
+            ],
         }
     }
 
@@ -845,7 +853,7 @@ mod tests {
         let psbt_bytes = psbt.serialize();
 
         // LTC's sign_transaction parses key_id as "hexseed@index".
-        let _key = wallet_plugin::KeyHandle {
+        let key = wallet_plugin::KeyHandle {
             key_id: format!("{seed_hex}@0"),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],

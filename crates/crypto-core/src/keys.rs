@@ -56,12 +56,18 @@ pub fn derive_k256_key(seed: &[u8], index: u32) -> Result<k256::SecretKey, Crypt
 }
 
 /// Generate a random 32-byte seed.
-pub fn generate_seed() -> zeroize::Zeroizing<[u8; 32]> {
+///
+/// Returns an error (rather than panicking) if the OS CSPRNG fails, so a
+/// depleted-entropy system degrades gracefully instead of crashing the wallet
+/// mid seed-generation.
+pub fn generate_seed() -> Result<zeroize::Zeroizing<[u8; 32]>, CryptoError> {
     use rand::TryRngCore;
     use zeroize::Zeroizing;
     let mut seed = Zeroizing::new([0u8; 32]);
-    OsRng.try_fill_bytes(seed.as_mut()).expect("OsRng failed");
-    seed
+    OsRng
+        .try_fill_bytes(seed.as_mut())
+        .map_err(|_| CryptoError::HashFailed("OsRng failed to produce entropy".into()))?;
+    Ok(seed)
 }
 
 // ── BIP-39 Mnemonic ──────────────────────────────────────────────────────────
@@ -70,7 +76,9 @@ pub fn generate_seed() -> zeroize::Zeroizing<[u8; 32]> {
 pub fn generate_mnemonic(strength: MnemonicStrength) -> Result<MnemonicPhrase, CryptoError> {
     use bip39::Mnemonic;
     let mut entropy = vec![0u8; strength.entropy_bytes()];
-    OsRng.try_fill_bytes(&mut entropy).expect("OsRng failed");
+    OsRng
+        .try_fill_bytes(&mut entropy)
+        .map_err(|_| CryptoError::HashFailed("OsRng failed to produce entropy".into()))?;
     let mnemonic =
         Mnemonic::from_entropy(&entropy).map_err(|e| CryptoError::MnemonicError(e.to_string()))?;
     let words: Vec<String> = mnemonic.words().map(|w| w.to_string()).collect();
@@ -165,9 +173,6 @@ pub fn derive_bip44_xmr_entropy(seed_512: &[u8; 64], index: u32) -> Result<[u8; 
 
 #[cfg(test)]
 mod tests {
-    // These tests intentionally exercise deprecated derivation helpers to verify
-    // they still work; keep them active until the helpers are removed.
-    #![allow(deprecated)]
     use super::*;
 
     #[test]
@@ -198,7 +203,7 @@ mod tests {
 
     #[test]
     fn generate_seed_nonzero() {
-        let seed = generate_seed();
+        let seed = generate_seed().expect("test invariant");
         assert_ne!(seed.as_slice(), [0u8; 32]);
     }
 

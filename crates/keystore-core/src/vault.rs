@@ -199,7 +199,7 @@ impl Vault {
         self.sealed = Some(sealed);
         self.derived_key = Some(key);
 
-        Ok(serialize_v2(&argon, &salt, &nonce_bytes, &ciphertext))
+        serialize_v2(&argon, &salt, &nonce_bytes, &ciphertext)
     }
 
     /// Open (decrypt) sealed data with AES-256-GCM.
@@ -290,7 +290,24 @@ fn parse_v2_params(blob: &[u8]) -> Result<ArgonParams, KeystoreError> {
 }
 
 /// Serialize a v2 blob: magic || version || params || salt || nonce || ciphertext.
-fn serialize_v2(p: &ArgonParams, salt: &[u8], nonce: &[u8], ct: &[u8]) -> Vec<u8> {
+///
+/// The v2 binary format stores `p_cost` as a single byte. A parallelism value
+/// above 255 would silently truncate and lock the user out (encryption and
+/// decryption would use different Argon2 parameters), so we refuse rather than
+/// wrap.
+fn serialize_v2(
+    p: &ArgonParams,
+    salt: &[u8],
+    nonce: &[u8],
+    ct: &[u8],
+) -> Result<Vec<u8>, KeystoreError> {
+    if p.p_cost > u8::MAX as u32 {
+        return Err(KeystoreError::Crypto(format!(
+            "Argon2 p_cost {} exceeds the v2 format limit of {}",
+            p.p_cost,
+            u8::MAX
+        )));
+    }
     let mut out = Vec::with_capacity(42 + ct.len());
     out.extend_from_slice(&MAGIC);
     out.push(KDF_VERSION_ARGON2);
@@ -300,7 +317,7 @@ fn serialize_v2(p: &ArgonParams, salt: &[u8], nonce: &[u8], ct: &[u8]) -> Vec<u8
     out.extend_from_slice(salt);
     out.extend_from_slice(nonce);
     out.extend_from_slice(ct);
-    out
+    Ok(out)
 }
 
 /// One-shot encrypt with a password (Argon2id KDF → salt || nonce || ciphertext).
@@ -330,7 +347,7 @@ pub fn encrypt_with_password(
         )
         .map_err(|e| KeystoreError::Crypto(format!("encryption failed: {e}")))?;
 
-    Ok(serialize_v2(&argon, &salt, &nonce_bytes, &ciphertext))
+    serialize_v2(&argon, &salt, &nonce_bytes, &ciphertext)
 }
 
 /// One-shot decrypt with a password (auto-detects Argon2id vs legacy HKDF).
@@ -596,7 +613,9 @@ mod tests {
 
     #[test]
     fn test_argon2_mem_safety() {
-        // Compile-time guarantee that the memory cost stays above the safety floor.
-        const _: () = assert!(ARGON2_M_COST >= 16 * 1024);
+        assert!(
+            ARGON2_M_COST >= 16 * 1024,
+            "m_cost should be at least 16 MiB"
+        );
     }
 }

@@ -67,7 +67,7 @@ async fn operations_blocked_after_lock() {
         &token,
         "vault.create_account",
         json!({
-            "network": "sepolia",
+            "network": "ethereum",
             "index": 0
         }),
     )
@@ -87,7 +87,7 @@ async fn operations_blocked_after_lock() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "sepolia",
+            "network": "ethereum",
             "tx_hex": "02f8",
             "key_id": account_id,
             "key_type": "Secp256k1"
@@ -183,7 +183,7 @@ async fn unlock_flow() {
         &token,
         "vault.sign_transaction",
         json!({
-            "network": "sepolia",
+            "network": "ethereum",
             "tx_hex": "02f8",
             "key_id": &account_id,
             "key_type": "Secp256k1"
@@ -237,6 +237,9 @@ async fn lock_unlock_accounts_preserved() {
         )
         .await;
         assert_ok(&r, "initialize");
+        // SECURITY (H1): init no longer auto-unlocks; create_account is gated
+        // on BiometricUnlocked, so unlock before creating accounts.
+        let _ = am.try_biometric();
         (token, handle, am)
     };
 

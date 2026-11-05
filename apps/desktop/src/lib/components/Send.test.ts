@@ -15,16 +15,14 @@ import { mockVault, resetMockVault } from '../../test/mockVault.svelte.ts';
 
 const validateAddressMock = vi.fn();
 const estimateFeeMock = vi.fn().mockResolvedValue([]);
-const signTransactionMock = vi.fn();
-const broadcastTransactionMock = vi.fn();
+const sendTransactionMock = vi.fn();
 const simulateTransferMock = vi.fn();
 
 vi.mock('../vault.svelte.ts', () => ({
   vault: mockVault,
   validateAddress: (...args: any[]) => validateAddressMock(...args),
   estimateFee: (...args: any[]) => estimateFeeMock(...args),
-  signTransaction: (...args: any[]) => signTransactionMock(...args),
-  broadcastTransaction: (...args: any[]) => broadcastTransactionMock(...args),
+  sendTransaction: (...args: any[]) => sendTransactionMock(...args),
   simulateTransfer: (...args: any[]) => simulateTransferMock(...args),
   getAccountLabel: () => null,
 }));
@@ -101,8 +99,7 @@ describe('Send.svelte', () => {
     oncloseMock.mockReset();
     validateAddressMock.mockReset();
     estimateFeeMock.mockReset().mockResolvedValue([]);
-    signTransactionMock.mockReset();
-    broadcastTransactionMock.mockReset();
+    sendTransactionMock.mockReset();
     simulateTransferMock.mockReset();
   });
 
@@ -304,21 +301,24 @@ describe('Send.svelte', () => {
 
   // ── Sign and Broadcast (with mock connected) ────────────────────────
 
-  it('calls signTransaction and broadcastTransaction when Sign & Send is clicked', async () => {
-    signTransactionMock.mockResolvedValue({ signed_tx: '0xsigned' });
-    broadcastTransactionMock.mockResolvedValue({ txid: '0xtxid123' });
+  it('calls sendTransaction with the amount converted to base units', async () => {
+    sendTransactionMock.mockResolvedValue({
+      txid: '0xtxid123',
+      raw_tx_hex: '0xdeadbeef',
+      network: 'litecoin-testnet',
+    });
     renderSend();
     await goToReviewStep();
     const signBtns = screen.getAllByText(/Sign & Send/i);
     await fireEvent.click(signBtns[0]);
-    expect(signTransactionMock).toHaveBeenCalledWith({
+    expect(sendTransactionMock).toHaveBeenCalledWith({
       from: TEST_ACCOUNT.address,
       to: 'tltc1qvalidadr',
-      amount: '1.0',
+      // 1.0 LTC → 100_000_000 satoshi, as an exact integer string
+      amount: '100000000',
       network: 'litecoin-testnet',
       feeLevel: 'medium',
     });
-    expect(broadcastTransactionMock).toHaveBeenCalledWith({ signed_tx: '0xsigned' });
     await vi.waitFor(() => {
       expect(screen.getAllByText(/Transaction Sent/i).length).toBeGreaterThan(0);
     });
@@ -326,8 +326,8 @@ describe('Send.svelte', () => {
 
   // ── Result state ────────────────────────────────────────────────────
 
-  it('shows transaction failed when signTransaction throws', async () => {
-    signTransactionMock.mockRejectedValue(new Error('Insufficient funds'));
+  it('shows transaction failed when the send path throws', async () => {
+    sendTransactionMock.mockRejectedValue(new Error('Insufficient funds'));
     renderSend();
     await goToReviewStep();
     const signBtns = screen.getAllByText(/Sign & Send/i);
@@ -339,8 +339,11 @@ describe('Send.svelte', () => {
   });
 
   it('shows success with txid on successful send', async () => {
-    signTransactionMock.mockResolvedValue({ signed_tx: '0xsigned' });
-    broadcastTransactionMock.mockResolvedValue({ txid: '0xabc123def456' });
+    sendTransactionMock.mockResolvedValue({
+      txid: '0xabc123def456',
+      raw_tx_hex: '0xdeadbeef',
+      network: 'litecoin-testnet',
+    });
     renderSend();
     await goToReviewStep();
     const signBtns = screen.getAllByText(/Sign & Send/i);

@@ -12,6 +12,7 @@ use tauri::Emitter;
 use tauri::State;
 use tokio::sync::RwLock;
 use vault_core::Vault;
+use vault_core::approval::ApprovalRequest;
 
 /// Application state holding the vault engine + IPC lifecycle.
 pub struct VaultState {
@@ -100,6 +101,34 @@ pub async fn get_vault_status(
         tor_enabled: false,
         active_plugins: vec!["btc".into(), "evm".into(), "xmr".into()],
     })
+}
+
+#[tauri::command]
+pub async fn approval_list(
+    state: State<'_, Arc<RwLock<VaultState>>>,
+) -> Result<Vec<ApprovalRequest>, String> {
+    let vs = state.read().await;
+    let vault_guard = vs.vault.read().await;
+    let vault = vault_guard.as_ref().ok_or("Vault not available")?;
+    let queue = vault.approval_queue.read().await;
+    Ok(queue.list_pending())
+}
+
+/// Respond to a pending approval request. `approved=true` grants the
+/// operation; `approved=false` denies it (an optional `reason` is shown to
+/// the caller). Returns `false` if the request no longer exists.
+#[tauri::command]
+pub async fn approval_respond(
+    id: String,
+    approved: bool,
+    reason: Option<String>,
+    state: State<'_, Arc<RwLock<VaultState>>>,
+) -> Result<bool, String> {
+    let vs = state.read().await;
+    let vault_guard = vs.vault.read().await;
+    let vault = vault_guard.as_ref().ok_or("Vault not available")?;
+    let mut queue = vault.approval_queue.write().await;
+    Ok(queue.respond(&id, approved, reason))
 }
 
 /// Biometric unlock — attempts to restore the vault from persisted keystore,
@@ -282,6 +311,20 @@ pub async fn create_account(
         return Err("Vault not initialized".into());
     }
 
+    // Approval gate (H4-A): desktop-requested account creation surfaces a
+    // pending approval for explicit user consent before deriving an account.
+    {
+        let mut summary = std::collections::HashMap::new();
+        summary.insert("network".into(), format!("{network} (index {index})"));
+        ensure_desktop_approval(
+            vault,
+            "vault.create_account",
+            "Create a new account",
+            summary,
+        )
+        .await?;
+    }
+
     let account = vault
         .create_account(&network, index)
         .await
@@ -292,6 +335,34 @@ pub async fn create_account(
         address: account.address,
         balance: "0".into(),
     })
+}
+
+/// Submit a desktop-originated state-changing operation to the shared
+/// approval queue and block until the user approves or denies it in the UI.
+///
+/// The desktop shell never has a remote `origin`, so we label every request
+/// with the `gullbur://desktop` pseudo-origin. The Svelte `ApprovalModal`
+/// polls `approval_list` and responds via `approval_respond`; when no UI is
+/// listening (e.g. a headless test drive), the receiver is dropped and we
+/// treat it as a denial to avoid silently proceeding.
+async fn ensure_desktop_approval(
+    vault: &Vault,
+    method: &str,
+    description: &str,
+    summary: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    let (approval_id, rx) = {
+        let mut queue = vault.approval_queue.write().await;
+        queue.submit("gullbur://desktop", method, description, summary)
+    };
+    tracing::info!("Approval requested: {approval_id} for {method}");
+    match rx.await {
+        Ok(vault_core::approval::ApprovalResponse::Approved) => Ok(()),
+        Ok(vault_core::approval::ApprovalResponse::Denied(reason)) => {
+            Err(format!("Approval denied: {reason}"))
+        }
+        Err(_) => Err("Approval request timed out (no UI response)".into()),
+    }
 }
 
 #[tauri::command]
@@ -325,11 +396,10 @@ pub async fn get_balance(
 }
 
 #[tauri::command]
-#[allow(unused_variables)] // key_id is part of the Tauri command arg contract (matched by name from JS)
 pub async fn sign_transaction(
     network: String,
     tx_hex: String,
-    key_id: String,
+    _key_id: String,
     account_index: Option<u32>,
     state: State<'_, Arc<RwLock<VaultState>>>,
 ) -> Result<String, String> {
@@ -338,6 +408,26 @@ pub async fn sign_transaction(
     let vault = vault_guard.as_ref().ok_or("Vault not available")?;
 
     let tx_bytes = hex::decode(&tx_hex).map_err(|e| format!("Invalid hex: {e}"))?;
+
+    // Approval gate (H4-A): desktop-requested signing surfaces a pending
+    // approval for explicit user consent before the private key touches data.
+    {
+        let mut summary = std::collections::HashMap::new();
+        if let Ok(s) = std::str::from_utf8(&tx_bytes) {
+            summary.insert("tx_hex".into(), s.chars().take(64).collect());
+        } else {
+            summary.insert("tx_len".into(), format!("{} bytes", tx_bytes.len()));
+        }
+        summary.insert("network".into(), network.clone());
+        ensure_desktop_approval(
+            vault,
+            "vault.sign_transaction",
+            "Sign the requested transaction with your account",
+            summary,
+        )
+        .await?;
+    }
+
     let seed_guard = vault.seed.read().await;
     let seed_bytes = seed_guard.as_ref().ok_or("Vault not initialized")?.clone();
     drop(seed_guard);
@@ -624,6 +714,60 @@ pub async fn launch_ipc_server(state: State<'_, Arc<RwLock<VaultState>>>) -> Res
 
 // ── Isolation Pattern Commands ──────────────────────────────────────────────
 
+/// SECURITY (H2): return the one-time IPC auth token to the trusted frontend.
+/// The frontend opens a raw WebSocket to ws://127.0.0.1:{port} and must present
+/// this token to authenticate (the server no longer trusts a bare loopback
+/// "hello"). The token is written by the IPC server to a `gullbur-auth-*.token`
+/// file; we read the newest one and return its (trimmed) contents. This is the
+/// trusted in-app delivery path for the token (the webview is part of the app,
+/// protected by Tauri's origin + CSP), so a same-host third process cannot
+/// obtain it.
+#[tauri::command]
+pub async fn get_ipc_auth_token(
+    vault_state: State<'_, Arc<RwLock<VaultState>>>,
+) -> Result<String, String> {
+    let vs = vault_state.read().await;
+    let base = ipc_token_base_dir();
+    drop(vs);
+
+    let entries = std::fs::read_dir(&base).map_err(|e| format!("read token dir: {e}"))?;
+    let mut newest: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with("gullbur-auth-") || !name.ends_with(".token") {
+            continue;
+        }
+        let mtime = entry.metadata().ok().and_then(|m| m.modified().ok());
+        let Some(mtime) = mtime else { continue };
+        if newest.as_ref().map(|(t, _)| mtime > *t).unwrap_or(true) {
+            newest = Some((mtime, entry.path()));
+        }
+    }
+    let Some((_, path)) = newest else {
+        return Err("no IPC auth token file found — is the IPC server running?".into());
+    };
+    std::fs::read_to_string(&path)
+        .map(|s| s.trim().to_string())
+        .map_err(|e| format!("read token file: {e}"))
+}
+
+/// Resolve the base directory for the IPC token file (mirrors ipc-core::server).
+fn ipc_token_base_dir() -> std::path::PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .or_else(|| std::env::var_os("TMPDIR"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(std::path::PathBuf::from)
+                .map(|h| h.join(".gullbur").join("ipc-tokens"))
+        })
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+}
+
+/// Discovery-only re-export name kept private to this module; the extension
+/// relay maintains its own copy. This resolves identically to the server.
+// ── Isolation Pattern Commands ──────────────────────────────────────────────
 /// One-time key exchange for the isolation iframe.
 /// Called once by the isolation iframe to obtain the per-session AES-GCM key.
 /// After this call, `key_sent` is set to true and subsequent calls returns empty.

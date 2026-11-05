@@ -69,13 +69,33 @@ impl DeviceKeyProvider for FileDeviceKeyProvider {
         rand::rng().fill_bytes(&mut key);
         std::fs::create_dir_all(&self.data_dir)
             .map_err(|e| KeystoreError::Internal(format!("failed to create data dir: {e}")))?;
-        std::fs::write(&key_path, key)
-            .map_err(|e| KeystoreError::Internal(format!("failed to persist device key: {e}")))?;
 
+        // Create the key file with private (0600) permissions from the very
+        // first byte — never expose it with default (umask-dependent) perms,
+        // even transiently. This removes the write-then-chmod race window.
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600));
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&key_path)
+                .map_err(|e| KeystoreError::Internal(format!("failed to open key file: {e}")))?;
+            f.write_all(&key).map_err(|e| {
+                KeystoreError::Internal(format!("failed to persist device key: {e}"))
+            })?;
+            f.sync_all()
+                .map_err(|e| KeystoreError::Internal(format!("failed to fsync device key: {e}")))?;
+        }
+
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&key_path, key).map_err(|e| {
+                KeystoreError::Internal(format!("failed to persist device key: {e}"))
+            })?;
         }
 
         Ok(key)

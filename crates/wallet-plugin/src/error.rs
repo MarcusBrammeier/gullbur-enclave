@@ -18,6 +18,9 @@ pub enum PluginError {
     #[error("unsupported network: {0}")]
     UnsupportedNetwork(String),
 
+    #[error("unsupported operation: {0}")]
+    Unsupported(String),
+
     #[error("internal error: {0}")]
     Internal(String),
 }

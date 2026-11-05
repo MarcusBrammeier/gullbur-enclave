@@ -89,6 +89,11 @@
       case 'vault.sign_transaction':
         return { signed_tx: '0x02f86b010285...' + Array.from({ length: 20 }, () => Math.floor(Math.random() * 16).toString(16)).join('') };
 
+      case 'vault.send_transaction': {
+        const mockTxid = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        return { txid: mockTxid, raw_tx_hex: '0x02f86b', network: 'demo' };
+      }
+
       case 'vault.broadcast_transaction':
         return { tx_hash: '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('') };
 

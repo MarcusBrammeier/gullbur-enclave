@@ -88,9 +88,17 @@ impl LifecycleManager {
         auth_manager: Arc<auth_core::AuthManager>,
     ) -> Result<tokio::task::JoinHandle<()>, VaultError> {
         if let Some(port) = self.ipc_port {
-            let server = ipc_core::server::IpcServer::new(port)
-                .map_err(|e| VaultError::Internal(format!("IPC server creation failed: {e}")))?;
-            tracing::info!("IPC server starting on 127.0.0.1:{}", port);
+            // Honor no_encrypt: the headless CLI (gullbur-cli --features headless)
+            // runs the engine without encryption for the functional sweep / test
+            // harness, and loopback is trusted on that plaintext path. Production
+            // LifecycleManager (no_encrypt=false) always uses the encrypted server.
+            let server = if self.no_encrypt {
+                ipc_core::server::IpcServer::with_encryption(port, false)
+            } else {
+                ipc_core::server::IpcServer::new(port)
+            }
+            .map_err(|e| VaultError::Internal(format!("IPC server creation failed: {e}")))?;
+            tracing::info!("IPC server starting on 127.0.0.1:{port}");
 
             // Register vault IPC handlers before starting the server
             {

@@ -145,7 +145,7 @@ async fn live_broadcast_testnet() {
     };
 
     let psbt_bytes = psbt.serialize();
-    let _key = KeyHandle {
+    let key = KeyHandle {
         key_id: seed_hex.to_string(),
         key_type: KeyType::Secp256k1,
         public_key: vec![],

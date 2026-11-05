@@ -43,6 +43,7 @@ pub mod xmr_wallet_rpc;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use subtle::ConstantTimeEq;
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
@@ -377,9 +378,9 @@ impl Vault {
         let derived = crypto_core::keys::mnemonic_to_seed(words.as_words(), passphrase)
             .map_err(|e| VaultError::CryptoError(e.to_string()))?;
 
-        // Constant-time-ish compare of the 64-byte seed.
-        let matches = stored_seed.len() == derived.len()
-            && stored_seed.iter().zip(derived.iter()).all(|(a, b)| a == b);
+        // Constant-time compare of the 64-byte seed (avoids short-circuit
+        // timing side channels that could leak passphrase correctness).
+        let matches = bool::from(stored_seed.as_slice().ct_eq(derived.as_slice()));
         if !matches {
             tracing::warn!("password unlock: passphrase did not reproduce the seed");
             return Err(VaultError::Internal("Incorrect passphrase".into()));

@@ -6,7 +6,7 @@ use cli_integration::server::spawn_test_server;
 const PORT: u16 = 19980;
 
 async fn setup_server(port: u16) -> (String, tokio::task::JoinHandle<()>) {
-    let (token, handle, _am) = spawn_test_server(port).await;
+    let (token, handle, auth_manager) = spawn_test_server(port).await;
 
     // Initialize vault
     let r = call(
@@ -33,6 +33,12 @@ async fn setup_server(port: u16) -> (String, tokio::task::JoinHandle<()>) {
     .await;
     assert_ok(&r, "vault.initialize");
 
+    // SECURITY (H1): vault.initialize NO LONGER auto-unlocks the AuthManager.
+    // Since create_account is gated on BiometricUnlocked, the test harness must
+    // explicitly unlock (simulating the in-app biometric/password unlock that
+    // follows vault creation). Mirror security.rs/signing.rs which already do this.
+    let _ = auth_manager.try_biometric();
+
     (token, handle)
 }
 
@@ -52,10 +58,10 @@ async fn create_btc_account() {
     .await;
     let result = assert_ok(&r, "vault.create_account (bitcoin-testnet)");
     let address = result["address"].as_str().expect("test invariant");
-    // BTC addresses start with bc1 (bech32) or tb1 (testnet)
+    // BTC addresses start with tb1 (testnet bech32)
     assert!(
-        address.starts_with("bc1") || address.starts_with("tb1"),
-        "BTC address should start with bc1/tb1, got: {address}"
+        address.starts_with("tb1"),
+        "BTC testnet address should start with tb1, got: {address}"
     );
 }
 
@@ -73,7 +79,7 @@ async fn create_eth_account() {
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (sepolia)");
+    let result = assert_ok(&r, "vault.create_account (ethereum)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(
         address.starts_with("0x"),
@@ -96,7 +102,7 @@ async fn create_xmr_account() {
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (monero-stagenet)");
+    let result = assert_ok(&r, "vault.create_account (monero)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(!address.is_empty(), "XMR address should be non-empty");
 }
@@ -115,7 +121,7 @@ async fn create_ltc_account() {
         }),
     )
     .await;
-    let result = assert_ok(&r, "vault.create_account (litecoin-testnet)");
+    let result = assert_ok(&r, "vault.create_account (litecoin)");
     let address = result["address"].as_str().expect("test invariant");
     assert!(!address.is_empty(), "LTC address should be non-empty");
 }
@@ -147,12 +153,14 @@ async fn create_sepolia_account() {
 async fn list_accounts_after_creation() {
     let (token, _handle) = setup_server(PORT + 5).await;
 
-    // Create accounts across distinct testnet networks
+    // Create 5 accounts across different networks (canonical testnet ids —
+    // the engine defaults testnet-only, so mainnet ids are rejected)
     for (i, net) in [
         "bitcoin-testnet",
         "sepolia",
         "monero-stagenet",
         "litecoin-testnet",
+        "sepolia",
     ]
     .iter()
     .enumerate()
@@ -181,8 +189,8 @@ async fn list_accounts_after_creation() {
     let accounts = result.as_array().expect("test invariant");
     assert_eq!(
         accounts.len(),
-        4,
-        "expected 4 accounts, got {}",
+        5,
+        "expected 5 accounts, got {}",
         accounts.len()
     );
     for acct in accounts {
@@ -202,8 +210,8 @@ async fn validate_valid_address() {
         &token,
         "vault.validate_address",
         serde_json::json!({
-            "network": "bitcoin-testnet",
-            "address": "tb1q7f5gpwcjvspelyu8sj9jlvt40wjlk93t4heqgk"
+            "network": "bitcoin",
+            "address": "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
         }),
     )
     .await;
@@ -221,8 +229,8 @@ async fn validate_invalid_address() {
         &token,
         "vault.validate_address",
         serde_json::json!({
-            "network": "bitcoin-testnet",
-            "address": "zzz-invalid-zzz"
+            "network": "bitcoin",
+            "address": "not-a-valid-address-xyz"
         }),
     )
     .await;
@@ -265,8 +273,8 @@ async fn multi_index_derivation() {
             .expect("test invariant")
             .to_string();
         assert!(
-            addr.starts_with("bc1") || addr.starts_with("tb1"),
-            "BTC address should start with bc1/tb1, got: {addr}"
+            addr.starts_with("tb1"),
+            "BTC testnet address should start with tb1, got: {addr}"
         );
         assert!(
             !addresses.contains(&addr),
@@ -348,8 +356,10 @@ async fn ltc_address_format() {
     .await;
     let result = assert_ok(&r, "vault.create_account (litecoin-testnet)");
     let address = result["address"].as_str().expect("test invariant");
+    // Testnet LTC is derived at BIP-84 m/84'/2'/0'/0/i but emitted as legacy
+    // P2PKH (m/n prefix) for faucet compatibility — see ltc plugin.
     assert!(
         address.starts_with('m') || address.starts_with('n'),
-        "LTC testnet address should be legacy P2PKH (m/n), got: {address}"
+        "LTC testnet address should start with m/n (P2PKH), got: {address}"
     );
 }

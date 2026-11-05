@@ -24,7 +24,9 @@ const RELAY_PORT: u16 = 19879;
 #[tokio::test]
 async fn e2e_relay_envelope_to_websocket() {
     // ── 1. Start vault-core IpcServer ──────────────────────────────────
-    let server = ipc_core::server::IpcServer::new(RELAY_PORT).expect("IpcServer");
+    // Routing test with plaintext WsClient — run unencrypted (H3 fail-closed).
+    let server =
+        ipc_core::server::IpcServer::with_encryption(RELAY_PORT, false).expect("IpcServer");
     let token_path = server.auth_token_path().to_path_buf();
     let auth_token = std::fs::read_to_string(&token_path).expect("read token");
 

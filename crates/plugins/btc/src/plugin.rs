@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::LazyLock;
 use wallet_plugin::{
     Account, Balance, Capability, FeeEstimate, NetworkSpec, PluginError, PluginMetadata, TxRecord,
-    TxStatus, WalletPlugin,
+    TxRequest, TxStatus, WalletPlugin,
 };
 
 use reqwest;
@@ -35,6 +35,108 @@ impl BtcPlugin {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
         }
         builder.build()
+    }
+
+    /// Fetch spendable outputs for an address from Esplora.
+    async fn fetch_utxos(
+        &self,
+        address: &str,
+        network: &str,
+    ) -> Result<Vec<crate::build::Utxo>, PluginError> {
+        let url = format!("{}/address/{}/utxo", esplora_base(network), address);
+        let client = self
+            .build_client()
+            .map_err(|e| PluginError::NetworkError(e.to_string()))?;
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("GET {url}: {e}")))?;
+        if !resp.status().is_success() {
+            return Err(PluginError::NetworkError(format!(
+                "GET {url} returned {}",
+                resp.status()
+            )));
+        }
+        let raw: Vec<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("UTXO parse error: {e}")))?;
+
+        let mut utxos = Vec::with_capacity(raw.len());
+        for entry in raw {
+            let txid_str = entry
+                .get("txid")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| PluginError::NetworkError("UTXO missing txid".into()))?;
+            let txid = txid_str
+                .parse::<bitcoin::Txid>()
+                .map_err(|e| PluginError::NetworkError(format!("bad txid {txid_str}: {e}")))?;
+            let vout = entry
+                .get("vout")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| PluginError::NetworkError("UTXO missing vout".into()))?
+                as u32;
+            let value = entry
+                .get("value")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| PluginError::NetworkError("UTXO missing value".into()))?;
+            utxos.push(crate::build::Utxo { txid, vout, value });
+        }
+        Ok(utxos)
+    }
+
+    /// Current fee rate in sat/vB for a human fee level, from Esplora.
+    async fn fee_rate_sat_vb(
+        &self,
+        network: &str,
+        level: Option<&str>,
+    ) -> Result<f64, PluginError> {
+        let target = match level.unwrap_or("normal") {
+            "fast" | "high" => 1u64,
+            "slow" | "low" => 6,
+            _ => 3,
+        };
+        let url = format!("{}/fee-estimates", esplora_base(network));
+        let client = self
+            .build_client()
+            .map_err(|e| PluginError::NetworkError(e.to_string()))?;
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("GET {url}: {e}")))?;
+        if !resp.status().is_success() {
+            return Err(PluginError::NetworkError(format!(
+                "GET {url} returned {}",
+                resp.status()
+            )));
+        }
+        let estimates: std::collections::HashMap<String, f64> = resp
+            .json()
+            .await
+            .map_err(|e| PluginError::NetworkError(format!("fee parse error: {e}")))?;
+
+        let mut targets: Vec<(u64, f64)> = estimates
+            .into_iter()
+            .filter_map(|(k, v)| k.parse::<u64>().ok().map(|t| (t, v)))
+            .filter(|(_, v)| v.is_finite() && *v > 0.0)
+            .collect();
+        if targets.is_empty() {
+            return Err(PluginError::NetworkError(
+                "fee estimate response contained no usable rates".into(),
+            ));
+        }
+        targets.sort_by_key(|(t, _)| *t);
+
+        // Exact target, else the next-slower bucket, else the slowest available.
+        let chosen = targets
+            .iter()
+            .find(|(t, _)| *t >= target)
+            .or_else(|| targets.last())
+            .map(|(_, v)| *v)
+            .ok_or_else(|| PluginError::NetworkError("no fee rate".into()))?;
+        Ok(chosen.max(1.0))
     }
 }
 
@@ -246,6 +348,60 @@ impl WalletPlugin for BtcPlugin {
 
         // Return the serialized signed PSBT bytes
         Ok(psbt.serialize())
+    }
+
+    async fn build_transaction(
+        &self,
+        request: &TxRequest,
+        network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        use std::str::FromStr;
+
+        let btc_network = match network {
+            "bitcoin" => bitcoin::Network::Bitcoin,
+            "bitcoin-testnet" => bitcoin::Network::Testnet4,
+            "bitcoin-signet" => bitcoin::Network::Signet,
+            _ => return Err(PluginError::UnsupportedNetwork(network.into())),
+        };
+
+        let parse = |s: &str| -> Result<bitcoin::Address, PluginError> {
+            bitcoin::Address::from_str(s)
+                .map_err(|e| PluginError::InvalidAddress(format!("{s}: {e}")))?
+                .require_network(btc_network)
+                .map_err(|e| PluginError::InvalidAddress(format!("{s}: {e}")))
+        };
+        let from = parse(&request.from)?;
+        let to = parse(&request.to)?;
+
+        let amount = u64::try_from(request.amount)
+            .map_err(|_| PluginError::Internal("amount exceeds satoshi range".into()))?;
+        if amount == 0 {
+            return Err(PluginError::Internal(
+                "amount must be greater than zero".into(),
+            ));
+        }
+
+        let utxos = self.fetch_utxos(&request.from, network).await?;
+        let rate = match request.fee_rate {
+            Some(r) if r.is_finite() && r > 0.0 => r,
+            _ => {
+                self.fee_rate_sat_vb(network, request.fee_level.as_deref())
+                    .await?
+            }
+        };
+
+        let selection = crate::build::select_coins(&utxos, amount, rate)
+            .map_err(|e| PluginError::Internal(e.to_string()))?;
+        crate::build::build_unsigned_psbt(&from, &to, &selection, amount)
+            .map_err(|e| PluginError::Internal(e.to_string()))
+    }
+
+    async fn finalize_transaction(
+        &self,
+        signed: &[u8],
+        _network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        crate::build::finalize_psbt(signed).map_err(|e| PluginError::Internal(e.to_string()))
     }
 
     async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
@@ -682,7 +838,7 @@ mod tests {
 
         let psbt_bytes = psbt.serialize();
         let seed_bytes = hex::decode(seed_hex).expect("test invariant");
-        let _key = wallet_plugin::KeyHandle {
+        let key = wallet_plugin::KeyHandle {
             key_id: seed_hex.into(),
             key_type: wallet_plugin::KeyType::Secp256k1,
             public_key: vec![],

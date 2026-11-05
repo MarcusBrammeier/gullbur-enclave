@@ -11,33 +11,36 @@ use vault_core::approval::ApprovalQueue;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
-const PORT: u16 = 19993;
+const PORT: u16 = 20001;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn e2e_full_vault_lifecycle() {
     // ── 1. Start IPC server ──────────────────────────────────────────────
-    let server = ipc_core::server::IpcServer::new(PORT).expect("test invariant");
+    let server = ipc_core::server::IpcServer::with_encryption(PORT, false).expect("test invariant");
     let token = server.auth_token_path().to_path_buf();
+    let auth_token = std::fs::read_to_string(&token).expect("read auth token");
+    let am = Arc::new(AuthManager::new());
     {
         let mut h = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
         let sd = Arc::new(RwLock::new(None::<zeroize::Zeroizing<Vec<u8>>>));
         let init = Arc::new(AtomicBool::new(false));
         let aq = Arc::new(RwLock::new(ApprovalQueue::new()));
-        let am = Arc::new(AuthManager::new());
         let mn = Arc::new(RwLock::new(None));
-        ipc_handlers::register_vault_handlers(&mut h, ph, sd, mn, init, aq, am);
+        ipc_handlers::register_vault_handlers(&mut h, ph, sd, mn, init, aq, am.clone());
     }
     let (sh, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(300)).await;
 
-    // ── 2. Connect WebSocket + hello handshake ───────────────────────────
+    // ── 2. Connect WebSocket + hello handshake (with one-time token, H2) ─
     let (ws, _) = connect_async(format!("ws://127.0.0.1:{PORT}"))
         .await
         .expect("test invariant");
     let (mut write, mut read) = ws.split();
     write
-        .send(Message::Text(r#"{"type":"hello"}"#.into()))
+        .send(Message::Text(
+            format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+        ))
         .await
         .expect("test invariant");
     let msg = tokio::time::timeout(Duration::from_secs(5), read.next())
@@ -76,6 +79,9 @@ async fn e2e_full_vault_lifecycle() {
     let r = rpc!("vault.initialize", {"seed_phrase": mnemonic, "passphrase": ""});
     assert!(r["initialized"].as_bool().expect("test invariant"));
     println!("[e2e] 2. Vault initialized ✓");
+    // SECURITY (H1): init no longer auto-unlocks; create_account is gated on
+    // BiometricUnlocked — unlock explicitly.
+    let _ = am.try_biometric();
 
     // ── 5. Status ────────────────────────────────────────────────────────
     let s = rpc!("vault.status", {});

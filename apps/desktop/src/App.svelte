@@ -13,6 +13,7 @@
   import Toasts from './lib/components/Toasts.svelte';
   import ConsoleLog from './lib/components/ConsoleLog.svelte';
   import DebugReport from './lib/components/DebugReport.svelte';
+  import ApprovalModal from './lib/components/ApprovalModal.svelte';
   import { iconHtml } from './lib/icons';
   import { IS_DEMO } from './lib/constants';
 
@@ -143,6 +144,9 @@
 
 <!-- Global toast notifications -->
 <Toasts />
+
+<!-- H4-A approval gate — renders above all other UI when ops are pending -->
+<ApprovalModal />
 
 <!-- Flex row: Sidebar + Main content -->
 <div class="flex min-h-screen">

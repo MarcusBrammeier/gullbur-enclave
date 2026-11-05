@@ -105,7 +105,11 @@ fn route_envelope(method: &str, params: Value) -> Option<router::RoutedRequest> 
 #[tokio::test]
 async fn e2e_full_browser_extension_flow() {
     // ── 1. Start vault-core IPC server ──────────────────────────────────
-    let server = ipc_core::server::IpcServer::new(E2E_PORT).expect("IpcServer");
+    // This e2e test exercises relay ROUTING (not E2EE), and its WsClient sends
+    // plaintext JSON-RPC. Since ipc-core now FAILS CLOSED (refuses plaintext on
+    // an encrypted server — H3), run this routing test against an unencrypted
+    // server explicitly.
+    let server = ipc_core::server::IpcServer::with_encryption(E2E_PORT, false).expect("IpcServer");
     let token_path = server.auth_token_path().to_path_buf();
     let auth_token = std::fs::read_to_string(&token_path).expect("read token");
 

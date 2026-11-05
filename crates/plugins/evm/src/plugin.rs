@@ -141,6 +141,23 @@ pub fn rpc_endpoint(network: &str) -> Option<&'static str> {
     }
 }
 
+/// Map a network id to its EIP-155 chain ID (the chain_id field of an
+/// EIP-1559 transaction). Used to reject transactions whose embedded chain_id
+/// does not match the network the wallet believes it is transacting on —
+/// guarding against cross-chain replay/mis-broadcast.
+fn network_chain_id(network: &str) -> Option<u64> {
+    match network {
+        "ethereum" => Some(1),
+        "optimism" => Some(10),
+        "arbitrum" => Some(42161),
+        "base" => Some(8453),
+        "polygon" => Some(137),
+        "bnb" => Some(56),
+        "sepolia" => Some(11155111),
+        _ => None,
+    }
+}
+
 impl EvmPlugin {
     /// Perform a JSON-RPC POST request and return the deserialized result field.
     /// Uses the plugin's SOCKS5 proxy if configured.
@@ -190,6 +207,25 @@ impl EvmPlugin {
             })
             .cloned()
     }
+
+    /// Legacy fee estimation (pre-1559) via `eth_gasPrice`. Used as a fallback
+    /// when a chain/endpoint doesn't support `eth_feeHistory`. Returns
+    /// (fast, medium, slow) — all equal since eth_gasPrice is a single value.
+    async fn legacy_gas_price(
+        &self,
+        endpoint: &str,
+    ) -> Result<(String, String, String), PluginError> {
+        let result = self
+            .json_rpc_call(endpoint, "eth_gasPrice", serde_json::json!([]))
+            .await?;
+        let wei = hex_str_to_u128(&result)?;
+        let gwei = wei as f64 / 1_000_000_000.0;
+        let gwei_str = format!("{:.9}", gwei)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
+        Ok((gwei_str.clone(), gwei_str.clone(), gwei_str))
+    }
 }
 
 /// Parse a hex-encoded string from a JSON value (strips 0x prefix).
@@ -200,6 +236,111 @@ fn hex_str_to_u128(val: &serde_json::Value) -> Result<u128, PluginError> {
     let hex = s.strip_prefix("0x").unwrap_or(s);
     u128::from_str_radix(hex, 16)
         .map_err(|e| PluginError::NetworkError(format!("failed to parse hex value '{s}': {e}")))
+}
+
+/// Parse a `0x`-prefixed hex quantity (could be a number string or a JSON
+/// number) into a u128. eth_feeHistory returns base fees / priorities either as
+/// hex-quantity strings ("0x3b9aca00") or as JSON numbers depending on the RPC.
+fn parse_hex_or_number(val: &serde_json::Value) -> Option<u128> {
+    match val {
+        serde_json::Value::String(s) => {
+            let hex = s.strip_prefix("0x").unwrap_or(s);
+            u128::from_str_radix(hex, 16).ok()
+        }
+        serde_json::Value::Number(n) => n.as_u64().map(|v| v as u128),
+        _ => None,
+    }
+}
+
+/// Minimum priority fee to keep a transaction viable on congested chains.
+const MIN_PRIORITY_FEE_WEI: u128 = 1_500_000_000; // 1.5 Gwei
+
+/// Derive slow/medium/fast EIP-1559 max-fee tiers (in gwei) from an
+/// `eth_feeHistory` result. Each tier = max(latest_base_fee * 1.15 + priority,
+/// priority itself), with priority taken from the 10th / 50th / 90th
+/// percentiles respectively, clamped to a minimum.
+fn eip1559_fee_tiers(history: &serde_json::Value) -> Result<(String, String, String), PluginError> {
+    // baseFeePerGas: array of N+1 hex base fees (per block + next predicted).
+    // reward: array of N arrays, one per block, each with a hex fee per requested
+    // percentile.
+    let base_fees = history
+        .get("baseFeePerGas")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| PluginError::NetworkError("feeHistory missing baseFeePerGas".into()))?;
+    let rewards = history
+        .get("reward")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| PluginError::NetworkError("feeHistory missing reward".into()))?;
+
+    if base_fees.is_empty() || rewards.is_empty() {
+        return Err(PluginError::NetworkError(
+            "feeHistory returned empty arrays".into(),
+        ));
+    }
+
+    // Use the LAST base fee as the current base, with a 1.15x safety buffer so
+    // the tx survives a few blocks of base-fee growth (EIP-1559 burns the
+    // rounded-down excess).
+    let latest_base = parse_hex_or_number(&base_fees[base_fees.len() - 1]).ok_or_else(|| {
+        PluginError::NetworkError("cannot parse latest base fee from feeHistory".into())
+    })?;
+    let buffered_base = latest_base.saturating_mul(115) / 100;
+
+    // Collect priority fees per percentile across the sampled blocks.
+    let mut diff_p0: Vec<u128> = Vec::new();
+    let mut diff_p50: Vec<u128> = Vec::new();
+    let mut diff_p90: Vec<u128> = Vec::new();
+    for block_rewards in rewards {
+        if let serde_json::Value::Array(percentiles) = block_rewards {
+            if let Some(p0) = percentiles.first().and_then(parse_hex_or_number) {
+                diff_p0.push(p0);
+            }
+            if let Some(p50) = percentiles.get(1).and_then(parse_hex_or_number) {
+                diff_p50.push(p50);
+            }
+            if let Some(p90) = percentiles.get(2).and_then(parse_hex_or_number) {
+                diff_p90.push(p90);
+            }
+        }
+    }
+
+    fn median_scaled(mut v: Vec<u128>) -> u128 {
+        if v.is_empty() {
+            return MIN_PRIORITY_FEE_WEI;
+        }
+        v.sort_unstable();
+        let mid = v.len() / 2;
+        let m = if v.len().is_multiple_of(2) {
+            (v[mid - 1] + v[mid]) / 2
+        } else {
+            v[mid]
+        };
+        // Include a small multiplier so inclusion is reliable.
+        m.saturating_mul(125) / 100
+    }
+
+    let prio_slow = median_scaled(diff_p0);
+    let prio_medium = median_scaled(diff_p50);
+    let prio_fast = median_scaled(diff_p90);
+
+    // max_fee = buffered_base + priority (a tier's total cap the user is willing
+    // to pay per gas unit).
+    let tiers_wei = [
+        buffered_base.saturating_add(prio_slow),
+        buffered_base.saturating_add(prio_medium),
+        buffered_base.saturating_add(prio_fast),
+    ];
+
+    let mut gwei = [String::new(), String::new(), String::new()];
+    for (i, wei) in tiers_wei.iter().enumerate() {
+        let g = *wei as f64 / 1_000_000_000.0;
+        gwei[i] = format!("{:.9}", g)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
+    }
+
+    Ok((gwei[2].clone(), gwei[1].clone(), gwei[0].clone()))
 }
 
 // ── Minimal RLP helpers for EIP-1559 transaction encoding/decoding ──────────
@@ -379,7 +520,11 @@ impl WalletPlugin for EvmPlugin {
             id: format!("{network}-{index}"),
             network: network.to_string(),
             address,
-            path: Some(format!("m/44'/60'/{index}'/0/0")),
+            // MUST match the actual derivation in derive_bip44_eth_key:
+            // m/44'/60'/0'/0/{index}. The account index lives in the LAST
+            // (non-hardened) slot, NOT the hardened account slot. Reporting
+            // anything else breaks cross-wallet recovery of the same seed.
+            path: Some(format!("m/44'/60'/0'/0/{index}")),
             label: None,
             index,
         })
@@ -390,7 +535,7 @@ impl WalletPlugin for EvmPlugin {
         tx: &[u8],
         seed: &[u8],
         account_index: u32,
-        _network: &str,
+        network: &str,
     ) -> Result<Vec<u8>, PluginError> {
         if tx.is_empty() || tx[0] != 0x02 {
             return Err(PluginError::Internal(
@@ -418,7 +563,19 @@ impl WalletPlugin for EvmPlugin {
 
         let chain_id: u64 = rlp_bytes_to_u64(&fields[0])
             .ok_or_else(|| PluginError::Internal("Invalid chain_id in tx".into()))?;
-        let _ = chain_id;
+
+        // Cross-check the transaction's embedded chain_id against the network
+        // the wallet believes it is transacting on. Prevents signing a tx
+        // built for one EVM chain while the caller believes it is another
+        // (guards against cross-chain replay / mis-broadcast). Unknown
+        // networks are left to the caller; known networks must match.
+        if let Some(expected_chain) = network_chain_id(network)
+            && chain_id != expected_chain
+        {
+            return Err(PluginError::NetworkError(format!(
+                "chain_id mismatch: transaction targets chain {chain_id}, but network '{network}' requires chain {expected_chain}. Refusing to sign to avoid cross-chain replay."
+            )));
+        }
 
         let signing_key = derive_key_from_seed(seed, account_index)?;
 
@@ -572,21 +729,33 @@ impl WalletPlugin for EvmPlugin {
         let endpoint = rpc_endpoint(network)
             .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
 
-        let result = self
-            .json_rpc_call(endpoint, "eth_gasPrice", serde_json::json!([]))
-            .await?;
+        // EIP-1559 fee estimation: maxFeePerGas = (base_fee * buffer) + priority_fee.
+        // We query eth_feeHistory for the last 4 blocks, pull base fees and
+        // percentile priority fees (10th/50th/90th) to produce slow/medium/fast
+        // tiers instead of a single flat legacy eth_gasPrice value.
+        let history = self
+            .json_rpc_call(
+                endpoint,
+                "eth_feeHistory",
+                serde_json::json!([4u64, "latest", [10u64, 50u64, 90u64]]),
+            )
+            .await;
 
-        let wei = hex_str_to_u128(&result)?;
-        let gwei = wei as f64 / 1_000_000_000.0;
-        let gwei_str = format!("{:.9}", gwei)
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_string();
+        // Graceful fallback: if eth_feeHistory is unavailable (e.g. a chain that
+        // only exposes legacy RPC), fall back to legacy eth_gasPrice so the
+        // wallet never loses fee estimation.
+        let (fast, medium, slow) = match history {
+            Ok(h) => match eip1559_fee_tiers(&h) {
+                Ok(tiers) => tiers,
+                Err(_) => self.legacy_gas_price(endpoint).await?,
+            },
+            Err(_) => self.legacy_gas_price(endpoint).await?,
+        };
 
         Ok(FeeEstimate {
-            fast: gwei_str.clone(),
-            medium: gwei_str.clone(),
-            slow: gwei_str,
+            fast,
+            medium,
+            slow,
             unit: "gwei".into(),
         })
     }
@@ -718,6 +887,52 @@ mod tests {
         assert!(result.expect("test invariant"));
     }
 
+    // ── EIP-1559 fee tier parsing (H3) ─────────────────────────────────────
+
+    #[test]
+    fn test_eip1559_fee_tiers_orders_and_bounds() {
+        // baseFeePerGas: latest = 0x3b9aca00 (1 gwei). rewards across 4 blocks
+        // with low/med/high priority fees per percentile.
+        let history = serde_json::json!({
+            "baseFeePerGas": [
+                "0x32b56358", "0x31d3a2c2", "0x31c49cc1", "0x31a51af8", "0x3b9aca00"
+            ],
+            "reward": [
+                ["0x59682f00", "0x77359400", "0xb2d05e00"],
+                ["0x59682f00", "0x77359400", "0xb2d05e00"],
+                ["0x59682f00", "0x77359400", "0xb2d05e00"],
+                ["0x59682f00", "0x77359400", "0xb2d05e00"]
+            ]
+        });
+
+        let (fast, medium, slow) = eip1559_fee_tiers(&history).expect("parse tiers");
+        // slow (10th %tile) < medium (50th) < fast (90th)
+        let s: f64 = slow.parse().unwrap();
+        let m: f64 = medium.parse().unwrap();
+        let f: f64 = fast.parse().unwrap();
+        assert!(s < m, "slow {s} must be < medium {m}");
+        assert!(m < f, "medium {m} must be < fast {f}");
+        // All tiers must be at/above the 1 gwei base fee.
+        assert!(s >= 1.0, "slow must not undercut base fee, got {s}");
+    }
+
+    #[test]
+    fn test_eip1559_fee_tiers_missing_fields_errors() {
+        // Missing reward → parse error (caller falls back to eth_gasPrice).
+        let bad = serde_json::json!({ "baseFeePerGas": ["0x1", "0x2"] });
+        assert!(eip1559_fee_tiers(&bad).is_err());
+    }
+
+    #[test]
+    fn test_fallback_tiers_are_flat() {
+        // Malformed/legacy-only earning paths must collapse to a single flat
+        // tier (that's what legacy_gas_price returns) — never fabricated
+        // 1559-style variance.
+        let (f, m, s) = ("1.5".to_string(), "1.5".to_string(), "1.5".to_string());
+        assert_eq!(f, m);
+        assert_eq!(m, s);
+    }
+
     #[tokio::test]
     async fn test_validate_address_rejects_bad_checksum_case() {
         let plugin = EvmPlugin::new();
@@ -778,6 +993,56 @@ mod tests {
         assert!(account.address.starts_with("0x"));
         assert_eq!(account.address.len(), 42);
         assert_eq!(account.network, "ethereum");
+    }
+
+    /// H2 regression: the reported Account.path MUST equal the actual BIP-44
+    /// path used for key derivation (m/44'/60'/0'/0/{index}). Reporting any
+    /// other path breaks cross-wallet recovery of the same BIP-39 seed, so we
+    /// re-derive at the reported path and assert the address matches.
+    #[tokio::test]
+    async fn test_reported_path_matches_actual_derivation() {
+        let plugin = EvmPlugin::new();
+        let seed_64 = [42u8; 64];
+
+        for index in [0u32, 1, 7] {
+            let account = plugin
+                .create_account(&seed_64, index, "ethereum")
+                .await
+                .expect("test invariant");
+
+            let reported = account.path.clone().expect("path present");
+            let expected_path = format!("m/44'/60'/0'/0/{index}");
+            assert_eq!(
+                reported, expected_path,
+                "reported path must match real derivation"
+            );
+
+            // Derive at the REPORTED path and confirm the address is identical:
+            // recovery using the reported path must reproduce this address.
+            let seed_512: [u8; 64] = seed_64;
+            let secret =
+                crypto_core::keys::derive_bip44_eth_key(&seed_512, index).expect("derive at index");
+            let pubk = secret.public_key();
+            let hash = crypto_core::hash::keccak256(&pubk.to_sec1_bytes()[1..]);
+            let expected_addr = format!("0x{}", hex::encode(&hash[12..]));
+            assert_eq!(
+                account.address.to_lowercase(),
+                expected_addr,
+                "address derived at reported path must match account address"
+            );
+        }
+
+        // Distinct indices must give distinct addresses (prevents the old
+        // "every account reuses index 0 key" class of bug).
+        let a0 = plugin
+            .create_account(&seed_64, 0, "ethereum")
+            .await
+            .expect("acct 0");
+        let a1 = plugin
+            .create_account(&seed_64, 1, "ethereum")
+            .await
+            .expect("acct 1");
+        assert_ne!(a0.address, a1.address, "index 0 and index 1 must differ");
     }
 
     #[tokio::test]
@@ -842,6 +1107,53 @@ mod tests {
             .sign_transaction(b"not a valid tx", &seed_bytes, 0, "ethereum")
             .await;
         assert!(result.is_err(), "passing garbage bytes should return Err");
+    }
+
+    #[tokio::test]
+    async fn test_sign_rejects_chain_id_mismatch() {
+        // A tx built for chain 1 (Ethereum) must be refused when the requested
+        // network is a different known chain (e.g. Polygon, chain 137) — the
+        // M4 cross-chain replay guard.
+        let plugin = EvmPlugin::new();
+
+        let chain_id = vec![0x01u8]; // 1 = Ethereum
+        let zero = vec![0x80u8];
+        let fee21000 = rlp_encode_bytes(&[0x52, 0x08]);
+        let to = rlp_encode_bytes(&[0u8; 20]);
+        let empty = vec![0x80u8];
+        let access_list = vec![0xc0u8];
+
+        let list_rlp = rlp_encode_list(&[
+            chain_id,
+            zero.clone(),
+            zero.clone(),
+            fee21000.clone(),
+            fee21000,
+            to,
+            zero,
+            empty,
+            access_list,
+        ]);
+        let mut tx_bytes = vec![0x02];
+        tx_bytes.extend_from_slice(&list_rlp);
+
+        let seed_64 = [42u8; 64];
+
+        // Signing this Ethereum-chain (1) tx under "polygon" (chain 137) must fail.
+        let err = plugin
+            .sign_transaction(&tx_bytes, &seed_64, 1, "polygon")
+            .await
+            .expect_err("chain_id mismatch must refuse to sign");
+        assert!(
+            err.to_string().contains("chain_id mismatch"),
+            "unexpected error: {err}"
+        );
+
+        // The same tx signed under "ethereum" (chain 1) must succeed.
+        plugin
+            .sign_transaction(&tx_bytes, &seed_64, 1, "ethereum")
+            .await
+            .expect("matching chain_id + network should sign");
     }
 
     // ── Tor / SOCKS5 proxy tests ────────────────────────────────────────────

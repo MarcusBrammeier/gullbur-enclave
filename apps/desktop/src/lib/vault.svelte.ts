@@ -134,6 +134,10 @@ export async function connect(): Promise<void> {
     // The vault IPC server is auto-launched during app startup.
     // We just connect directly to the running server.
     let ipcPort = VAULT_IPC_PORT;
+    // SECURITY (H2): the one-time IPC auth token, fetched from the Rust backend
+    // (Tauri `get_ipc_auth_token`) and presented to the WebSocket server on
+    // connect. The server refuses bare loopback "hello" without it.
+    let ipcAuthToken = "";
     if (IS_DEMO) {
       // Demo mode uses mock — skip real IPC
     }
@@ -172,6 +176,14 @@ export async function connect(): Promise<void> {
             vault.vaultStatus = 'IPC server failed to start';
             setVaultError(lastErr);
             throw new Error(`IPC server launch failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+          }
+          // Fetch the one-time IPC auth token so the WebSocket connect can
+          // authenticate (server refuses bare loopback hello).
+          try {
+            ipcAuthToken = await invoke<string>('get_ipc_auth_token');
+          } catch (e) {
+            vault.vaultStatus = 'Could not read IPC auth token';
+            throw new Error(`get_ipc_auth_token failed: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
 
@@ -229,7 +241,7 @@ export async function connect(): Promise<void> {
       }
       try {
         client = new IpcClientClass();
-        await client.connect(ipcPort);
+        await client.connect(ipcPort, ipcAuthToken);
         lastError = undefined;
         break;
       } catch (e) {
@@ -573,6 +585,33 @@ export async function signTransaction(params: {
   const c = await getClient();
   vault.error = null;
   return await c.call('vault.sign_transaction', params);
+}
+
+/**
+ * Build, sign, finalise and broadcast a payment in one call.
+ *
+ * `amount` must be an integer string in the chain's base unit — convert with
+ * `toBaseUnits()` at the call site. This is the product send path; the old
+ * sign/broadcast pair could never succeed because nothing produced a tx_hex.
+ */
+export async function sendTransaction(params: {
+  from: string;
+  to: string;
+  amount: string;
+  network: string;
+  feeLevel: 'fast' | 'medium' | 'slow';
+  accountIndex?: number;
+}): Promise<{ txid: string; raw_tx_hex: string; network: string }> {
+  const c = await getClient();
+  vault.error = null;
+  return (await c.call('vault.send_transaction', {
+    from: params.from,
+    to: params.to,
+    amount: params.amount,
+    network: params.network,
+    fee_level: params.feeLevel,
+    account_index: params.accountIndex ?? 0,
+  })) as { txid: string; raw_tx_hex: string; network: string };
 }
 
 export async function broadcastTransaction(signedTx: unknown): Promise<unknown> {

@@ -58,6 +58,13 @@ fn read_frame(stdout: &mut ChildStdout) -> Option<String> {
     Some(String::from_utf8_lossy(&body).to_string())
 }
 
+/// Shared slot for the IPC auth token so spawn_relay can pass it to the relay.
+static AUTH_TOKEN_SLOT: std::sync::OnceLock<std::sync::Mutex<Option<String>>> =
+    std::sync::OnceLock::new();
+fn auth_token_slot() -> &'static std::sync::Mutex<Option<String>> {
+    AUTH_TOKEN_SLOT.get_or_init(|| std::sync::Mutex::new(None))
+}
+
 /// Spawn a real IPC WebSocket server on the given port, so the relay's
 /// connect/retry loop succeeds and it reaches its stdio message loop.
 /// Runs on its own thread with its own tokio runtime.
@@ -65,7 +72,12 @@ fn spawn_ws_server(port: u16) {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("test runtime");
         rt.block_on(async {
-            let server = ipc_core::server::IpcServer::new(port).expect("create IPC server");
+            let server = ipc_core::server::IpcServer::with_encryption(port, false)
+                .expect("create IPC server");
+            // Record the token so spawn_relay can pass it to the relay binary.
+            *auth_token_slot().lock().unwrap() = std::fs::read_to_string(server.auth_token_path())
+                .ok()
+                .map(|s| s.trim().to_string());
             let (handle, _ready) = server.run();
             // Keep the runtime alive for the duration of the test.
             tokio::time::sleep(Duration::from_secs(30)).await;
@@ -78,9 +90,17 @@ fn spawn_ws_server(port: u16) {
 /// Spawn the real relay binary with stdin/stdout as native-messaging pipes.
 fn spawn_relay(port: u16) -> (Child, ChildStdin, ChildStdout) {
     let bin = env!("CARGO_BIN_EXE_gullbur-relay");
-    let mut child = Command::new(bin)
-        .arg("--ipc-port")
-        .arg(port.to_string())
+    let token = auth_token_slot()
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_default();
+    let mut cmd = Command::new(bin);
+    cmd.arg("--ipc-port").arg(port.to_string());
+    if !token.is_empty() {
+        cmd.arg("--auth-token").arg(&token);
+    }
+    let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

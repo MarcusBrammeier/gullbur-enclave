@@ -95,6 +95,9 @@ async fn e2e_signing_flow() {
         init_val.get("master_key").is_some(),
         "initialize response should contain master_key"
     );
+    // SECURITY (H1): init no longer auto-unlocks; create_account is gated on
+    // BiometricUnlocked — unlock explicitly for the rest of this flow.
+    let _ = am_for_test.try_biometric();
 
     // ── Step 2: vault.status ───────────────────────────────────────────────
     let result = handler

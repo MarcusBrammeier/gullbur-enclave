@@ -22,16 +22,32 @@ use rand::Rng;
 use serde_json::Value;
 use std::collections::HashSet;
 
-use crate::{PluginError, daemon_rpc};
+use crate::{PluginError, daemon_rpc_with};
 
 /// Default ring size for Monero transactions (11 = 10 decoys + 1 real).
 pub const RING_SIZE: usize = 11;
 
-/// Select real decoy output keys from the blockchain and build a ring.
+/// Build the differential-on-chain-offset sequence the `Decoys` API requires.
 ///
-/// Returns `(signer_ring_member, ring, offsets)` where `ring` is `RING_SIZE` entries of
-/// `[public_key, commitment]` — same shape as the legacy `build_decoy_ring` —
-/// and `offsets` contains the actual blockchain output indices for `Decoys::new`.
+/// `Decoys::new` treats its `offsets` as *positions offset from the prior ring
+/// member* (first member offset from 0), not absolute global output indices.
+/// `positions` holds the absolute on-chain global index of every ring member.
+/// Returns `None` if the indices are not strictly increasing (which would break
+/// the differential encoding / signal a malformed ring).
+pub fn to_differential_offsets(positions: &[u64]) -> Option<Vec<u64>> {
+    let mut prev = 0u64;
+    let mut offsets = Vec::with_capacity(positions.len());
+    for &pos in positions {
+        if pos < prev {
+            return None; // must be non-decreasing
+        }
+        offsets.push(pos - prev);
+        prev = pos;
+    }
+    Some(offsets)
+}
+
+/// Select real decoy output keys from the blockchain and build a ring.
 ///
 /// `signer_public` is the real signer's public spend key.
 ///
@@ -41,11 +57,17 @@ pub const RING_SIZE: usize = 11;
 /// no outputs, or returns malformed data.
 pub async fn fetch_and_build_ring(
     client: &reqwest::Client,
-    network: &str,
+    daemon_urls: &[String],
     signer_public: &EdwardsPoint,
 ) -> Result<([EdwardsPoint; 2], Vec<[EdwardsPoint; 2]>, Vec<u64>), PluginError> {
+    if daemon_urls.is_empty() {
+        return Err(PluginError::NetworkError(
+            "no daemon endpoints configured for this network — cannot fetch real decoys".into(),
+        ));
+    }
+
     // 1. Fetch output distribution to know which indices exist
-    let distribution = fetch_output_distribution(client, network).await?;
+    let distribution = fetch_output_distribution(client, daemon_urls).await?;
 
     // Total number of outputs on this chain
     let total_outputs = *distribution.last().unwrap_or(&0);
@@ -67,7 +89,7 @@ pub async fn fetch_and_build_ring(
     }
 
     // 3. Fetch actual output keys + commitments for selected indices
-    let real_outputs = fetch_output_keys(client, network, &decoy_indices).await?;
+    let real_outputs = fetch_output_keys(client, daemon_urls, &decoy_indices).await?;
 
     if real_outputs.len() < decoy_count {
         return Err(PluginError::NetworkError(format!(
@@ -76,31 +98,40 @@ pub async fn fetch_and_build_ring(
         )));
     }
 
-    // 4. Insert the real signer at a random position in the ring, tracking indices
-    let mut rng = rand::rng();
-    let signer_index = rng.random_range(0..RING_SIZE) as u8;
+    // 4. Build the ring + on-chain positions. The signer's real spent-output
+    //    position is not yet known to the wallet (Option A — chain scanning —
+    //    is the funded mainnet path; this testnet-only path is hard-refused on
+    //    mainnet). To keep the position list strictly increasing so that the
+    //    differential offsets `Decoys::new` requires are encodable, the signer
+    //    occupies the LAST ring slot and carries a placeholder position one
+    //    greater than the largest decoy position.
 
     let signer_commitment = signer_public * Scalar::from(8u8);
     let signer_member = [*signer_public, signer_commitment];
+    let signer_position = decoy_indices.last().map_or(1, |m| m + 1);
 
     let mut ring = Vec::with_capacity(RING_SIZE);
-    let mut ring_indices: Vec<u64> = Vec::with_capacity(RING_SIZE);
-    let mut decoy_iter = real_outputs.into_iter();
+    let mut ring_positions = Vec::with_capacity(RING_SIZE);
 
-    for i in 0..RING_SIZE {
-        if i as u8 == signer_index {
-            ring.push(signer_member);
-            ring_indices.push(decoy_indices[0]); // placeholder — real signer has no real index
-        } else {
-            let entry = decoy_iter
-                .next()
-                .ok_or_else(|| PluginError::Internal("decoy iterator exhausted early".into()))?;
-            ring.push(entry);
-            ring_indices.push(decoy_indices[ring.len() - 1]);
-        }
+    for (i, entry) in real_outputs.into_iter().enumerate() {
+        ring.push(entry);
+        ring_positions.push(decoy_indices[i]);
     }
 
-    Ok((signer_member, ring, ring_indices))
+    // Append the real signer as the final ring member.
+    ring.push(signer_member);
+    ring_positions.push(signer_position);
+    debug_assert_eq!(ring.len(), RING_SIZE);
+    debug_assert_eq!(ring_positions.len(), RING_SIZE);
+
+    // The decoys are strictly increasing (sorted), and the signer's placeholder
+    // sits above the largest, so the full position list is strictly increasing
+    // and the differential encoding is valid.
+    let offsets = to_differential_offsets(&ring_positions).ok_or_else(|| {
+        PluginError::Internal("failed to encode differential offsets for ring".into())
+    })?;
+
+    Ok((signer_member, ring, offsets))
 }
 
 /// Fetch cumulative output distribution from the Monero daemon.
@@ -109,7 +140,7 @@ pub async fn fetch_and_build_ring(
 /// at height `h + from_height` (with `from_height = 0`).
 async fn fetch_output_distribution(
     client: &reqwest::Client,
-    network: &str,
+    daemon_urls: &[String],
 ) -> Result<Vec<u64>, PluginError> {
     let params = serde_json::json!({
         "amounts": [0],
@@ -117,7 +148,7 @@ async fn fetch_output_distribution(
         "from_height": 0,
     });
 
-    let result = daemon_rpc(client, network, "get_output_distribution", params).await?;
+    let result = daemon_rpc_with(client, daemon_urls, "get_output_distribution", params).await?;
 
     let distributions = result
         .get("distributions")
@@ -212,7 +243,7 @@ fn select_decoy_indices(distribution: &[u64], count: usize, total_outputs: u64) 
 /// Returns one `[EdwardsPoint; 2]` per index: `[output_key, commitment]`.
 async fn fetch_output_keys(
     client: &reqwest::Client,
-    network: &str,
+    daemon_urls: &[String],
     indices: &[u64],
 ) -> Result<Vec<[EdwardsPoint; 2]>, PluginError> {
     let outputs: Vec<Value> = indices
@@ -230,7 +261,7 @@ async fn fetch_output_keys(
         "get_txid": false,
     });
 
-    let result = daemon_rpc(client, network, "get_outs", params).await?;
+    let result = daemon_rpc_with(client, daemon_urls, "get_outs", params).await?;
 
     let outs = result
         .get("outs")

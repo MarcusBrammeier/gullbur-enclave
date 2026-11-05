@@ -29,6 +29,7 @@ use vault_core::ipc_handlers;
 /// Helper: connect to IPC server, do hello handshake, return (write, read, key_bytes).
 async fn connect_encrypted(
     port: u16,
+    auth_token: &str,
 ) -> (
     futures_util::stream::SplitSink<
         tokio_tungstenite::WebSocketStream<
@@ -48,9 +49,11 @@ async fn connect_encrypted(
         .expect("WebSocket connect");
     let (mut write, mut read) = ws.split();
 
-    // Hello handshake → session key
+    // Hello handshake (with one-time token, H2) → session key
     write
-        .send(Message::Text(r#"{"type":"hello"}"#.into()))
+        .send(Message::Text(
+            format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+        ))
         .await
         .expect("send hello");
 
@@ -137,7 +140,7 @@ async fn recv_decrypted(
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
-const ISOLATION_PORT: u16 = 19994;
+const ISOLATION_PORT: u16 = 20005;
 
 /// Test 1: Encrypted round-trip for `get_vault_status` (no network, simple state query).
 #[tokio::test]
@@ -145,6 +148,7 @@ async fn e2e_isolation_vault_status() {
     let server = ipc_core::server::IpcServer::with_encryption(ISOLATION_PORT, true)
         .expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -158,7 +162,7 @@ async fn e2e_isolation_vault_status() {
     let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, key) = connect_encrypted(ISOLATION_PORT).await;
+    let (mut write, mut read, key) = connect_encrypted(ISOLATION_PORT, &auth_tok).await;
 
     // Send encrypted request for vault.status
     send_encrypted(&mut write, &key, "vault.status", serde_json::json!({}), 1).await;
@@ -188,6 +192,7 @@ async fn e2e_isolation_generate_mnemonic() {
     let server =
         ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -201,7 +206,7 @@ async fn e2e_isolation_generate_mnemonic() {
     let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, key) = connect_encrypted(port).await;
+    let (mut write, mut read, key) = connect_encrypted(port, &auth_tok).await;
 
     send_encrypted(
         &mut write,
@@ -232,6 +237,7 @@ async fn e2e_isolation_method_not_found() {
     let server =
         ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -245,7 +251,7 @@ async fn e2e_isolation_method_not_found() {
     let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, key) = connect_encrypted(port).await;
+    let (mut write, mut read, key) = connect_encrypted(port, &auth_tok).await;
 
     send_encrypted(
         &mut write,
@@ -279,6 +285,7 @@ async fn e2e_isolation_tampered_payload_rejected() {
     let server =
         ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -292,7 +299,7 @@ async fn e2e_isolation_tampered_payload_rejected() {
     let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, key) = connect_encrypted(port).await;
+    let (mut write, mut read, key) = connect_encrypted(port, &auth_tok).await;
 
     // Build an encrypted payload, then corrupt it.
     let request = serde_json::json!({
@@ -355,15 +362,19 @@ async fn e2e_isolation_tampered_payload_rejected() {
     let _ = std::fs::remove_file(&token_path);
 }
 
-/// Test 5: Plaintext (non-encrypted) request gets a plaintext (non-encrypted)
-/// response even when encryption is enabled on the server — proves the
-/// was_encrypted response-matching logic in the IPC isolation pattern.
+/// Test 5: Plaintext (non-encrypted) request on an ENCRYPTED server is
+/// REJECTED (fail-closed, H3). The previous lenient path — where the server
+/// mirrored plaintext requests with plaintext responses — was removed (a
+/// loopback caller could bypass the AES-GCM session). Now the server must refuse
+/// the plaintext request with an "encrypted IPC required" error, or close the
+/// connection.
 #[tokio::test]
-async fn e2e_isolation_plaintext_request_plaintext_response() {
+async fn e2e_isolation_plaintext_requests_are_refused() {
     let port = ISOLATION_PORT + 4;
     let server =
         ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -374,47 +385,56 @@ async fn e2e_isolation_plaintext_request_plaintext_response() {
         let mn = Arc::new(RwLock::new(None));
         ipc_handlers::register_vault_handlers(&mut handler, ph, sd, mn, init, aq, am);
     }
-    let (_handle, _ready) = server.run();
+    let (handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, _key) = connect_encrypted(port).await;
+    // Authenticate, but send a PLAINTEXT JSON-RPC (not wrapped in __encrypted__).
+    let (mut write, mut read, _key) = connect_encrypted(port, &auth_tok).await;
 
-    // Send plaintext JSON-RPC (not wrapped in __encrypted__)
     let rpc = r#"{"jsonrpc":"2.0","method":"vault.generate_mnemonic","params":{},"id":10}"#;
     write
         .send(Message::Text(rpc.into()))
         .await
         .expect("send plaintext rpc");
 
+    // The server must refuse: either a fail-closed error response, or a close.
     let resp_msg = tokio::time::timeout(Duration::from_secs(3), read.next())
         .await
-        .expect("timeout")
-        .expect("stream ended")
-        .expect("ws error");
-    let resp_text = match &resp_msg {
-        Message::Text(t) => t.to_string(),
-        o => panic!("expected Text, got: {o:?}"),
-    };
-    let resp_val: serde_json::Value =
-        serde_json::from_str(&resp_text).expect("valid JSON response");
-    assert!(
-        resp_val.get("__encrypted__").is_none(),
-        "plaintext request must get plaintext response: {resp_text}"
-    );
-    assert!(
-        resp_val.get("result").is_some(),
-        "response must have a result"
-    );
-    let mnemonic = resp_val["result"]["mnemonic"]
-        .as_str()
-        .expect("mnemonic string");
-    assert_eq!(
-        mnemonic.split_whitespace().count(),
-        24,
-        "24-word mnemonic from plaintext request"
-    );
+        .expect("timeout waiting for fail-closed response");
 
-    _handle.abort();
+    match resp_msg {
+        Some(Ok(Message::Text(t))) => {
+            let resp_val: serde_json::Value =
+                serde_json::from_str(&t).expect("valid JSON response");
+            // Fail-closed: the server must NOT process the plaintext request as success.
+            assert!(
+                resp_val.get("result").is_none(),
+                "plaintext request on encrypted server must NOT succeed: {t}"
+            );
+            let err_msg = resp_val["error"]["message"].as_str().unwrap_or("");
+            assert!(
+                err_msg.contains("encrypted IPC required") || err_msg.contains("plaintext"),
+                "expected encrypted-IPC-required error, got: {t}"
+            );
+        }
+        Some(Ok(Message::Close(_))) => {
+            // Server closed with a Close frame — acceptable fail-closed.
+            eprintln!("Server closed connection on plaintext request (fail-closed OK)");
+        }
+        Some(Ok(o)) => {
+            panic!("expected Text or Close, got: {o:?}");
+        }
+        Some(Err(e)) => {
+            // Connection reset — acceptable fail-closed.
+            eprintln!("Connection reset on plaintext request (fail-closed OK): {e}");
+        }
+        None => {
+            // Stream ended — server closed, acceptable fail-closed.
+            eprintln!("Stream ended on plaintext request (fail-closed OK)");
+        }
+    }
+
+    handle.abort();
     let _ = std::fs::remove_file(&token_path);
 }
 
@@ -426,6 +446,7 @@ async fn e2e_isolation_sequential_calls_same_session() {
     let server =
         ipc_core::server::IpcServer::with_encryption(port, true).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_tok = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -439,7 +460,7 @@ async fn e2e_isolation_sequential_calls_same_session() {
     let (_handle, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let (mut write, mut read, key) = connect_encrypted(port).await;
+    let (mut write, mut read, key) = connect_encrypted(port, &auth_tok).await;
 
     // Call 1: vault.status
     send_encrypted(&mut write, &key, "vault.status", serde_json::json!({}), 1).await;

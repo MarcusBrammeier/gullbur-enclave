@@ -30,6 +30,7 @@ reqwest = { workspace = true }
 bzip2 = ">=0.5,<1"
 tar = ">=0.4,<1"
 sha2 = { workspace = true }
+subtle = "2"
 
 [features]
 default = ["plugins"]

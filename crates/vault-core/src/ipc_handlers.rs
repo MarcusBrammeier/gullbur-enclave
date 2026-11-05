@@ -87,7 +87,6 @@ pub fn register_vault_handlers(
         let sd = Arc::clone(&seed);
         let mn = Arc::clone(&mnemonic);
         let init = Arc::clone(&initialized);
-        let auth = Arc::clone(&auth_manager);
         // Staged mnemonic produced by vault.stage_mnemonic (kept in Rust so the
         // phrase is never re-sent from the UI after generation).
         let staged = Arc::clone(&staged_mnemonic);
@@ -96,7 +95,6 @@ pub fn register_vault_handlers(
             let sd = Arc::clone(&sd);
             let mn = Arc::clone(&mn);
             let init = Arc::clone(&init);
-            let auth = Arc::clone(&auth);
             let staged = Arc::clone(&staged);
             async move {
                 if init.load(Ordering::SeqCst) {
@@ -186,9 +184,14 @@ pub fn register_vault_handlers(
 
                 init.store(true, Ordering::SeqCst);
 
-                // After successful initialization, unlock the vault.
-                // In headless/CLI mode, the init flow itself is the auth.
-                let _ = auth.try_biometric();
+                // SECURITY (H1): do NOT auto-unlock as a side effect of init.
+                // Previously `auth.try_biometric()` here silently flipped the
+                // AuthManager to BiometricUnlocked with NO credential check —
+                // letting an unauthenticated loopback caller who invokes
+                // vault.initialize escalate straight to a fully-signing unlocked
+                // state (and receive a freshly-generated mnemonic). The vault is
+                // now initialized but LOCKED; the caller must explicitly unlock
+                // (biometric/password) before any sensitive operation.
 
                 // Clear the staged mnemonic now that the vault holds the real seed.
                 *staged.write().await = None;
@@ -529,6 +532,7 @@ pub fn register_vault_handlers(
                     .to_string();
                 let signed_tx_hex = params
                     .get("signed_tx_hex")
+                    .or_else(|| params.get("signed_tx"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(RpcError::invalid_params)?;
 
@@ -543,6 +547,140 @@ pub fn register_vault_handlers(
 
                 Ok(serde_json::json!({
                     "txid": txid,
+                }))
+            }
+        });
+    }
+
+    // ── vault.send_transaction (build → sign → finalize → broadcast) ────
+    //
+    // The product path. Before this handler existed the GUI had no way to
+    // produce a transaction at all: it passed {from,to,amount} to
+    // vault.sign_transaction, which requires a tx_hex it never received.
+    {
+        let ph = Arc::clone(&plugin_host);
+        let sd = Arc::clone(&seed);
+        let aq = Arc::clone(&approval_queue);
+        let auth = Arc::clone(&auth_manager);
+        handler.register("vault.send_transaction", move |params: Value| {
+            let ph = Arc::clone(&ph);
+            let sd = Arc::clone(&sd);
+            let aq = Arc::clone(&aq);
+            let auth = Arc::clone(&auth);
+            async move {
+                enforce_auth(&auth, auth_core::AuthStatus::BiometricUnlocked)?;
+
+                let network = params
+                    .get("network")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(RpcError::invalid_params)?
+                    .to_string();
+                let from = params
+                    .get("from")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(RpcError::invalid_params)?
+                    .to_string();
+                let to = params
+                    .get("to")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(RpcError::invalid_params)?
+                    .to_string();
+                // Amount is an integer string in the chain's base unit
+                // (satoshi / wei). Floats never touch a transaction.
+                let amount: u128 = params
+                    .get("amount")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(RpcError::invalid_params)?
+                    .parse()
+                    .map_err(|_| {
+                        RpcError::new(
+                            -32602,
+                            "amount must be an integer string in the chain's base unit",
+                        )
+                    })?;
+                if amount == 0 {
+                    return Err(RpcError::new(-32602, "amount must be greater than zero"));
+                }
+
+                let fee_level = params
+                    .get("fee_level")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string);
+                let fee_rate = params.get("fee_rate").and_then(|v| v.as_f64());
+                let account_index = params
+                    .get("account_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+
+                // Same approval rule as signing: anything arriving with an
+                // extension origin needs out-of-band consent.
+                if let Some(origin) = params.get("origin").and_then(|v| v.as_str()) {
+                    let mut summary = HashMap::new();
+                    summary.insert("network".into(), network.clone());
+                    summary.insert("to".into(), to.clone());
+                    summary.insert("amount".into(), amount.to_string());
+                    summary.insert("method".into(), "vault.send_transaction".to_string());
+                    let (approval_id, rx) = {
+                        let mut queue = aq.write().await;
+                        queue.submit(
+                            origin,
+                            "vault.send_transaction",
+                            "Approve sending funds",
+                            summary,
+                        )
+                    };
+                    tracing::info!("Approval requested: {} for send_transaction", approval_id);
+                    match rx.await {
+                        Ok(crate::approval::ApprovalResponse::Approved) => {}
+                        Ok(crate::approval::ApprovalResponse::Denied(reason)) => {
+                            return Err(RpcError::new(-32001, format!("User denied: {reason}")));
+                        }
+                        Err(_) => {
+                            return Err(RpcError::new(-32000, "Approval request timed out"));
+                        }
+                    }
+                }
+
+                let request = wallet_plugin::TxRequest {
+                    from,
+                    to,
+                    amount,
+                    fee_rate,
+                    fee_level,
+                };
+
+                let host = ph.read().await;
+                let unsigned = host
+                    .build_transaction(&request, &network)
+                    .await
+                    .map_err(|e| RpcError::new(-32000, format!("Build failed: {e}")))?;
+
+                let seed_guard = sd.read().await;
+                let seed_bytes = seed_guard
+                    .as_ref()
+                    .map(|s| s.as_slice())
+                    .ok_or_else(|| RpcError::new(-32000, "Vault is not initialized"))?;
+
+                let signed = host
+                    .sign_transaction(&unsigned, seed_bytes, account_index, &network)
+                    .await
+                    .map_err(|e| RpcError::new(-32000, format!("Signing failed: {e}")))?;
+                drop(seed_guard);
+
+                let raw = host
+                    .finalize_transaction(&signed, &network)
+                    .await
+                    .map_err(|e| RpcError::new(-32000, format!("Finalisation failed: {e}")))?;
+
+                let txid = host
+                    .broadcast_transaction(&raw, &network)
+                    .await
+                    .map_err(|e| RpcError::new(-32000, format!("Broadcast failed: {e}")))?;
+
+                Ok(serde_json::json!({
+                    "txid": txid,
+                    "raw_tx_hex": hex::encode(raw),
+                    "network": network,
                 }))
             }
         });
@@ -692,6 +830,24 @@ pub fn register_vault_handlers(
             async move {
                 auth.lock();
                 Ok(serde_json::json!({ "locked": true }))
+            }
+        });
+    }
+
+    // ── vault.unlock ─────────────────────────────────────────────────────
+    // Symmetric counterpart to vault.lock. Since init no longer auto-unlocks
+    // (SECURITY H1), a caller must explicitly unlock before sensitive ops.
+    // In the headless/CLI harness this is the password/biometric equivalent
+    // (the CLI has no OS biometrics, so it uses the software-unlock path).
+    {
+        let auth = Arc::clone(&auth_manager);
+        handler.register("vault.unlock", move |_params: Value| {
+            let auth = Arc::clone(&auth);
+            async move {
+                match auth.try_biometric() {
+                    Ok(()) => Ok(serde_json::json!({ "unlocked": true })),
+                    Err(e) => Err(RpcError::new(-32002, format!("Authentication failed: {e}"))),
+                }
             }
         });
     }

@@ -14,7 +14,7 @@ use vault_core::approval::ApprovalQueue;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
-const PORT: u16 = 19994;
+const PORT: u16 = 20003;
 
 async fn rpc_call<W, R>(
     write: &mut W,
@@ -48,9 +48,11 @@ where
 
 #[tokio::test(flavor = "multi_thread")]
 async fn e2e_disconnect_reconnect() {
-    // Start server
-    let server = ipc_core::server::IpcServer::new(PORT).expect("test invariant");
+    // Start server — plaintext IPC (explicit with_encryption(false), since the
+    // default IpcServer::new() is now encrypted + fail-closed)
+    let server = ipc_core::server::IpcServer::with_encryption(PORT, false).expect("test invariant");
     let token = server.auth_token_path().to_path_buf();
+    let auth_token = std::fs::read_to_string(&token).expect("read auth token");
     {
         let mut h = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -64,14 +66,16 @@ async fn e2e_disconnect_reconnect() {
     let (sh, _ready) = server.run();
     tokio::time::sleep(Duration::from_millis(300)).await;
 
-    // ── Connection 1: hello + generate mnemonic ─────────────────────────
+    // ── Connection 1: hello (with token) + generate mnemonic ─────────────
     let (ws, _) = connect_async(format!("ws://127.0.0.1:{PORT}"))
         .await
         .expect("test invariant");
     let (mut w1, mut r1) = ws.split();
-    w1.send(Message::Text(r#"{"type":"hello"}"#.into()))
-        .await
-        .expect("test invariant");
+    w1.send(Message::Text(
+        format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+    ))
+    .await
+    .expect("test invariant");
     let msg = tokio::time::timeout(Duration::from_secs(5), r1.next())
         .await
         .expect("test invariant")
@@ -103,9 +107,11 @@ async fn e2e_disconnect_reconnect() {
         .await
         .expect("test invariant");
     let (mut w2, mut r2) = ws.split();
-    w2.send(Message::Text(r#"{"type":"hello"}"#.into()))
-        .await
-        .expect("test invariant");
+    w2.send(Message::Text(
+        format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+    ))
+    .await
+    .expect("test invariant");
     let msg = tokio::time::timeout(Duration::from_secs(5), r2.next())
         .await
         .expect("test invariant")

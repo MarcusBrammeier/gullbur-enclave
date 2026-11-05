@@ -61,6 +61,9 @@ async fn setup_signing_server(
     )
     .await;
     assert_ok(&r, "vault.initialize");
+    // SECURITY (H1): init no longer auto-unlocks; create_account is gated on
+    // BiometricUnlocked, so unlock before creating the reference account.
+    let _ = auth_manager.try_biometric();
 
     // Extract the seed hex from initialization — the master_key key_id
     // "bip44-eth-0" is not the seed. Instead, derive the seed locally

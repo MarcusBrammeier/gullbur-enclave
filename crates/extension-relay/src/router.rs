@@ -71,12 +71,12 @@ pub fn route(method: &str, params: Value) -> Option<RoutedRequest> {
             requires_approval: true,
             approval_description: Some("Sign message with your wallet".into()),
         }),
-        "wallet_switchEthereumChain" => Some(RoutedRequest {
-            vault_method: "vault.list_networks".into(),
-            params,
-            requires_approval: false,
-            approval_description: None,
-        }),
+        // wallet_switchEthereumChain is intentionally NOT supported. The vault
+        // does not dynamically switch chains from a dApp context; routing it to
+        // a metadata list call is a silent no-op that misleads callers. Returning
+        // None here makes the relay respond with -32601 "Method not found",
+        // which is honest and lets dApps fall back gracefully.
+        "wallet_switchEthereumChain" => None,
         // ── Channel B: Next-gen vault_* API (Phase 2 stubs) ──────────────
         "vault_executeBatch" => Some(RoutedRequest {
             vault_method: "vault_executeBatch".into(),
@@ -130,7 +130,6 @@ mod tests {
             "eth_estimateGas",
             "eth_sendTransaction",
             "personal_sign",
-            "wallet_switchEthereumChain",
             "vault_executeBatch",
             "vault_requestSessionKey",
             "vault_simulateAndSend",
@@ -139,6 +138,17 @@ mod tests {
             let r = route(m, json!({}));
             assert!(r.is_some(), "method {m} should be routable");
         }
+    }
+
+    #[test]
+    fn test_wallet_switch_chain_is_explicitly_unsupported() {
+        // L7: wallet_switchEthereumChain must NOT be silently no-op'd to a
+        // metadata list call. It returns None so the relay answers with
+        // -32601 "Method not found" — honest, and dApps fall back gracefully.
+        assert!(
+            route("wallet_switchEthereumChain", json!({})).is_none(),
+            "wallet_switchEthereumChain must be unsupported, not a silent no-op"
+        );
     }
 
     #[test]

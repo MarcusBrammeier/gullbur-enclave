@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Account, FeeEstimate } from '../types';
-  import { vault, validateAddress, estimateFee, signTransaction, broadcastTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
-  import { formatBalance, getBalanceFloat } from '../utils';
+  import { vault, validateAddress, estimateFee, sendTransaction, simulateTransfer, getAccountLabel } from '../vault.svelte.ts';
+  import { formatBalance, getBalanceFloat, toBaseUnits, decimalsForNetwork } from '../utils';
   import { getAddressBook, saveAddressEntry, removeAddressEntry, isAddressSaved } from '../addressBook';
   import { fade, scale } from 'svelte/transition';
   import { cubicInOut } from 'svelte/easing';
@@ -182,15 +182,21 @@
     resultError = '';
 
     try {
-      const signedTx = await signTransaction({
+      const amountBaseUnits = toBaseUnits(amount, decimalsForNetwork(account.network));
+      if (!amountBaseUnits) {
+        throw new Error(
+          `Amount has more decimal places than ${account.network} supports, or is not a number`,
+        );
+      }
+
+      const result = await sendTransaction({
         from: account.address,
         to: recipientAddress.trim(),
-        amount: amount,
+        amount: amountBaseUnits,
         network: account.network,
         feeLevel: selectedFee,
       });
 
-      const result = (await broadcastTransaction(signedTx)) as { txid: string };
       txid = result?.txid ?? 'Unknown';
       step = 'result';
     } catch (err) {

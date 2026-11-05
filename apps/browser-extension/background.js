@@ -71,6 +71,45 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log(`[gullbur] Native host: ${NATIVE_HOST}`);
 });
 
+// ── Stable per-extension EIP-6963 UUID ────────────────────────────────────
+// EIP-6963 requires a STABLE uuid per wallet (not regenerated per page). We
+// generate it once and persist in chrome.storage.local so every page and every
+// reload of a dApp sees the SAME provider identity.
+function generateUUID() {
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+  buf[8] = (buf[8] & 0x3f) | 0x80; // variant 10
+  const hex = Array.from(buf, (b) => b.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4).join(""),
+    hex.slice(4, 6).join(""),
+    hex.slice(6, 8).join(""),
+    hex.slice(8, 10).join(""),
+    hex.slice(10).join(""),
+  ].join("-");
+}
+
+// Resolve the wallet UUID, generating + persisting it on first call.
+async function getWalletUuid() {
+  const stored = await chrome.storage.local.get("eip6963Uuid");
+  if (stored?.eip6963Uuid) return stored.eip6963Uuid;
+  const uuid = generateUUID();
+  await chrome.storage.local.set({ eip6963Uuid: uuid });
+  return uuid;
+}
+
+// Tell the content script what identity to announce. The content script calls
+// this over port messaging instead of duplicating the uuid-random in each page
+// (which would violate EIP-6963's stable-uuid requirement).
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "GET_PROVIDER_UUID") {
+    getWalletUuid().then((uuid) => sendResponse({ uuid }));
+    return true; // async response
+  }
+  return false;
+});
+
 // ── Native host connection test ───────────────────────────────────────────
 
 chrome.runtime.onStartup?.addListener(() => {

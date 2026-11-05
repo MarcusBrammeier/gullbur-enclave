@@ -23,13 +23,14 @@ use vault_core::approval::ApprovalQueue;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
-const ENC_PORT: u16 = 19993;
+const ENC_PORT: u16 = 20002;
 
 #[tokio::test]
 async fn e2e_encrypted_roundtrip() {
     // 1. Start IPC server with encryption enabled (default).
     let server = ipc_core::server::IpcServer::new(ENC_PORT).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_token = std::fs::read_to_string(&token_path).expect("read auth token");
     {
         let mut handler = server.handler().await;
         let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -49,7 +50,9 @@ async fn e2e_encrypted_roundtrip() {
         .expect("WebSocket connect");
     let (mut write, mut read) = ws.split();
     write
-        .send(Message::Text(r#"{"type":"hello"}"#.into()))
+        .send(Message::Text(
+            format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+        ))
         .await
         .expect("send hello");
 

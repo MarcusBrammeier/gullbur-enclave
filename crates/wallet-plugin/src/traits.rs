@@ -52,6 +52,32 @@ pub trait WalletPlugin: Send + Sync {
         network: &str,
     ) -> Result<Vec<u8>, PluginError>;
 
+    /// Build an unsigned transaction for `request`: input selection, fee and change.
+    ///
+    /// Default: unsupported. Plugins opt in once they can construct a transaction
+    /// (this is the seam that was missing entirely before 2026-11).
+    async fn build_transaction(
+        &self,
+        _request: &crate::types::TxRequest,
+        _network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        Err(PluginError::Unsupported(
+            "transaction construction is not implemented for this chain".into(),
+        ))
+    }
+
+    /// Finalise a signed transaction into broadcastable bytes.
+    ///
+    /// Default: pass through — an EVM signed transaction is already final. UTXO
+    /// chains override this to extract the witness from a signed PSBT.
+    async fn finalize_transaction(
+        &self,
+        signed: &[u8],
+        _network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        Ok(signed.to_vec())
+    }
+
     /// Broadcast a signed transaction to the network.
     /// Returns the transaction ID (txid / hash).
     async fn broadcast_transaction(

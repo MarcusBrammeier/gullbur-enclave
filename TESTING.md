@@ -4,13 +4,19 @@ This page explains how **Gullbúr Enclave**'s testnet support is validated, what
 is proven, what is still pending, and — if you want to help — how to send us
 testnet coins to finish the job.
 
-> **Short version:** Signing, broadcast, and **public-chain relay are proven on
-> BTC testnet4 and EVM Sepolia** (confirmed on-chain), and `monero-wallet-rpc`
-> balance/history now works against a local synced stagenet node. The remaining
-> gap is **LTC public testnet relay** (testnet3/4), which simply awaits any
-> testnet LTC landing at our address — we have not yet received a payout that
-> propagates to the public LTC testnet chain. That is the gap we'd like your
-> closing.
+> **Short version:** Signing, broadcast, and **public-chain relay are proven at the harness level**
+> on BTC testnet4 and EVM Sepolia (confirmed on-chain), and `monero-wallet-rpc` balance/history works
+> against a local synced stagenet node.
+>
+> **Read that precisely:** those proofs live in integration tests that *hand-build* a raw transaction
+> and broadcast it themselves. They do not exercise the application's own send path. **The GUI cannot
+> construct a transaction today**, so pressing Send in a real (non-demo) build fails before a key is
+> touched. Wiring that path — UTXO selection, PSBT finalisation, EVM tx building — is the current
+> milestone. Until it lands, treat every "broadcast proven" claim on this page as a statement about
+> the signer and the relay, not about the product.
+>
+> The remaining *external* gap is **LTC public testnet relay** (testnet3/4), which awaits any testnet
+> LTC landing at our address.
 
 ---
 

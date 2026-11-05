@@ -234,11 +234,11 @@ fn write_varint(buf: &mut Vec<u8>, value: u64) {
 
 /// Ring size for Monero transactions (11 = 10 decoys + 1 real).
 ///
-/// ⚠️ KNOWN LIMITATION: `build_decoy_ring()` generates random curve points
-/// instead of selecting real UTXOs from the blockchain. The resulting
-/// transaction signs correctly and broadcasts, but has zero ring-signature
-/// privacy — an observer can trivially identify the real signer. Real decoy
-/// selection (picking actual UTXOs from the chain) is required before mainnet.
+/// ⚠️ TESTNET-ONLY: `build_decoy_ring()` generates random curve points instead
+/// of selecting real UTXOs from the blockchain — zero ring-signature privacy.
+/// It is gated to testnet/stagenet signing only (see `sign_monero_tx`); mainnet
+/// REQUIRES real on-chain decoys via `fetch_and_build_ring` and refuses to sign
+/// otherwise. On testnets the guarantee is irrelevant (no real value at risk).
 const RING_SIZE: usize = 11;
 
 /// Build a ring of decoy members for CLSAG signing.
@@ -300,6 +300,7 @@ async fn sign_monero_tx(
     spend_key: &SpendKey,
     tx_json: &serde_json::Value,
     client: Option<&reqwest::Client>,
+    daemon_urls: &[String],
     network: &str,
 ) -> Result<Vec<u8>, PluginError> {
     let inputs = tx_json
@@ -327,26 +328,44 @@ async fn sign_monero_tx(
 
     for (i, input) in inputs.iter().enumerate() {
         let _amount = input.get("amount").and_then(|v| v.as_u64()).unwrap_or(0);
-        let signer_index = (i % RING_SIZE) as u8;
 
-        let (_signer_ring_member, ring, offsets): (
-            [EdwardsPoint; 2],
-            Vec<[EdwardsPoint; 2]>,
-            Vec<u64>,
-        ) = if let Some(c) = client {
-            // Try real decoys from the daemon; on failure fall back
-            match fetch_and_build_ring(c, network, &signer_key).await {
-                Ok((member, r, o)) => (member, r, o),
+        // Decoy selection is PRIVACY-CRITICAL. Monero ring signatures only
+        // provide anonymity if the signer's ring member is the REAL one-time
+        // key of the actual output being spent — merely surrounding it with
+        // real decoys is not enough. Until Option A (on-chain scanning to
+        // recover owned outputs + build genuine signer one-time keys) is
+        // implemented, MAINNET SIGNING IS HARD-REFUSED to avoid producing a
+        // ring that looks private but is traceable on real funds.
+        let (ring, offsets, signer_index): (Vec<[EdwardsPoint; 2]>, Vec<u64>, u8) = if network
+            == "monero"
+        {
+            return Err(PluginError::Internal(
+                "mainnet XMR signing is disabled: real spent-output (one-time key) recovery is not yet implemented (Option A). Refusing to sign a traceable ring on real funds.".into(),
+            ));
+        } else if let Some(c) = client {
+            // Testnet/stagenet with a daemon — use real on-chain decoys when
+            // available. `fetch_and_build_ring` returns the signer in the last
+            // ring slot with valid differential offsets; use that slot.
+            match fetch_and_build_ring(c, daemon_urls, &signer_key).await {
+                Ok((_member, r, o)) => (r, o, (RING_SIZE - 1) as u8),
                 Err(e) => {
-                    tracing::warn!("Real decoy selection failed ({e}), falling back to synthetic");
-                    let (m, r) = build_decoy_ring(&signer_key, signer_index);
-                    (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
+                    tracing::warn!(
+                        "XMR real decoy selection failed ({e}); falling back to synthetic decoys (testnet-only, no privacy guarantee)"
+                    );
+                    let si = (i % RING_SIZE) as u8;
+                    let (_, r) = build_decoy_ring(&signer_key, si);
+                    (r, (0..RING_SIZE).map(|_| 0u64).collect(), si)
                 }
             }
         } else {
-            // No daemon client — synthetic decoys (test/dev path)
-            let (m, r) = build_decoy_ring(&signer_key, signer_index);
-            (m, r, (0..RING_SIZE).map(|_| 0u64).collect())
+            // Testnet/stagenet dev/offline path — synthetic decoys only.
+            // Mainnet is hard-refused above, so this is testnet-only.
+            tracing::warn!(
+                "XMR signing without a daemon client; using synthetic decoys (testnet-only, no privacy guarantee)"
+            );
+            let si = (i % RING_SIZE) as u8;
+            let (_, r) = build_decoy_ring(&signer_key, si);
+            (r, (0..RING_SIZE).map(|_| 0u64).collect(), si)
         };
 
         let decoys = Decoys::new(offsets, signer_index, ring)
@@ -423,16 +442,9 @@ async fn sign_monero_tx(
 /// node serving mainnet (18089) / stagenet (38089) / testnet (28089), all
 /// confirmed live via get_info (2026-08).
 ///
-/// This is the built-in default; callers can override via `XmrPlugin::with_daemon_urls`.
-fn default_daemon_url(network: &str) -> Result<&'static str, PluginError> {
-    match network {
-        "monero" => Ok("http://node.monerodevs.org:18089/json_rpc"),
-        "monero-stagenet" => Ok("http://node.monerodevs.org:38089/json_rpc"),
-        "monero-testnet" => Ok("http://node.monerodevs.org:28089/json_rpc"),
-        _ => Err(PluginError::UnsupportedNetwork(network.into())),
-    }
-}
-
+/// The URL lists live in `default_daemon_urls()` and are applied via
+/// `daemon_rpc_with` so decoy fetches and spends honor the plugin's configured
+/// daemon endpoints + socks5 proxy.
 /// Perform a JSON-RPC call to a Monero daemon, trying each candidate URL in order.
 ///
 /// `urls` is the ordered fallback list (from `XmrPlugin`) for the network. If a
@@ -490,17 +502,6 @@ async fn daemon_rpc_with(
         "all daemon endpoints failed: {}",
         last_err.unwrap_or_else(|| "no endpoints".into())
     )))
-}
-
-/// Convenience: call the default single endpoint for a network (tests / fallback).
-async fn daemon_rpc(
-    client: &reqwest::Client,
-    network: &str,
-    method: &str,
-    params: serde_json::Value,
-) -> Result<serde_json::Value, PluginError> {
-    let url = default_daemon_url(network)?;
-    daemon_rpc_with(client, &[url.to_string()], method, params).await
 }
 
 // ── WalletPlugin implementation ─────────────────────────────────────────────
@@ -583,7 +584,7 @@ impl WalletPlugin for XmrPlugin {
             id: account_id,
             network: network.into(),
             address: addr,
-            path: Some(format!("m/44'/128'/{index}'/0/0")),
+            path: Some(format!("m/44'/128'/0'/0/{index}")),
             label: None,
             index,
         })
@@ -600,14 +601,24 @@ impl WalletPlugin for XmrPlugin {
         let tx_json: serde_json::Value = serde_json::from_slice(tx)
             .map_err(|e| PluginError::Internal(format!("invalid tx JSON: {e}")))?;
 
-        // Derive the spend key from the seed directly (never exposed through IPC)
-        let spend_key = SpendKey::from_seed(seed, account_index);
+        // Derive the spend key from the seed using the SAME derivation as
+        // create_account, so the address shown in the UI is the key that signs.
+        // create_account: from_seed(bip44_xmr_entropy(seed, index), 0).
+        // Must match exactly — a mismatch means funds sent to a displayed
+        // address are unspendable by the signing key (CRITICAL, fixed).
+        let seed_512: [u8; 64] = seed
+            .try_into()
+            .map_err(|_| PluginError::Internal("expected 64-byte BIP-39 seed".into()))?;
+        let key_entropy = crypto_core::keys::derive_bip44_xmr_entropy(&seed_512, account_index)
+            .map_err(|e| PluginError::Internal(format!("Key derivation failed: {e}")))?;
+        let spend_key = SpendKey::from_seed(&key_entropy, 0);
 
         // Build a daemon client for real decoy selection (best-effort)
         let client = self.build_client().ok();
+        let daemon_urls = self.daemon_urls_for(network).unwrap_or_default();
 
         // Sign using CLSAG with real decoys when daemon is reachable
-        sign_monero_tx(&spend_key, &tx_json, client.as_ref(), network).await
+        sign_monero_tx(&spend_key, &tx_json, client.as_ref(), &daemon_urls, network).await
     }
 
     async fn broadcast_transaction(&self, tx: &[u8], network: &str) -> Result<String, PluginError> {
@@ -1345,7 +1356,8 @@ mod tests {
     #[tokio::test]
     async fn test_sign_transaction_produces_clsag_signature() {
         let plugin = XmrPlugin::new();
-        let seed_bytes = b"test-xmr-key-clsag-01";
+        // 64-byte BIP-39 seed (same shape the wallet stores in initialize).
+        let seed_bytes: [u8; 64] = [0x42u8; 64];
 
         // Build a simple unsigned transaction JSON
         let unsigned_tx = serde_json::json!({
@@ -1357,7 +1369,7 @@ mod tests {
         let tx_bytes = serde_json::to_vec(&unsigned_tx).expect("test invariant");
 
         let result = plugin
-            .sign_transaction(&tx_bytes, seed_bytes, 0, "monero")
+            .sign_transaction(&tx_bytes, &seed_bytes, 0, "monero-stagenet")
             .await;
         assert!(
             result.is_ok(),
@@ -1396,6 +1408,38 @@ mod tests {
             s_arr.len(),
             11,
             "s vector must have 11 elements (ring size)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mainnet_sign_refused_without_real_decoys() {
+        let plugin = XmrPlugin::new();
+        // 64-byte BIP-39 seed (same shape the wallet stores in initialize).
+        let seed_bytes: [u8; 64] = [0x42u8; 64];
+
+        let unsigned_tx = serde_json::json!({
+            "version": 2,
+            "inputs": [{"amount": 1000000000000u64}],
+            "outputs": [{"amount": 0, "key": "0000000000000000000000000000000000000000000000000000000000000000"}],
+            "extra": ""
+        });
+        let tx_bytes = serde_json::to_vec(&unsigned_tx).expect("test invariant");
+
+        // Mainnet signing must NOT silently fall back to synthetic decoys —
+        // it must refuse (no daemon configured here).
+        let result = plugin
+            .sign_transaction(&tx_bytes, &seed_bytes, 0, "monero")
+            .await;
+        assert!(
+            result.is_err(),
+            "mainnet XMR signing without real decoys must be refused"
+        );
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("mainnet XMR signing is disabled")
+                || err.contains("real decoys")
+                || err.contains("daemon"),
+            "error should explain the mainnet refusal, got: {err}"
         );
     }
 
@@ -1548,7 +1592,7 @@ mod tests {
 
     #[test]
     fn test_validate_address_77_byte_len_accepted_for_both_networks_checked() {
-        let _plugin = XmrPlugin::new();
+        let plugin = XmrPlugin::new();
         // A 77-byte integrated/sub-address decodes cleanly (encode path); the
         // network-byte gate above governs acceptance. Assert the encode yields a
         // base58-decodable 77-byte payload (so the 69-vs-77 length gate is the

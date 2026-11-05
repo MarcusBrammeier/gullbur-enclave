@@ -1,10 +1,10 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  # Manual trigger so maintainers can run CI on demand without a PR.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always

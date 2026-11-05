@@ -182,7 +182,7 @@ async fn deterministic_seed_restoration() {
 
     // Session A: init with known seed, create accounts
     let (addrs_a, _) = {
-        let (token, handle, _am) = spawn_test_server(DET_PORT).await;
+        let (token, handle, auth_manager) = spawn_test_server(DET_PORT).await;
         let r = call(
             DET_PORT,
             &token,
@@ -191,6 +191,9 @@ async fn deterministic_seed_restoration() {
         )
         .await;
         assert_ok(&r, "vault.initialize (A)");
+        // SECURITY (H1): init no longer auto-unlocks; create_account is gated
+        // on BiometricUnlocked, so the harness must unlock explicitly.
+        let _ = auth_manager.try_biometric();
 
         let b = assert_ok(
             &call(
@@ -241,7 +244,7 @@ async fn deterministic_seed_restoration() {
 
     // Session B: new server port, SAME seed
     let (addrs_b, _) = {
-        let (token, handle, _am) = spawn_test_server(DET_PORT + 1).await;
+        let (token, handle, auth_manager) = spawn_test_server(DET_PORT + 1).await;
         let r = call(
             DET_PORT + 1,
             &token,
@@ -250,6 +253,9 @@ async fn deterministic_seed_restoration() {
         )
         .await;
         assert_ok(&r, "vault.initialize (B)");
+        // SECURITY (H1): init no longer auto-unlocks; create_account is gated
+        // on BiometricUnlocked, so the harness must unlock explicitly.
+        let _ = auth_manager.try_biometric();
 
         let b = assert_ok(
             &call(

@@ -64,6 +64,21 @@ pub struct FeeEstimate {
     pub unit: String,
 }
 
+/// A request to build, sign and broadcast a payment.
+///
+/// `amount` is in the chain's smallest unit (satoshi for UTXO chains, wei for
+/// EVM) so float rounding can never reach a transaction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxRequest {
+    pub from: String,
+    pub to: String,
+    pub amount: u128,
+    /// Fixed fee rate: sat/vB for UTXO chains, gwei for EVM.
+    pub fee_rate: Option<f64>,
+    /// Human fee level used when no explicit rate is given: "low" | "normal" | "high".
+    pub fee_level: Option<String>,
+}
+
 /// Capabilities a plugin can advertise.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Capability {

@@ -154,6 +154,7 @@ pub fn run() {
             commands::simulate_and_send,
             commands::simulate_transfer,
             commands::launch_ipc_server,
+            commands::get_ipc_auth_token,
             // Isolation Pattern
             commands::__get_isolation_key,
             commands::isolation_invoke,
@@ -184,6 +185,9 @@ pub fn run() {
             commands::check_for_updates,
             // Debug Report
             commands::generate_debug_report,
+            // H4-A Approval gating
+            commands::approval_list,
+            commands::approval_respond,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

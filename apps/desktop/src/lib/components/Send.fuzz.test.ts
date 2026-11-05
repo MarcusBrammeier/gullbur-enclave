@@ -28,6 +28,7 @@ vi.mock('../vault.svelte.ts', () => ({
   validateAddress: (...args: any[]) => validateAddressMock(...args),
   estimateFee: (...args: any[]) => estimateFeeMock(...args),
   signTransaction: vi.fn(),
+  sendTransaction: vi.fn(),
   broadcastTransaction: vi.fn(),
   simulateTransfer: vi.fn(),
   getAccountLabel: () => null,

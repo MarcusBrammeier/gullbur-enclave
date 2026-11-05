@@ -48,23 +48,27 @@ impl SessionKeyModule {
     /// Generates a real ed25519 keypair via crypto-core and stores the
     /// public key in the returned `SessionKey`. The private key is held
     /// by the caller (vault-core) for signing.
-    pub fn create_session(permissions: SessionPermissions, duration_secs: u64) -> SessionKey {
+    ///
+    /// Returns an error if the OS CSPRNG fails rather than panicking.
+    pub fn create_session(
+        permissions: SessionPermissions,
+        duration_secs: u64,
+    ) -> Result<SessionKey, crypto_core::CryptoError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
 
         // Generate a real ed25519 keypair for this session
-        let seed = crypto_core::keys::generate_seed();
-        let key_handle = crypto_core::keys::derive_ed25519_key(seed.as_slice(), 0)
-            .expect("ed25519 key derivation from fresh seed must succeed");
+        let seed = crypto_core::keys::generate_seed()?;
+        let key_handle = crypto_core::keys::derive_ed25519_key(seed.as_slice(), 0)?;
 
-        SessionKey {
+        Ok(SessionKey {
             key_id: uuid_v4(),
             public_key: key_handle.public_key,
             permissions,
             expires_at: now.saturating_add(duration_secs),
-        }
+        })
     }
 
     /// Validate whether a session key can sign a given transaction.
@@ -144,8 +148,7 @@ mod tests {
             max_value_per_tx: "1000000000000000000".into(),
             allowed_methods: vec![],
         };
-        let key = SessionKeyModule::create_session(perms, 3600);
-        // Verify key_id format (UUID-like)
+        let key = SessionKeyModule::create_session(perms, 3600).expect("test invariant");
         assert!(
             key.key_id.contains('-'),
             "key_id should be UUID-like: {}",
@@ -173,7 +176,7 @@ mod tests {
             max_value_per_tx: "1000000000000000000".into(),
             allowed_methods: vec![],
         };
-        let key = SessionKeyModule::create_session(perms, 3600);
+        let key = SessionKeyModule::create_session(perms, 3600).expect("test invariant");
         let tx = SessionTx {
             to: "0xContract".into(),
             value: "1000".into(),
@@ -191,7 +194,7 @@ mod tests {
             max_value_per_tx: "1000000000000000000".into(),
             allowed_methods: vec![],
         };
-        let key = SessionKeyModule::create_session(perms, 3600);
+        let key = SessionKeyModule::create_session(perms, 3600).expect("test invariant");
         let tx = SessionTx {
             to: "0xOther".into(),
             value: "1000".into(),
@@ -210,7 +213,7 @@ mod tests {
             allowed_methods: vec![],
         };
         // Create session with 0 duration — expires_at == now
-        let key = SessionKeyModule::create_session(perms, 0);
+        let key = SessionKeyModule::create_session(perms, 0).expect("test invariant");
         let tx = SessionTx {
             to: "0xContract".into(),
             value: "1000".into(),

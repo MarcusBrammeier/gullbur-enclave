@@ -102,3 +102,30 @@ export function getNetworkBadge(networkId: string): BadgeInfo {
       return { label: networkId.toUpperCase(), color: 'bg-gray-600 text-gray-100' };
   }
 }
+
+// ── Amount conversion ───────────────────────────────────────────────────────
+
+/** Base-unit decimals for a network id (satoshi / wei / piconero). */
+export function decimalsForNetwork(networkId: string): number {
+  if (networkId.startsWith('bitcoin') || networkId.startsWith('litecoin')) return 8;
+  if (networkId.startsWith('monero')) return 12;
+  return 18; // EVM family
+}
+
+/**
+ * Convert a human decimal string to an integer string in the chain's base unit.
+ *
+ * Uses BigInt, never floats: `0.1 + 0.2` problems must not reach a signature.
+ * Returns null rather than rounding when the input has more precision than the
+ * chain supports.
+ */
+export function toBaseUnits(decimal: string, decimals: number): string | null {
+  const s = decimal.trim();
+  if (!/^\d*(\.\d*)?$/.test(s) || s === '' || s === '.') return null;
+  const [whole = '0', frac = ''] = s.split('.');
+  if (frac.length > decimals) return null;
+  const padded = frac.padEnd(decimals, '0');
+  const scale = 10n ** BigInt(decimals);
+  const value = BigInt(whole === '' ? '0' : whole) * scale + BigInt(padded === '' ? '0' : padded);
+  return value.toString();
+}

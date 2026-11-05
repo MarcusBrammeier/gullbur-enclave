@@ -1,11 +1,22 @@
 /**
  * IPC Client — connects to the vault-core WebSocket server.
  *
- * SECURITY: Uses AES-256-GCM via WASM crypto blob for all messages.
- * The session key is exchanged with the server after auth.
+ * SECURITY (C3-A, zero-trust key isolation): all cryptography — the per-session
+ * AES-256-GCM key and the WASM encrypt/decrypt — lives inside an isolated
+ * sandboxed Web Worker (`ipcWorker.ts`). The worker opens and owns the
+ * WebSocket, receives the session key directly from the server, and encrypts/
+ * decrypts every frame. This class NEVER holds the session key and never runs
+ * encrypt/decrypt in main-window JS; it only relays serialized JSON-RPC
+ * requests to the worker and surfaces the worker's decrypted responses.
+ *
+ * Public API (connect / call / disconnect / onAuthRequired) is unchanged so
+ * callers (vault.svelte.ts, MockIpcClient) are unaffected.
  */
 
-import init, { encrypt, decrypt } from './wasm/crypto_wasm.js';
+import type {
+  WorkerInboundMessage,
+  WorkerOutboundMessage,
+} from './ipcWorker';
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -21,16 +32,25 @@ export interface JsonRpcResponse {
   id: number;
 }
 
+export interface WorkerResponseMsg {
+  type: 'response';
+  id: number;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+}
+
+type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
+
 export class IpcClient {
-  private ws: WebSocket | null = null;
+  private worker: Worker | null = null;
   private nextId = 1;
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<number, Pending>();
   /** Callback for auth errors — called when -32002 is received */
   onAuthRequired?: () => void;
-  private sessionKey: string | null = null;
-  private wasmReady = false;
   private connectResolve: ((value: void) => void) | null = null;
   private connectReject: ((reason: Error) => void) | null = null;
+  private connected = false;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Timeout (ms) for the WebSocket connection attempt */
   private static readonly CONNECT_TIMEOUT_MS = 5_000;
 
@@ -51,146 +71,125 @@ export class IpcClient {
     } catch {}
   }
 
-  async connect(port?: number): Promise<void> {
-    this.dbg(`connect() called, port=${port}, wasmReady=${this.wasmReady}`);
-    // Initialize WASM crypto module with a timeout — the WASM file may not
-    // load from the tauri:// asset protocol in AppImage/bundled builds.
-    // If WASM hangs or fails, fall back to plaintext IPC (encryption is
-    // skipped on loopback connections and the server accepts both modes).
-    if (!this.wasmReady) {
-      try {
-        this.dbg('WASM init starting...');
-        await Promise.race([
-          init(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('WASM crypto init timed out after 3s')), 3_000)
-          ),
-        ]);
-        this.wasmReady = true;
-        this.dbg('WASM init OK');
-      } catch (e) {
-        console.warn('[ipc] WASM crypto init failed/timed out — falling back to plaintext IPC');
-        this.dbg(`WASM init FAIL: ${e instanceof Error ? e.message : String(e)}`);
-        this.wasmReady = false;
-      }
+  private clearConnectTimer(): void {
+    if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
+  }
+
+  /** Reject the in-flight connect (worker boot failure, timeout, crash). */
+  private failConnect(e: Error): void {
+    this.clearConnectTimer();
+    const rejectFn = this.connectReject;
+    this.connectResolve = null;
+    this.connectReject = null;
+    this.worker?.terminate();
+    this.worker = null;
+    this.connected = false;
+    rejectFn?.(e);
+  }
+
+  async connect(port?: number, authToken?: string): Promise<void> {
+    if (typeof Worker === 'undefined') {
+      // Fail closed: no Worker support means no isolated crypto.
+      this.dbg('Worker is unavailable in this runtime — refusing to connect');
+      throw new Error(
+        'Encrypted IPC unavailable: worker isolation is not supported in this runtime. ' +
+        'Refusing to connect over plaintext.'
+      );
     }
 
+    this.dbg(`connect() called, port=${port}`);
+    this.connected = false;
+
+    // 1. Spawn the isolated worker and wire its message bus.
+    //    The worker initializes WASM and opens the WebSocket.
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./ipcWorker.ts', import.meta.url), { type: 'module' });
+    } catch (e) {
+      this.dbg(`Worker spawn failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(
+        'Encrypted IPC unavailable: failed to start isolated crypto worker. ' +
+        'Refusing to connect over plaintext.'
+      );
+    }
+    this.worker = worker;
+
     return new Promise((resolve, reject) => {
-      this.dbg('Opening new Promise for WebSocket connect...');
       this.connectResolve = resolve;
       this.connectReject = reject;
 
       const wsPort = port ?? 19876;
-      const wsUrl = `ws://127.0.0.1:${wsPort}`;
-      this.dbg(`Creating WebSocket to ${wsUrl}...`);
-      this.ws = new WebSocket(wsUrl);
 
-      // Force-reject the promise if the WebSocket doesn't handshake in time
-      const timer = setTimeout(() => {
-        this.dbg('CONNECT TIMEOUT — 5000ms elapsed, no session_key received');
-        this.ws?.close();
-        this.ws = null;
-        this.connectResolve = null;
-        this.connectReject = null;
-        reject(new Error(`WebSocket connect timed out after ${IpcClient.CONNECT_TIMEOUT_MS}ms`));
+      // Force-reject if the worker doesn't report key exchange in time.
+      this.connectTimer = setTimeout(() => {
+        this.dbg('CONNECT TIMEOUT — no session_key received');
+        this.failConnect(
+          new Error(`WebSocket connect timed out after ${IpcClient.CONNECT_TIMEOUT_MS}ms`)
+        );
       }, IpcClient.CONNECT_TIMEOUT_MS);
 
-      this.ws.onopen = () => {
-        this.dbg('WebSocket onopen fired, sending hello...');
-        // On localhost, skip auth token — the IPC server trusts loopback.
-        // The frontend sends a simple "hello" to trigger session key exchange.
-        this.ws!.send(JSON.stringify({ type: "hello" }));
-        this.log('send', 'hello', '', false);
-      };
-
-      this.ws.onmessage = (event) => {
-        this.dbg(`onmessage: ${event.data.slice(0, 80)}${event.data.length > 80 ? '...' : ''}`);
-        try {
-          const msg = JSON.parse(event.data);
-
-          // ── Session key exchange ────────────────────────────────────
-          if (msg.type === "session_key" && msg.key) {
-            this.sessionKey = msg.key;
-            this.log('receive', 'session_key', 'key exchanged', false);
-            clearTimeout(timer);
-            const resolve = this.connectResolve;
+      worker.onmessage = (event: MessageEvent) => {
+        const msg = event.data as WorkerOutboundMessage;
+        switch (msg.type) {
+          case 'key_ready':
+            this.clearConnectTimer();
+            const resolveFn = this.connectResolve;
             this.connectResolve = null;
             this.connectReject = null;
-            resolve?.();
-            return;
-          }
-
-          // ── Encrypted response ──────────────────────────────────────
-          if (msg.__encrypted__ && this.sessionKey) {
-            const payloadJson = JSON.stringify(msg.__payload__);
-            const decryptedStr = decrypt(this.sessionKey, payloadJson);
-            const inner: JsonRpcResponse = JSON.parse(decryptedStr);
-
-            const pending = this.pending.get(inner.id);
-            if (pending) {
-              this.pending.delete(inner.id);
-              if (inner.error) {
-                if (inner.error.code === -32002) {
-                  this.onAuthRequired?.();
-                }
-                pending.reject(new Error(inner.error.message));
-              } else {
-                pending.resolve(inner.result);
-              }
-            }
-            return;
-          }
-
-          // ── Plain response (fallback / initial key exchange) ────────
-          const plain: JsonRpcResponse = msg;
-          const pending = this.pending.get(plain.id);
-          if (pending) {
-            this.pending.delete(plain.id);
-            if (plain.error) {
-              pending.reject(new Error(plain.error.message));
-            } else {
-              pending.resolve(plain.result);
-            }
-          }
-        } catch {
-          // Ignore non-JSON messages
+            this.connected = true;
+            this.dbg('Worker received session key — connection established');
+            resolveFn?.();
+            break;
+          case 'connect_failed':
+            this.failConnect(new Error(msg.message));
+            break;
+          case 'status':
+            if (msg.state === 'closed') this.connected = false;
+            break;
+          case 'auth_required':
+            try { this.onAuthRequired?.(); } catch { /* callback is best-effort */ }
+            break;
+          case 'response':
+            this.handleResponse(msg);
+            break;
         }
       };
-
-      this.ws.onerror = () => {
-        this.dbg('WebSocket onerror fired');
-        clearTimeout(timer);
-        const reject = this.connectReject;
-        this.connectResolve = null;
-        this.connectReject = null;
-        reject?.(new Error("WebSocket connection failed"));
+      worker.onerror = (e) => {
+        this.dbg(`Worker onerror: ${e.message}`);
+        this.failConnect(new Error(`IPC crypto worker crashed: ${e.message}`));
       };
 
-      this.ws.onclose = () => {
-        this.dbg('WebSocket onclose fired');
-        clearTimeout(timer);
-        for (const [, p] of this.pending) {
-          p.reject(new Error("Connection closed"));
-        }
-        this.pending.clear();
-        const reject = this.connectReject;
-        this.connectResolve = null;
-        this.connectReject = null;
-        reject?.(new Error("Connection closed before session key exchange"));
-      };
+      const connectMsg: WorkerInboundMessage = { type: 'connect', port: wsPort, token: authToken ?? '' };
+      this.sendToWorker(connectMsg);
+      this.dbg(`Sent connect to worker for ws://127.0.0.1:${wsPort}`);
     });
   }
 
+  private handleResponse(msg: WorkerResponseMsg): void {
+    if (msg.error) {
+      const pending = this.pending.get(msg.id);
+      if (pending) {
+        this.pending.delete(msg.id);
+        pending.reject(new Error(msg.error.message));
+      }
+      return;
+    }
+    const pending = this.pending.get(msg.id);
+    if (pending) {
+      this.pending.delete(msg.id);
+      pending.resolve(msg.result);
+    }
+  }
+
   async call(method: string, params: unknown = {}): Promise<unknown> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.connected || !this.worker) {
+      this.log('receive', method, 'Not connected to vault', true);
       throw new Error("Not connected to vault");
     }
 
     const id = this.nextId++;
-    const request: JsonRpcRequest = { jsonrpc: "2.0", method, params, id };
 
     return new Promise((resolve, reject) => {
-      // Log response when settled
       const origResolve = resolve;
       const origReject = reject;
       this.pending.set(id, {
@@ -204,28 +203,30 @@ export class IpcClient {
         },
       });
 
-      if (this.sessionKey && this.wasmReady) {
-        // Encrypt the JSON-RPC request before sending.
-        const requestJson = JSON.stringify(request);
-        const encryptedPayloadStr = encrypt(this.sessionKey, requestJson);
-        const encryptedPayload = JSON.parse(encryptedPayloadStr);
-        this.ws!.send(
-          JSON.stringify({
-            __encrypted__: true,
-            __payload__: encryptedPayload,
-          })
-        );
-      } else {
-        // No session key yet — send plain (shouldn't happen after connect).
-        this.ws!.send(JSON.stringify(request));
-      }
+      // The worker owns encryption + the socket; we only relay the plaintext
+      // JSON-RPC request. sessionKey never exists on this thread.
+      const sendMsg: WorkerInboundMessage = { type: 'call', id, method, params };
+      this.sendToWorker(sendMsg);
       this.log('send', method, JSON.stringify(params).slice(0, 120), false);
     });
   }
 
   disconnect(): void {
-    this.ws?.close();
-    this.ws = null;
-    this.sessionKey = null;
+    this.sendToWorker({ type: 'disconnect' });
+    this.worker?.terminate();
+    this.worker = null;
+    this.connected = false;
+    this.clearConnectTimer();
+    this.connectResolve = null;
+    this.connectReject = null;
+    for (const [, p] of this.pending) {
+      p.reject(new Error("Connection closed"));
+    }
+    this.pending.clear();
+  }
+
+  private sendToWorker(msg: WorkerInboundMessage): void {
+    if (!this.worker) throw new Error("Not connected to vault");
+    this.worker.postMessage(msg);
   }
 }

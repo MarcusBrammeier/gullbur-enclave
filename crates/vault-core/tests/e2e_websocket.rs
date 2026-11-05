@@ -78,9 +78,10 @@ const TEST_PORT: u16 = 19877;
 
 #[tokio::test]
 async fn e2e_all_10_methods_via_websocket() {
-    let server = ipc_core::server::IpcServer::new(TEST_PORT).expect("create IpcServer");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(TEST_PORT, false).expect("create IpcServer");
     let token_path = server.auth_token_path().to_path_buf();
-    let auth_token = std::fs::read_to_string(&token_path).expect("read auth token");
+    let auth_token = server.auth_token().to_string();
 
     let auth_manager = Arc::new(AuthManager::new());
     {
@@ -149,6 +150,9 @@ async fn e2e_all_10_methods_via_websocket() {
         )
         .await;
     WsClient::assert_ok(&r, "vault.initialize");
+    // SECURITY (H1): init no longer auto-unlocks; create_account is gated on
+    // BiometricUnlocked — unlock explicitly.
+    let _ = auth_manager.try_biometric();
 
     // 5b. Disable testnet-only — this E2E creates a mainnet bitcoin account.
     let r = client

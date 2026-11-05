@@ -327,6 +327,32 @@ impl PluginHost {
             .await
     }
 
+    /// Construct an unsigned transaction for a payment request.
+    pub async fn build_transaction(
+        &self,
+        request: &wallet_plugin::TxRequest,
+        network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        self.ensure_testnet_ok(network)?;
+        let plugin = self
+            .resolve(network)
+            .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
+        plugin.build_transaction(request, network).await
+    }
+
+    /// Turn a signed transaction into broadcastable bytes.
+    pub async fn finalize_transaction(
+        &self,
+        signed: &[u8],
+        network: &str,
+    ) -> Result<Vec<u8>, PluginError> {
+        self.ensure_testnet_ok(network)?;
+        let plugin = self
+            .resolve(network)
+            .ok_or_else(|| PluginError::UnsupportedNetwork(network.to_string()))?;
+        plugin.finalize_transaction(signed, network).await
+    }
+
     pub async fn broadcast_transaction(
         &self,
         signed_tx: &[u8],
@@ -511,10 +537,11 @@ impl PluginHost {
             .unwrap_or(3600);
 
         // Generate a fresh k256 keypair for this session.
-        // derives a generic secp256k1 session key from the 32-byte seed (NOT a
-        // BIP-44 eth key, which would change the session-key material) — so the
-        // deprecated helper is deliberately retained here. See deprecation note.
-        let seed = crypto_core::keys::generate_seed();
+        // Derivation from the ephemeral seed is intentional (not BIP-44 —
+        // this is a transient session key, not a wallet account), so the
+        // deprecated HMAC-based helper is used deliberately.
+        let seed = crypto_core::keys::generate_seed()
+            .map_err(|e| PluginError::Internal(format!("Session key generation failed: {e}")))?;
         let mut seed_bytes = [0u8; 32];
         seed_bytes.copy_from_slice(seed.as_slice());
         #[allow(deprecated)]

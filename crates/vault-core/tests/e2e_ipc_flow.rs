@@ -18,8 +18,10 @@ const TEST_PORT: u16 = 19990;
 
 #[tokio::test]
 async fn e2e_plaintext_connect_and_generate_mnemonic() {
-    let server = ipc_core::server::IpcServer::new(TEST_PORT).expect("create IPC server");
+    let server =
+        ipc_core::server::IpcServer::with_encryption(TEST_PORT, false).expect("create IPC server");
     let token_path = server.auth_token_path().to_path_buf();
+    let auth_token = std::fs::read_to_string(&token_path).expect("read auth token");
 
     {
         let mut handler = server.handler().await;
@@ -40,9 +42,12 @@ async fn e2e_plaintext_connect_and_generate_mnemonic() {
         .expect("WebSocket connect");
     let (mut write, mut read) = ws.split();
 
-    // Hello handshake (loopback trust)
+    // Hello handshake WITH the one-time auth token (SECURITY H2: the server
+    // refuses a bare loopback hello without it).
     write
-        .send(Message::Text(r#"{"type":"hello"}"#.into()))
+        .send(Message::Text(
+            format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+        ))
         .await
         .expect("send hello");
 

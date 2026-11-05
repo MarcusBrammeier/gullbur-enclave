@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rand::Rng;
+use subtle::ConstantTimeEq;
 use tokio::sync::RwLock;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
@@ -10,6 +11,13 @@ use tracing::{error, info, warn};
 
 use crate::error::IpcError;
 use crate::handler::MessageHandler;
+
+/// Compare two auth tokens in constant time to avoid a timing side-channel
+/// that a local attacker could use to byte-by-byte brute-force the 256-bit
+/// one-time token over loopback.
+fn constant_time_token_eq(a: &str, b: &str) -> bool {
+    a.as_bytes().ct_eq(b.as_bytes()).into()
+}
 
 /// WebSocket IPC server bound to 127.0.0.1 with one-time token auth.
 ///
@@ -95,6 +103,14 @@ impl IpcServer {
     /// Returns the path to the token file.
     pub fn auth_token_path(&self) -> &Path {
         &self.token_path
+    }
+
+    /// Returns a reference to the one-time auth token (H2: used to deliver the
+    /// token to the trusted frontend via a Tauri command so the desktop client
+    /// authenticates like any other client instead of relying on a loopback hello
+    /// bypass).
+    pub fn auth_token(&self) -> &str {
+        &self.auth_token
     }
 
     /// Returns a mutable reference to the `MessageHandler` for registration.
@@ -192,27 +208,41 @@ impl IpcServer {
                     match auth_result {
                         Ok(Some(Ok(Message::Text(token)))) => {
                             let token_str = token.to_string().trim().to_string();
-                            // Accept auth token OR hello handshake from localhost (127.0.0.1, ::1)
-                            let is_loopback = peer.ip().is_loopback();
-                            // Parse hello structurally (JSON) so whitespace/field-order
-                            // variations from any client are accepted, not just the exact
-                            // compact string the Svelte frontend happens to emit.
-                            let is_hello = serde_json::from_str::<serde_json::Value>(&token_str)
-                                .ok()
-                                .and_then(|v| {
-                                    v.get("type").and_then(|t| t.as_str()).map(|s| s == "hello")
-                                })
-                                .unwrap_or(false);
-                            if token_str == auth_token {
-                                // Authenticated with token — proceed
-                            } else if is_loopback && is_hello {
-                                // Localhost hello — trust loopback, skip token auth
+                            // SECURITY (H2): require the one-time token for production
+                            // (encrypted) servers — even from loopback, which prevents a
+                            // same-host process from invoking the full vault API without
+                            // the trusted frontend's token.
+                            //
+                            // PLAINTEXT EXCEPTION: when `encrypt == false` (headless
+                            // no_encrypt CLI harness), loopback is trusted without a token.
+                            // The plaintext path offers no confidentiality anyway, and the
+                            // CLI harness has no way to receive a persisted token. This
+                            // keeps the production encrypted server strict while letting the
+                            // internal headless test harness authenticate locally.
+                            if encrypt {
+                                let parsed: Option<serde_json::Value> =
+                                    serde_json::from_str(&token_str).ok();
+                                // A hello may carry the token in a `token` field.
+                                let hello_token = parsed.as_ref().and_then(|v| {
+                                    v.get("type")
+                                        .and_then(|t| t.as_str())
+                                        .filter(|t| *t == "hello")?;
+                                    v.get("token").and_then(|t| t.as_str())
+                                });
+                                let presented = hello_token.unwrap_or(&token_str);
+
+                                if !constant_time_token_eq(presented, &auth_token) {
+                                    warn!(
+                                        "Bad/missing auth token from {peer} (loopback hello without token is refused)"
+                                    );
+                                    let _ = write.send(Message::Text("auth-failed".into())).await;
+                                    return;
+                                }
                             } else {
-                                warn!("Bad auth token from {peer}");
-                                let _ = tokio_tungstenite::tungstenite::Message::Text(
-                                    "auth-failed".into(),
+                                // Plaintext no_encrypt mode: loopback hello is trusted.
+                                info!(
+                                    "Loopback connection from {peer} (plaintext no_encrypt — trusted without token)"
                                 );
-                                return;
                             }
                         }
                         Ok(Some(Err(e))) => {
@@ -294,6 +324,31 @@ impl IpcServer {
                                             continue;
                                         }
                                     }
+                                } else if encrypt {
+                                    // FAIL CLOSED (H3): the server was started with encryption
+                                    // enabled. Accepting a plaintext JSON-RPC request would let a
+                                    // loopback caller bypass the AES-GCM session and read/write
+                                    // every payload (balances, tx hex, addresses, even the
+                                    // mnemonic). Only the unauthenticated session-key exchange
+                                    // (a bare `{"type":"session_key"}` prefixed at connect) is
+                                    // legitimate in plaintext. Anything else is a protocol
+                                    // violation — reject the connection.
+                                    warn!(
+                                        "Refusing plaintext JSON-RPC request from {peer} on an encrypted server (fail-closed H3)"
+                                    );
+                                    let resp = ipc_protocol::JsonRpcError::new(
+                                        ipc_protocol::RpcError::new(
+                                            -32001,
+                                            "encrypted IPC required; plaintext refused",
+                                        ),
+                                        0,
+                                    );
+                                    if let Ok(json) = serde_json::to_string(&resp) {
+                                        let _ = write.send(Message::Text(json.into())).await;
+                                    }
+                                    // Close the connection — do not continue processing.
+                                    let _ = write.send(Message::Close(None)).await;
+                                    return;
                                 } else {
                                     was_encrypted = false;
                                     raw_value

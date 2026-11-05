@@ -84,7 +84,9 @@ fn register(handler: &mut ipc_core::handler::MessageHandler, auth_manager: Arc<A
 }
 
 async fn spawn_server(port: u16) -> WsClient {
-    let server = IpcServer::new(port).expect("create IpcServer");
+    // Plaintext test server (explicit with_encryption(false) — the default
+    // IpcServer::new() is now encrypted + fail-closed on plaintext).
+    let server = IpcServer::with_encryption(port, false).expect("create IpcServer");
     let token_path = server.auth_token_path().to_path_buf();
     let auth_token = std::fs::read_to_string(&token_path).expect("read auth token");
     let auth_manager = Arc::new(AuthManager::new());

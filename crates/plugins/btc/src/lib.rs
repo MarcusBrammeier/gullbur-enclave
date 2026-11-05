@@ -4,6 +4,7 @@
 // BIP84 (Native SegWit / P2WPKH) derivation, PSBT parsing,
 // and address validation. Network-dependent stubs for RPC ops.
 
+pub mod build;
 pub mod plugin;
 
 pub use plugin::BtcPlugin;

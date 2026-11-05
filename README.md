@@ -1,10 +1,10 @@
 # Gullbúr Enclave
 
-A **source-available** multi-chain cryptocurrency wallet — built in Rust with zero unsafe code. **Becomes fully open-source (FOSS) at v1.0.**
+A **source-available** multi-chain cryptocurrency wallet — built in Rust (one `unsafe` block, for `TMPDIR` at startup). **Becomes fully open-source (FOSS) at v1.0.**
 
 **Self-custody. Private. Multi-Chain.** Bitcoin, Ethereum, Monero, and Litecoin — one vault, your keys, your control.
 
-[Download the latest release](https://github.com/MarcusBrammeier/gullbur-enclave/releases) · [Report a bug](https://github.com/MarcusBrammeier/gullbur-enclave/issues/new)
+**No public build has been published yet** — the first release lands with the send path. · [Report a bug](https://github.com/MarcusBrammeier/gullbur-enclave/issues/new)
 
 ---
 
@@ -34,6 +34,9 @@ release). Read the license for the exact terms.
 | **Linux** x86_64 | `.deb` | *(CI build)* |
 | **macOS** arm64 | `.dmg` | *(CI build)* |
 
+> **These are not published yet.** No release has been cut, so the table above describes the planned
+> artifacts, not downloadable files. The first release will be tagged once the in-app send path works.
+
 Android APK installs as a standalone app — no desktop companion needed.
 
 ---
@@ -51,13 +54,12 @@ Gullbúr Enclave is a multi-chain cryptocurrency wallet that runs multiple block
 - **Biometric unlock** — TouchID / Windows Hello / Android fingerprint
 - **FIDO2 YubiKey** — optional hardware gating for high-value operations
 - **Tor support** — optional SOCKS5 routing for all RPC traffic
-- **Desktop + mobile** — Tauri desktop shell, Android APK
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────┐
-│              Desktop / Mobile                │
+│              Desktop / Mobile           │
 ├──────────────────────────────────────────────┤
 │             IPC WebSocket Layer               │
 ├──────────┬──────────┬───────────────────────┤
@@ -82,9 +84,7 @@ Gullbúr Enclave is a multi-chain cryptocurrency wallet that runs multiple block
 
 ## Quick Start
 
-> This repository ships the open-source desktop GUI (Linux / macOS) and the
-> Android app. It does not include internal or non-FOSS build tooling; follow
-> the build instructions below to compile the desktop app.
+> desktop GUI (Linux / macOS) or the Android app.
 
 ```bash
 # Build + run the app
@@ -106,11 +106,10 @@ Built with Rust 2024 edition. Requires nightly for fuzzing.
 
 **Beta.** Core crypto works across all 4 chains. **Testnet-only mode is on by default** — mainnet access requires an explicit opt-in warning, so no real funds are at risk during beta. This is a deliberate early release for community development: the codebase is published before every testnet proof and the audit are complete, and known gaps are tracked openly on the [issues page](https://github.com/MarcusBrammeier/gullbur-enclave/issues).
 
-> **⚠️ GUI overhaul planned before 1.0.** The current desktop/mobile interface is a functional work-in-progress. A **full GUI overhaul** is planned for a later beta before the 1.0 release. Community UX feedback during beta directly informs it.
-
 > **Testnet validation status (see [TESTING.md](TESTING.md)):**
-> - ✅ **Broadcast + public-chain relay proven:** Bitcoin testnet4 and EVM Sepolia (confirmed on-chain).
-> - ✅ **Monero wallet-rpc (balance/history)** works against a local synced stagenet node.
+> - ✅ **Signing and relay proven at the harness level:** an integration test that hand-builds a raw transaction broadcasts successfully on Bitcoin testnet4 and EVM Sepolia (confirmed on-chain).
+> - ⚠️ **Sending is partially wired.** A build → sign → finalise → broadcast path now exists for Bitcoin (`vault.send_transaction`), verified by tests that assert a spendable witness, but **not yet proven on a funded testnet run**. LTC and EVM still lack a transaction builder. Until those land, treat the harness proofs above as statements about the signer and the relay.
+> - ✅ **Monero wallet-rpc (balance/history)** works against a local synced stagenet node. Monero signing is disabled pending a real spend-path implementation.
 > - 🟡 **LTC public testnet relay** awaits any testnet LTC at our address (all public faucets currently dead). Signing/broadcast logic is proven on a local regtest node.
 > - 🟡 **A third-party security audit** has not yet been performed; see [SECURITY.md](SECURITY.md).
 

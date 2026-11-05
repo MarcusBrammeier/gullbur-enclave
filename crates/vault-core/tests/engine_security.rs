@@ -22,18 +22,24 @@ use vault_core::approval::ApprovalQueue;
 use vault_core::host::PluginHost;
 use vault_core::ipc_handlers;
 
-const SEC_PORT: u16 = 19994;
+const SEC_PORT: u16 = 20004;
 
 /// A live IPC server harness shared by all tests.
 struct Harness {
     port: u16,
     token_path: std::path::PathBuf,
+    auth_token: String,
 }
 
 impl Harness {
     async fn new(port: u16) -> Self {
-        let server = ipc_core::server::IpcServer::new(port).expect("create IPC server");
+        // Plaintext test server (explicit with_encryption(false) — the default
+        // IpcServer::new() is encrypted + fail-closed on plaintext, which would
+        // reject the raw probe frames these tests send).
+        let server =
+            ipc_core::server::IpcServer::with_encryption(port, false).expect("create IPC server");
         let token_path = server.auth_token_path().to_path_buf();
+        let auth_token = server.auth_token().to_string();
         {
             let mut handler = server.handler().await;
             let ph = Arc::new(RwLock::new(PluginHost::new()));
@@ -46,7 +52,11 @@ impl Harness {
         }
         let (_handle, _ready) = server.run();
         tokio::time::sleep(Duration::from_millis(200)).await;
-        Self { port, token_path }
+        Self {
+            port,
+            token_path,
+            auth_token,
+        }
     }
 
     /// Send a raw text frame and return the raw response text (or None on close).
@@ -55,9 +65,12 @@ impl Harness {
             .await
             .expect("connect");
         let (mut write, mut read) = ws.split();
-        // Hello handshake
+        // Hello handshake WITH the one-time token (H2).
+        let auth_token = self.auth_token.clone();
         write
-            .send(Message::Text(r#"{"type":"hello"}"#.into()))
+            .send(Message::Text(
+                format!(r#"{{"type":"hello","token":"{auth_token}"}}"#).into(),
+            ))
             .await
             .ok()?;
         let _ = read.next().await; // session_key
@@ -78,7 +91,10 @@ async fn malformed_json_returns_error_not_crash() {
     let h = Harness::new(SEC_PORT).await;
     let resp = h.send_raw("not json at all").await;
     // Server should respond with a parse error JSON, not crash/close.
-    assert!(resp.is_some(), "server must respond to malformed JSON");
+    assert!(
+        resp.is_some(),
+        "server must respond to malformed JSON, got: {resp:?}"
+    );
     let v: serde_json::Value = serde_json::from_str(&resp.unwrap()).expect("valid json error");
     assert_eq!(v["error"]["code"], -32700, "parse error code: {v}");
     let _ = std::fs::remove_file(&h.token_path);
