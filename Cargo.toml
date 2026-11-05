@@ -51,7 +51,7 @@ base58ck = ">=0.1,<0.2"
 serde = { version = ">=1,<2", features = ["derive"] }
 serde_json = ">=1,<2"
 tokio = { version = ">=1,<2", features = ["full"] }
-tokio-tungstenite = ">=0.27,<0.28"
+tokio-tungstenite = ">=0.27, <0.31"
 rand = ">=0.9,<0.10"
 keyring = { version = ">=3,<4" }
 thiserror = { version = ">=2,<3" }
