@@ -11,7 +11,7 @@ async-trait = { workspace = true }
 bitcoin = { workspace = true }
 base58ck = { workspace = true }
 crypto-core = { path = "../../crypto-core" }
-bech32 = { version = ">=0.11,<0.12" }
+bech32 = { version = ">=0.11, <0.13" }
 hex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
