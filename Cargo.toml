@@ -42,7 +42,7 @@ hmac = ">=0.12,<1"
 zeroize = { version = ">=1.8,<2", features = ["zeroize_derive"] }
 async-trait = ">=0.1,<1"
 k256 = { version = ">=0.14,<0.15", features = ["ecdsa", "schnorr"] }
-ed25519-dalek = { version = ">=2.2,<3" }
+ed25519-dalek = { version = ">=2.2, <4" }
 curve25519-dalek = { version = ">=4.1,<6" }
 bitcoin = { version = ">=0.32,<0.33", features = ["rand"] }
 bip39 = { version = ">=2.1,<3" }
